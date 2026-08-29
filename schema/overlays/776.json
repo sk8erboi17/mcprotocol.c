@@ -1,0 +1,7 @@
+{
+  "base_release": "26.1",
+  "packet_renames": {
+    "play:serverbound:spectate_entity": "spectator_action"
+  },
+  "release": "26.2"
+}

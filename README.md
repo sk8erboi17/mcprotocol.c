@@ -164,6 +164,30 @@ Available symmetric field codecs are:
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
 
+## Generated packet schemas
+
+`tools/schema_compiler.py` turns a pinned `minecraft-data` `protocol.json` into
+deterministic packet-ID constants, C structs and allocation-free body codecs in
+`generated/`. It rejects unsupported schema nodes instead of guessing or
+emitting an opaque remainder. Because the pinned `minecraft-data` checkout
+currently inherits 26.2 protocol data from 26.1, the reviewed wire-only delta
+is explicit in `schema/overlays/776.json`; it cannot become gameplay state.
+The initial vertical slice covers the 26.2
+`use_item` and `block_dig` packets used by Perry's canonical player-action
+tests; additional schema families can be added without moving gameplay
+semantics into this library.
+
+With `minecraft-data` checked out next to this repository:
+
+```sh
+make generate
+make test
+```
+
+Override `MINECRAFT_DATA_ROOT` or `SCHEMA_PROTOCOL_JSON` when the data checkout
+is elsewhere. Generated sources are checked in so downstream test binaries do
+not need Python or JSON at build/runtime.
+
 ### Send a command or chat packet
 
 The body for protocol 47 `chat` is one string:

@@ -1,0 +1,20 @@
+{
+  "catalog_validation_count": 251,
+  "generated_packets": [
+    {
+      "packet_id": 67,
+      "selector": "play:serverbound:use_item",
+      "type": "Mc776PlayServerboundUseItem"
+    },
+    {
+      "packet_id": 41,
+      "selector": "play:serverbound:block_dig",
+      "type": "Mc776PlayServerboundBlockDig"
+    }
+  ],
+  "generator_version": 1,
+  "overlay_sha256": "552856dafa54dd03f76a437f810043fc902187784dd24f77866159b996fd2e6b",
+  "packet_id_count": 257,
+  "protocol": 776,
+  "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"
+}
