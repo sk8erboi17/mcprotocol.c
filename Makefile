@@ -41,6 +41,7 @@ generate:
 test: tests/api_test tests/generated_test
 	./tests/api_test
 	./tests/generated_test
+	python3 tests/schema_compiler_test.py
 
 tests/api_test: tests/api_test.c api.c api.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 $(WARNINGS) -UNDEBUG \

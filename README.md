@@ -188,6 +188,20 @@ Override `MINECRAFT_DATA_ROOT` or `SCHEMA_PROTOCOL_JSON` when the data checkout
 is elsewhere. Generated sources are checked in so downstream test binaries do
 not need Python or JSON at build/runtime.
 
+For downstream multi-release suites, the same compiler accepts a pinned profile
+manifest and generates deterministic packet IDs, flat typed structs and codecs:
+
+```sh
+python3 tools/schema_compiler.py \
+  --minecraft-data ../minecraft-data \
+  --manifest ../consumer/schema_manifest.json \
+  --output ../consumer/generated
+```
+
+Add `--check` to reject missing, changed, or unexpected managed outputs. A
+manifest may use source-validated field overrides, integer constants, and the
+`single_attribute_no_modifiers` projection for a constrained attribute packet.
+
 ### Send a command or chat packet
 
 The body for protocol 47 `chat` is one string:
