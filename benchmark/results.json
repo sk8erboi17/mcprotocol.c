@@ -1,0 +1,486 @@
+{
+  "generated_at": "2026-08-29T18:26:44.694801+00:00",
+  "protocol": 47,
+  "comparison": {
+    "c": "mcprotocol.c working tree",
+    "node": "minecraft-protocol 1.68.0"
+  },
+  "method": {
+    "warmups": 2,
+    "repetitions": 7,
+    "order": "alternated by case and repetition",
+    "timing": "client-internal monotonic time; process and dependency loading excluded, client creation/login and protocol work included",
+    "validation": "the same loopback mock server validates every login packet and every keepalive token echoed by both implementations",
+    "c_compile_command": [
+      "cc",
+      "-O3",
+      "-DNDEBUG",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wconversion",
+      "-Wshadow",
+      "-Werror",
+      "-pthread",
+      "$ROOT/benchmark/c_client.c",
+      "$ROOT/api.c",
+      "-lz",
+      "-o",
+      "$BUILD/c_client"
+    ]
+  },
+  "environment": {
+    "system": "Darwin",
+    "release": "25.5.0",
+    "machine": "arm64",
+    "python": "3.14.6",
+    "node": "v26.7.0",
+    "npm": "11.19.0",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+  },
+  "sources": {
+    "api.c": "62ef8b8efd124c0914ed95ff2b8abcc720952464fde0bd6b6a415203d9502d5a",
+    "api.h": "3f0d3f19440094d03a6b513eeb3effafd9c6139da1e4895a857a920a84b7e2d8",
+    "benchmark/mock_server.c": "9b4f67af8ec586cd9eea33176fa55a9bcd08bf2cf5b5a7c010e0e4f3a19a6312",
+    "benchmark/c_client.c": "f38ecc231ec3f8f59f8a2593e344669b29deac6b9097ef864a9de35b3da75510",
+    "benchmark/node_client.js": "1e55299eabe5b26c4d13bf0217700343d6b94e2a8b7c8d470e0c12a749e04971",
+    "benchmark/package.json": "91a5d094e6b13c8ec31e258ae390ca6ee5d9a0b13625f13c0861ee6aeac0807c",
+    "benchmark/package-lock.json": "5327b44e07f02b2731e82ad3ec940b1018698e66ee7edaea7b9107f463382b8d",
+    "benchmark/run.py": "227eebb839b40864ba9e6aa4f6106ff2509c6a0e9bdeef3061e851041f775b32"
+  },
+  "cases": [
+    {
+      "id": "sequential_login",
+      "mode": "login",
+      "label": "Sequential offline login",
+      "clients": 32,
+      "messages": 1,
+      "operation": "completed login sessions",
+      "operations_per_run": 32,
+      "warmup_samples": {
+        "mcprotocol.c": [
+          {
+            "elapsed_ns": 5133000,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 5993000,
+            "operations": 32
+          }
+        ],
+        "node-minecraft-protocol": [
+          {
+            "elapsed_ns": 592324709,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 589373833,
+            "operations": 32
+          }
+        ]
+      },
+      "raw_samples": {
+        "mcprotocol.c": [
+          {
+            "elapsed_ns": 5593000,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 5188000,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 6309000,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 5773000,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 5544000,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 5409000,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 5111000,
+            "operations": 32
+          }
+        ],
+        "node-minecraft-protocol": [
+          {
+            "elapsed_ns": 587680333,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 588778417,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 594414625,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 590702500,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 603854666,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 585288375,
+            "operations": 32
+          },
+          {
+            "elapsed_ns": 581364958,
+            "operations": 32
+          }
+        ]
+      },
+      "implementations": {
+        "mcprotocol.c": {
+          "elapsed_ms": [
+            5.593,
+            5.188,
+            6.309,
+            5.773,
+            5.544,
+            5.409,
+            5.111
+          ],
+          "operations_per_second": [
+            5721.437511174682,
+            6168.080185042406,
+            5072.119194801078,
+            5543.045210462498,
+            5772.005772005772,
+            5916.065816232205,
+            6261.0056740363925
+          ],
+          "median_elapsed_ms": 5.544,
+          "median_operations_per_second": 5772.005772005772,
+          "q1_operations_per_second": 5632.241360818591,
+          "q3_operations_per_second": 6042.073000637305
+        },
+        "node-minecraft-protocol": {
+          "elapsed_ms": [
+            587.680333,
+            588.778417,
+            594.414625,
+            590.7025,
+            603.854666,
+            585.288375,
+            581.364958
+          ],
+          "operations_per_second": [
+            54.451371269557185,
+            54.34981832902343,
+            53.83447622945011,
+            54.172785793186925,
+            52.99288355585879,
+            54.67390327033234,
+            55.042877214488044
+          ],
+          "median_elapsed_ms": 588.778417,
+          "median_operations_per_second": 54.34981832902343,
+          "q1_operations_per_second": 54.00363101131852,
+          "q3_operations_per_second": 54.56263726994476
+        }
+      },
+      "mcprotocol_c_speedup": 106.20101316738817
+    },
+    {
+      "id": "keepalive_stream",
+      "mode": "stream",
+      "label": "Keepalive stream",
+      "clients": 1,
+      "messages": 10000,
+      "operation": "validated keepalive echoes",
+      "operations_per_run": 10000,
+      "warmup_samples": {
+        "mcprotocol.c": [
+          {
+            "elapsed_ns": 235950000,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 244045000,
+            "operations": 10000
+          }
+        ],
+        "node-minecraft-protocol": [
+          {
+            "elapsed_ns": 476150833,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 490889167,
+            "operations": 10000
+          }
+        ]
+      },
+      "raw_samples": {
+        "mcprotocol.c": [
+          {
+            "elapsed_ns": 235514000,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 234163000,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 238842000,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 237326000,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 235669000,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 234188000,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 234512000,
+            "operations": 10000
+          }
+        ],
+        "node-minecraft-protocol": [
+          {
+            "elapsed_ns": 459781625,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 467818959,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 464526292,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 471082125,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 465700375,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 463442125,
+            "operations": 10000
+          },
+          {
+            "elapsed_ns": 464690916,
+            "operations": 10000
+          }
+        ]
+      },
+      "implementations": {
+        "mcprotocol.c": {
+          "elapsed_ms": [
+            235.514,
+            234.163,
+            238.842,
+            237.326,
+            235.669,
+            234.188,
+            234.512
+          ],
+          "operations_per_second": [
+            42460.320830184195,
+            42705.29502953071,
+            41868.68306244296,
+            42136.133419852864,
+            42432.394587323746,
+            42700.73616069141,
+            42641.74114757454
+          ],
+          "median_elapsed_ms": 235.514,
+          "median_operations_per_second": 42460.320830184195,
+          "q1_operations_per_second": 42284.26400358831,
+          "q3_operations_per_second": 42671.238654132976
+        },
+        "node-minecraft-protocol": {
+          "elapsed_ms": [
+            459.781625,
+            467.818959,
+            464.526292,
+            471.082125,
+            465.700375,
+            463.442125,
+            464.690916
+          ],
+          "operations_per_second": [
+            21749.45551597457,
+            21375.790372788204,
+            21527.306790204246,
+            21227.721174943752,
+            21473.03402965909,
+            21577.66733009003,
+            21519.68040623372
+          ],
+          "median_elapsed_ms": 464.690916,
+          "median_operations_per_second": 21519.68040623372,
+          "q1_operations_per_second": 21424.412201223648,
+          "q3_operations_per_second": 21552.487060147138
+        }
+      },
+      "mcprotocol_c_speedup": 1.9730925380232174
+    },
+    {
+      "id": "concurrent_keepalive",
+      "mode": "concurrent",
+      "label": "Concurrent keepalive",
+      "clients": 32,
+      "messages": 256,
+      "operation": "validated keepalive echoes",
+      "operations_per_run": 8192,
+      "warmup_samples": {
+        "mcprotocol.c": [
+          {
+            "elapsed_ns": 106315000,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 102375000,
+            "operations": 8192
+          }
+        ],
+        "node-minecraft-protocol": [
+          {
+            "elapsed_ns": 857432500,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 868466042,
+            "operations": 8192
+          }
+        ]
+      },
+      "raw_samples": {
+        "mcprotocol.c": [
+          {
+            "elapsed_ns": 104095000,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 105433000,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 101585000,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 105331000,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 102062000,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 107307000,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 105905000,
+            "operations": 8192
+          }
+        ],
+        "node-minecraft-protocol": [
+          {
+            "elapsed_ns": 866085042,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 863802167,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 882083834,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 868294416,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 886014833,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 864606792,
+            "operations": 8192
+          },
+          {
+            "elapsed_ns": 864618916,
+            "operations": 8192
+          }
+        ]
+      },
+      "implementations": {
+        "mcprotocol.c": {
+          "elapsed_ms": [
+            104.095,
+            105.433,
+            101.585,
+            105.331,
+            102.062,
+            107.307,
+            105.905
+          ],
+          "operations_per_second": [
+            78697.3437725155,
+            77698.63325524266,
+            80641.8270413939,
+            77773.87473773153,
+            80264.93699907899,
+            76341.71116516164,
+            77352.34408196024
+          ],
+          "median_elapsed_ms": 105.331,
+          "median_operations_per_second": 77773.87473773153,
+          "q1_operations_per_second": 77525.48866860145,
+          "q3_operations_per_second": 79481.14038579725
+        },
+        "node-minecraft-protocol": {
+          "elapsed_ms": [
+            866.085042,
+            863.802167,
+            882.083834,
+            868.294416,
+            886.014833,
+            864.606792,
+            864.618916
+          ],
+          "operations_per_second": [
+            9458.655446909335,
+            9483.652985556819,
+            9287.099121691874,
+            9434.58791055959,
+            9245.894870927064,
+            9474.827257660498,
+            9474.694398196581
+          ],
+          "median_elapsed_ms": 866.085042,
+          "median_operations_per_second": 9458.655446909335,
+          "q1_operations_per_second": 9360.843516125733,
+          "q3_operations_per_second": 9474.76082792854
+        }
+      },
+      "mcprotocol_c_speedup": 8.222508492276727
+    }
+  ]
+}

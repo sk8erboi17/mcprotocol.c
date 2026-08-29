@@ -1,0 +1,10 @@
+{
+  "name": "mcprotocol-c-benchmark",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Reproducible mcprotocol.c and node-minecraft-protocol benchmark",
+  "license": "MIT",
+  "dependencies": {
+    "minecraft-protocol": "1.68.0"
+  }
+}

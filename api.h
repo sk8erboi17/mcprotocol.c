@@ -1,0 +1,399 @@
+#ifndef MC_PROTOCOL_API_H
+#define MC_PROTOCOL_API_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define MC_PROTOCOL_API_VERSION 1
+#define MC_DEFAULT_PORT 25565U
+#define MC_UUID_STRING_SIZE 37U
+#define MC_HANDSHAKE_HOST_SIZE 256U
+
+/* mcprotocol.c deliberately exposes the protocol rather than a game bot. The
+ * client takes care of connection state, framing and mandatory protocol
+ * replies; application packets remain visible to the caller through the raw
+ * callback and can be built without allocations with McPacket.
+ *
+ * A client is driven by the thread calling mc_client_connect(),
+ * mc_client_poll() or mc_client_run(). Callbacks run synchronously on that same
+ * thread. mc_client_disconnect() is the sole operation intended to interrupt a
+ * running client from another thread. */
+
+/* ============================================================
+ * PUBLIC TYPES
+ * ============================================================ */
+
+typedef struct McClient McClient;
+typedef struct McServer McServer;
+
+typedef enum {
+    MC_STATE_DISCONNECTED = 0,
+    MC_STATE_LOGIN,
+    MC_STATE_CONFIGURATION,
+    MC_STATE_PLAY,
+    MC_STATE_STATUS
+} McState;
+
+typedef enum {
+    MC_BACKEND_NONE = 0,
+    MC_BACKEND_IO_URING,
+    MC_BACKEND_KQUEUE,
+    MC_BACKEND_EPOLL,
+    MC_BACKEND_POLL
+} McBackend;
+
+typedef enum {
+    MC_PACKET_SERVERBOUND = 0,
+    MC_PACKET_CLIENTBOUND
+} McPacketDirection;
+
+typedef struct {
+    McState state;
+    McPacketDirection direction;
+    int32_t id;
+    const char *name;
+} McPacketInfo;
+
+typedef struct {
+    void (*on_state)(void *userdata, McState previous, McState current);
+    /* Payload excludes the VarInt packet ID. It becomes invalid as soon as the
+     * callback returns, so copy it when it must outlive the call. */
+    void (*on_packet)(void *userdata, McState state, int32_t packet_id,
+        const unsigned char *payload, size_t payload_size);
+} McCallbacks;
+
+/* Minecraft online-mode encrypts the entire framed TCP stream. A transform is
+ * stateful and operates in place; return zero on success. Supplying callbacks
+ * lets applications use their preferred crypto provider without making it a
+ * mandatory dependency of this two-file library. */
+typedef int (*McStreamTransform)(void *userdata, unsigned char *data,
+    size_t size);
+
+typedef struct {
+    McStreamTransform encrypt;
+    McStreamTransform decrypt;
+    void *userdata;
+} McStreamTransforms;
+
+typedef struct {
+    uint64_t sent_bytes;
+    uint64_t received_bytes;
+} McTraffic;
+
+typedef struct {
+    int32_t packet_id;
+    const void *payload;
+    size_t payload_size;
+} McOutboundPacket;
+
+typedef struct {
+    size_t json_size;
+    uint64_t latency_ms;
+} McStatus;
+
+typedef struct {
+    int protocol;
+    unsigned char host[MC_HANDSHAKE_HOST_SIZE];
+    size_t host_size;
+    uint16_t port;
+    McState next_state;
+} McHandshake;
+
+
+/* ============================================================
+ * PROTOCOL PROFILES / PACKET REGISTRY
+ * ============================================================ */
+
+/* The returned protocol array and all catalog names are immutable and live for
+ * the lifetime of the process. McPacketInfo itself is copied into caller-owned
+ * storage. Unknown protocols, states, directions, IDs and names fail without
+ * modifying library state. */
+typedef enum {
+    MC_PROTOCOL_FEATURE_COMPRESSION = 1U << 0,
+    MC_PROTOCOL_FEATURE_LOGIN_KEY = 1U << 1,
+    MC_PROTOCOL_FEATURE_OPTIONAL_UUID = 1U << 2,
+    MC_PROTOCOL_FEATURE_REQUIRED_UUID = 1U << 3,
+    MC_PROTOCOL_FEATURE_CONFIGURATION = 1U << 4,
+    MC_PROTOCOL_FEATURE_POSITION_DELTA = 1U << 5,
+    MC_PROTOCOL_FEATURE_KEEP_ALIVE_I64 = 1U << 6,
+    MC_PROTOCOL_FEATURE_CHAT_LAST_SEEN = 1U << 7,
+    MC_PROTOCOL_FEATURE_CHAT_ACKNOWLEDGED = 1U << 8
+} McProtocolFeature;
+
+typedef enum {
+    MC_AUTOMATIC_KEEP_ALIVE = 1U << 0,
+    MC_AUTOMATIC_TELEPORT = 1U << 1,
+    MC_AUTOMATIC_PLAYER_LOADED = 1U << 2,
+    MC_AUTOMATIC_CHUNK_BATCH = 1U << 3,
+    MC_AUTOMATIC_ALL = (1U << 4) - 1U
+} McAutomaticReply;
+
+const int *mc_supported_protocols(size_t *count);
+bool mc_protocol_supported(int protocol);
+/* Canonical names select the newest stable release sharing a protocol number,
+ * for example 47 -> "1.8.9" and 776 -> "26.2". */
+const char *mc_protocol_name(int protocol);
+int mc_protocol_by_name(const char *release_name);
+/* Feature bits describe wire-shape changes shared by several packets. For
+ * example, KEEP_ALIVE_I64 selects an i64 rather than VarInt payload and the
+ * UUID bits select the Login Start suffix. A supported old protocol can
+ * legitimately return zero; use mc_protocol_supported() to detect unknowns. */
+uint32_t mc_protocol_features(int protocol);
+size_t mc_packet_count(int protocol);
+bool mc_packet_at(int protocol, size_t index, McPacketInfo *packet);
+const char *mc_packet_name(int protocol, McState state,
+    McPacketDirection direction, int32_t id);
+int32_t mc_packet_id(int protocol, McState state,
+    McPacketDirection direction, const char *name);
+
+
+/* ============================================================
+ * READER / WRITER CODEC
+ * ============================================================ */
+
+/* McPacket writes a packet body into storage supplied by the caller. Writers
+ * use Minecraft network byte order and VarInt/String encodings. Failure is
+ * sticky: once capacity or input validation fails, every later write fails and
+ * the packet cannot accidentally be sent as a valid truncated body. */
+typedef struct {
+    unsigned char *data;
+    size_t length;
+    size_t capacity;
+    bool failed;
+} McPacket;
+
+/* McBytes is a borrowed, non-NUL-terminated view into an input packet. */
+typedef struct {
+    const unsigned char *data;
+    size_t size;
+} McBytes;
+
+/* McReader decodes one packet body without allocation. Like McPacket, failure
+ * is sticky so a complete schema can be read linearly and checked once. Views
+ * returned by mc_reader_bytes() and mc_reader_string() borrow input storage. */
+typedef struct {
+    const unsigned char *data;
+    size_t size;
+    size_t offset;
+    bool failed;
+} McReader;
+
+typedef enum {
+    MC_NBT_END = 0,
+    MC_NBT_BYTE = 1,
+    MC_NBT_SHORT = 2,
+    MC_NBT_INT = 3,
+    MC_NBT_LONG = 4,
+    MC_NBT_FLOAT = 5,
+    MC_NBT_DOUBLE = 6,
+    MC_NBT_BYTE_ARRAY = 7,
+    MC_NBT_STRING = 8,
+    MC_NBT_LIST = 9,
+    MC_NBT_COMPOUND = 10,
+    MC_NBT_INT_ARRAY = 11,
+    MC_NBT_LONG_ARRAY = 12
+} McNbtType;
+
+typedef struct {
+    int32_t x;
+    int32_t y;
+    int32_t z;
+} McPosition;
+
+typedef struct {
+    double x;
+    double y;
+    double z;
+    float yaw;
+    float pitch;
+    bool on_ground;
+} McPlayerPosition;
+
+typedef struct {
+    unsigned char bytes[16];
+} McUuid;
+
+void mc_packet_init(McPacket *packet, void *storage, size_t capacity);
+bool mc_packet_bytes(McPacket *packet, const void *data, size_t size);
+bool mc_packet_bool(McPacket *packet, bool value);
+bool mc_packet_i8(McPacket *packet, int8_t value);
+bool mc_packet_u8(McPacket *packet, uint8_t value);
+bool mc_packet_i16(McPacket *packet, int16_t value);
+bool mc_packet_u16(McPacket *packet, uint16_t value);
+bool mc_packet_i32(McPacket *packet, int32_t value);
+bool mc_packet_u32(McPacket *packet, uint32_t value);
+bool mc_packet_i64(McPacket *packet, int64_t value);
+bool mc_packet_u64(McPacket *packet, uint64_t value);
+bool mc_packet_float(McPacket *packet, float value);
+bool mc_packet_double(McPacket *packet, double value);
+bool mc_packet_varint(McPacket *packet, int32_t value);
+bool mc_packet_varlong(McPacket *packet, int64_t value);
+bool mc_packet_string_n(McPacket *packet, const char *value, size_t size);
+bool mc_packet_string(McPacket *packet, const char *value);
+bool mc_packet_position(McPacket *packet, int protocol, McPosition value);
+bool mc_packet_uuid(McPacket *packet, const McUuid *value);
+/* Encodes a metadata-free Slot/ItemStack value. count=0 writes the empty-item
+ * sentinel for the selected release; non-empty stacks require item_id > 0. */
+bool mc_packet_plain_item(McPacket *packet, int protocol,
+    int32_t item_id, int32_t count);
+/* Builds the body of the serverbound position_look packet, including the
+ * stance field used only by 1.7. Packet ID/framing remain mc_client_send's job. */
+bool mc_packet_player_position(McPacket *packet, int protocol,
+    const McPlayerPosition *value);
+
+void mc_reader_init(McReader *reader, const void *data, size_t size);
+size_t mc_reader_remaining(const McReader *reader);
+bool mc_reader_bytes(McReader *reader, size_t size, McBytes *value);
+bool mc_reader_skip(McReader *reader, size_t size);
+bool mc_reader_bool(McReader *reader, bool *value);
+bool mc_reader_i8(McReader *reader, int8_t *value);
+bool mc_reader_u8(McReader *reader, uint8_t *value);
+bool mc_reader_i16(McReader *reader, int16_t *value);
+bool mc_reader_u16(McReader *reader, uint16_t *value);
+bool mc_reader_i32(McReader *reader, int32_t *value);
+bool mc_reader_u32(McReader *reader, uint32_t *value);
+bool mc_reader_i64(McReader *reader, int64_t *value);
+bool mc_reader_u64(McReader *reader, uint64_t *value);
+bool mc_reader_float(McReader *reader, float *value);
+bool mc_reader_double(McReader *reader, double *value);
+bool mc_reader_varint(McReader *reader, int32_t *value);
+bool mc_reader_varlong(McReader *reader, int64_t *value);
+bool mc_reader_string(McReader *reader, McBytes *value);
+bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
+bool mc_reader_uuid(McReader *reader, McUuid *value);
+bool mc_reader_plain_item(McReader *reader, int protocol,
+    int32_t *item_id, int32_t *count);
+
+/* NBT functions validate the complete encoded value and optionally return a
+ * borrowed slice (encoded may be NULL when only validation/skipping matters).
+ * Network NBT before 1.20.2 normally has a named root; newer packet schemas
+ * often use an anonymous root. mc_reader_nbt_value() starts after the tag type
+ * and is useful while walking selected fields in a compound. */
+bool mc_reader_nbt_name(McReader *reader, McBytes *name);
+bool mc_reader_nbt_value(McReader *reader, McNbtType type, McBytes *encoded);
+bool mc_reader_nbt(McReader *reader, bool named_root, McBytes *encoded);
+
+
+/* ============================================================
+ * AUTH / UUID HELPERS
+ * ============================================================ */
+
+/* Parse accepts canonical dashed UUIDs and compact 32-hex-digit UUIDs. Format
+ * writes lowercase canonical text and always needs MC_UUID_STRING_SIZE bytes. */
+bool mc_uuid_parse(const char *text, McUuid *uuid);
+void mc_uuid_format(const McUuid *uuid, char text[MC_UUID_STRING_SIZE]);
+bool mc_offline_uuid(const char *username, McUuid *uuid);
+
+
+/* ============================================================
+ * CLIENT LIFECYCLE
+ * ============================================================ */
+
+/* Creation validates the protocol but opens no socket. The callbacks and
+ * userdata pointer are borrowed until destroy; their targets must therefore
+ * outlive the client. Errors are written only when error is non-NULL and
+ * error_size is non-zero. */
+McClient *mc_client_create(int protocol, const McCallbacks *callbacks,
+    void *userdata, char *error, size_t error_size);
+void mc_client_destroy(McClient *client);
+
+/* A raw server validates the initial handshake and returns a normal McClient
+ * representing the accepted peer. Named sends on that object resolve the
+ * clientbound catalog; received callbacks contain serverbound packet IDs. */
+McServer *mc_server_create(const char *bind_host, uint16_t port, int backlog,
+    char *error, size_t error_size);
+void mc_server_destroy(McServer *server);
+uint16_t mc_server_port(const McServer *server);
+int mc_server_accept(McServer *server, unsigned int timeout_ms,
+    const McCallbacks *callbacks, void *userdata, McClient **accepted,
+    McHandshake *handshake, char *error, size_t error_size);
+
+/* Opens TCP, sends the handshake and stops in LOGIN or STATUS without sending
+ * a Login Start/Status Request. This is the entry point for custom login,
+ * authentication and protocol probing. */
+int mc_client_open(McClient *client, const char *host, uint16_t port,
+    McState next_state, char *error, size_t error_size);
+
+/* Performs an offline-mode login and returns only after PLAY is reached,
+ * including the CONFIGURATION exchange required by modern versions. */
+int mc_client_connect(McClient *client, const char *host, uint16_t port,
+    const char *username, char *error, size_t error_size);
+
+/* Performs the server-list status handshake, copies the response JSON with a
+ * terminating NUL and verifies a ping/pong nonce. timeout_ms applies to each
+ * response packet; port=0 selects MC_DEFAULT_PORT. */
+int mc_status_ping(int protocol, const char *host, uint16_t port,
+    unsigned int timeout_ms, char *json, size_t json_capacity,
+    McStatus *status, char *error, size_t error_size);
+
+/* Sends one serverbound body. The library adds the packet ID, framing and the
+ * negotiated compression envelope. The numeric form is useful for generated
+ * or application-specific packets; the named form resolves the ID in the
+ * client's current protocol state. */
+int mc_client_send(McClient *client, int32_t packet_id,
+    const void *payload, size_t payload_size, char *error, size_t error_size);
+int mc_client_send_named(McClient *client, const char *packet_name,
+    const void *payload, size_t payload_size, char *error, size_t error_size);
+/* Encodes every packet with the current compression settings and writes the
+ * resulting frames contiguously. This preserves packet order while avoiding a
+ * send syscall per packet. A zero-length batch is a successful no-op. */
+int mc_client_send_batch(McClient *client, const McOutboundPacket *packets,
+    size_t count, char *error, size_t error_size);
+
+/* Poll processes at most one inbound packet: 1 means a packet was processed,
+ * 0 is a timeout or requested stop, and -1 is an error. Run repeats that work
+ * until disconnect is requested. */
+int mc_client_poll(McClient *client, unsigned int timeout_ms,
+    char *error, size_t error_size);
+int mc_client_run(McClient *client, char *error, size_t error_size);
+/* Wait checks socket readability without consuming a packet. */
+int mc_client_wait(McClient *client, unsigned int timeout_ms,
+    char *error, size_t error_size);
+void mc_client_disconnect(McClient *client);
+
+
+/* ============================================================
+ * NETWORK BACKENDS / CLIENT INSPECTION
+ * ============================================================ */
+
+/* Set the backend before connect. MC_BACKEND_NONE preserves automatic native
+ * selection; an unavailable explicit backend is rejected instead of silently
+ * changing the caller's requested execution model. */
+int mc_client_set_backend(McClient *client, McBackend backend,
+    char *error, size_t error_size);
+/* Automatic replies are enabled by default. Set a subset (or zero for a raw
+ * protocol client) before connect when the application owns those packets. */
+int mc_client_set_automatic_replies(McClient *client, uint32_t replies,
+    char *error, size_t error_size);
+/* Raw sessions may update protocol state and compression after the matching
+ * server packet. Stream transforms are normally installed immediately after
+ * sending Encryption Response. Passing NULL removes both transforms. */
+int mc_client_set_state(McClient *client, McState state,
+    char *error, size_t error_size);
+int mc_client_set_compression(McClient *client, int threshold,
+    char *error, size_t error_size);
+/* Sets the maximum idle wait while completing one partially received frame.
+ * Poll temporarily uses its own timeout for the packet it processes. */
+int mc_client_set_read_timeout(McClient *client, unsigned int timeout_ms,
+    char *error, size_t error_size);
+int mc_client_set_stream_transforms(McClient *client,
+    const McStreamTransforms *transforms, char *error, size_t error_size);
+const char *mc_backend_name(McBackend backend);
+
+/* Inspection functions do not transfer ownership. Traffic counters include
+ * Minecraft framing bytes and are cumulative for the client object. */
+int mc_client_protocol(const McClient *client);
+McState mc_client_state(const McClient *client);
+McBackend mc_client_backend(const McClient *client);
+void mc_client_traffic(const McClient *client, McTraffic *traffic);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
