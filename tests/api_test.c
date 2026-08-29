@@ -92,6 +92,53 @@ static void invalid_commands_fail_sticky(void)
     assert(packet.failed);
 }
 
+static void expect_player_abilities(int protocol)
+{
+    const McPlayerAbilities expected = {
+        .flags = 0x0dU,
+        .flying_speed = 0.05F,
+        .walking_speed = 0.1F,
+    };
+    unsigned char storage[9];
+    McPacket packet;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_player_abilities(&packet, protocol, &expected));
+    assert(packet.length == (protocol < 735 ? sizeof(storage) : 1U));
+
+    McReader reader;
+    uint8_t flags = 0U;
+    float flying_speed = 0.0F;
+    float walking_speed = 0.0F;
+    mc_reader_init(&reader, packet.data, packet.length);
+    assert(mc_reader_u8(&reader, &flags));
+    if (protocol < 735) {
+        assert(mc_reader_float(&reader, &flying_speed));
+        assert(mc_reader_float(&reader, &walking_speed));
+    }
+    assert(mc_reader_remaining(&reader) == 0U);
+    assert(flags == expected.flags);
+    if (protocol < 735) {
+        assert(flying_speed == expected.flying_speed);
+        assert(walking_speed == expected.walking_speed);
+    }
+
+    unsigned char short_storage[8];
+    mc_packet_init(&packet, short_storage, sizeof(short_storage));
+    assert(mc_packet_player_abilities(&packet, protocol, &expected) == (protocol >= 735));
+    assert(packet.failed == (protocol < 735));
+    if (protocol < 735) {
+        assert(!mc_packet_player_abilities(&packet, protocol, &expected));
+    }
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_player_abilities(&packet, protocol, NULL));
+    assert(packet.failed);
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_player_abilities(&packet, 6, &expected));
+    assert(packet.failed);
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -106,13 +153,38 @@ static void dump_command(int protocol)
     putchar('\n');
 }
 
+static void dump_player_abilities(int protocol)
+{
+    unsigned char storage[9];
+    const McPlayerAbilities abilities = {
+        .flags = 0x0dU,
+        .flying_speed = 0.05F,
+        .walking_speed = 0.1F,
+    };
+    McPacket packet;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_player_abilities(&packet, protocol, &abilities));
+    printf("%d:", protocol);
+    for (size_t index = 0U; index < packet.length; ++index) {
+        printf("%02x", packet.data[index]);
+    }
+    putchar('\n');
+}
+
 int main(int argc, char **argv)
 {
-    const int boundary_protocols[] = {4, 758, 759, 760, 761, 765, 766, 776};
+    const int boundary_protocols[] = {4, 578, 735, 758, 759, 760, 761, 765, 766, 776};
     if (argc == 2 && strcmp(argv[1], "--dump-commands") == 0) {
         for (size_t index = 0U;
                 index < sizeof(boundary_protocols) / sizeof(boundary_protocols[0]); ++index) {
             dump_command(boundary_protocols[index]);
+        }
+        return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "--dump-abilities") == 0) {
+        for (size_t index = 0U;
+                index < sizeof(boundary_protocols) / sizeof(boundary_protocols[0]); ++index) {
+            dump_player_abilities(boundary_protocols[index]);
         }
         return 0;
     }
@@ -121,6 +193,10 @@ int main(int argc, char **argv)
         expect_command(boundary_protocols[index]);
     }
     invalid_commands_fail_sticky();
-    puts("PASS command codec boundaries 4/758/759/760/761/765/766/776");
+    expect_player_abilities(4);
+    expect_player_abilities(578);
+    expect_player_abilities(735);
+    expect_player_abilities(776);
+    puts("PASS command codec boundaries and player abilities body");
     return 0;
 }

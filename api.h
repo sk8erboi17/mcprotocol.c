@@ -215,6 +215,12 @@ typedef struct {
 } McPlayerPosition;
 
 typedef struct {
+    uint8_t flags;
+    float flying_speed;
+    float walking_speed;
+} McPlayerAbilities;
+
+typedef struct {
     unsigned char bytes[16];
 } McUuid;
 
@@ -245,6 +251,10 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
  * stance field used only by 1.7. Packet ID/framing remain mc_client_send's job. */
 bool mc_packet_player_position(McPacket *packet, int protocol,
     const McPlayerPosition *value);
+/* Builds the release-aware serverbound abilities body. Through 1.15.2 it
+ * contains flags plus both speed floats; 1.16+ contains flags only. */
+bool mc_packet_player_abilities(McPacket *packet, int protocol,
+    const McPlayerAbilities *value);
 /* Builds the body used to execute a command for the selected release. The
  * command may include one leading slash. timestamp_ms and salt are used only
  * by signed-chat-era protocols; offline callers may pass salt zero. */
@@ -348,6 +358,9 @@ int mc_client_send_named(McClient *client, const char *packet_name,
  * modern unsigned command packet. The command may include one leading slash. */
 int mc_client_send_command(McClient *client, const char *command,
     char *error, size_t error_size);
+/* Sends the serverbound abilities state while the client is in PLAY. */
+int mc_client_send_player_abilities(McClient *client,
+    const McPlayerAbilities *abilities, char *error, size_t error_size);
 /* Encodes every packet with the current compression settings and writes the
  * resulting frames contiguously. This preserves packet order while avoiding a
  * send syscall per packet. A zero-length batch is a successful no-op. */

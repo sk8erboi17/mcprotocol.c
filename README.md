@@ -162,6 +162,7 @@ Available symmetric field codecs are:
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |
 | `player_position` | Release-aware position/look body | movement and teleport responses |
+| `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
 
 ### Send a command or chat packet
 
@@ -213,6 +214,25 @@ mc_packet_init(&body, storage, sizeof(storage));
 if (mc_packet_player_position(&body, mc_client_protocol(client), &position)) {
     mc_client_send_named(client, "position_look", body.data, body.length,
         error, sizeof(error));
+}
+```
+
+### Send client abilities
+
+The high-level helper resolves both the release-specific packet ID and body:
+protocols through 1.15.2 send both speed floats after the flags, while 1.16+
+sends only the flags byte.
+
+```c
+McPlayerAbilities abilities = {
+    .flags = 0x0d,
+    .flying_speed = 0.05f,
+    .walking_speed = 0.1f
+};
+
+if (mc_client_send_player_abilities(client, &abilities,
+        error, sizeof(error)) != 0) {
+    fprintf(stderr, "%s\n", error);
 }
 ```
 

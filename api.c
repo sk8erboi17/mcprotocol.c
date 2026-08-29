@@ -2836,6 +2836,19 @@ bool mc_packet_player_position(McPacket *packet, int protocol,
         && mc_packet_bool(packet, value->on_ground);
 }
 
+bool mc_packet_player_abilities(McPacket *packet, int protocol,
+    const McPlayerAbilities *value)
+{
+    if (packet == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (!mc_packet_u8(packet, value->flags)) return false;
+    return protocol >= 735
+        || (mc_packet_float(packet, value->flying_speed)
+            && mc_packet_float(packet, value->walking_speed));
+}
+
 bool mc_packet_command(McPacket *packet, int protocol, const char *command,
     int64_t timestamp_ms, int64_t salt)
 {
@@ -4407,6 +4420,26 @@ int mc_client_send_command(McClient *client, const char *command,
     const char *packet_name = client->profile->protocol <= 758
         ? "chat" : "chat_command";
     return mc_client_send_named(client, packet_name,
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_send_player_abilities(McClient *client,
+    const McPlayerAbilities *abilities, char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[9];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_player_abilities(&body, client->profile->protocol, abilities)) {
+        set_error(error, error_size, "Abilities Minecraft non valide");
+        return -1;
+    }
+    return mc_client_send_named(client, "abilities",
         body.data, body.length, error, error_size);
 }
 
