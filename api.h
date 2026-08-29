@@ -245,6 +245,11 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
  * stance field used only by 1.7. Packet ID/framing remain mc_client_send's job. */
 bool mc_packet_player_position(McPacket *packet, int protocol,
     const McPlayerPosition *value);
+/* Builds the body used to execute a command for the selected release. The
+ * command may include one leading slash. timestamp_ms and salt are used only
+ * by signed-chat-era protocols; offline callers may pass salt zero. */
+bool mc_packet_command(McPacket *packet, int protocol, const char *command,
+    int64_t timestamp_ms, int64_t salt);
 
 void mc_reader_init(McReader *reader, const void *data, size_t size);
 size_t mc_reader_remaining(const McReader *reader);
@@ -339,6 +344,10 @@ int mc_client_send(McClient *client, int32_t packet_id,
     const void *payload, size_t payload_size, char *error, size_t error_size);
 int mc_client_send_named(McClient *client, const char *packet_name,
     const void *payload, size_t payload_size, char *error, size_t error_size);
+/* Sends one offline command using the correct legacy, signed-chat-era or
+ * modern unsigned command packet. The command may include one leading slash. */
+int mc_client_send_command(McClient *client, const char *command,
+    char *error, size_t error_size);
 /* Encodes every packet with the current compression settings and writes the
  * resulting frames contiguously. This preserves packet order while avoiding a
  * send syscall per packet. A zero-length batch is a successful no-op. */

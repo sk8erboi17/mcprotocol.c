@@ -5,7 +5,7 @@ CPPFLAGS ?=
 WARNINGS = -Wall -Wextra -Wpedantic -Wconversion -Wshadow
 API_CFLAGS = $(CFLAGS) -std=c11 -DNDEBUG $(WARNINGS)
 
-.PHONY: all clean shared benchmark
+.PHONY: all clean shared benchmark test
 
 all: libmcprotocol.a
 
@@ -25,5 +25,12 @@ shared: api.c api.h
 benchmark:
 	CC="$(CC)" python3 benchmark/run.py
 
+test: tests/api_test
+	./tests/api_test
+
+tests/api_test: tests/api_test.c api.c api.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 $(WARNINGS) -UNDEBUG \
+		-I. tests/api_test.c api.c -lz -o $@
+
 clean:
-	rm -f api.o libmcprotocol.a libmcprotocol.so libmcprotocol.dylib
+	rm -f api.o libmcprotocol.a libmcprotocol.so libmcprotocol.dylib tests/api_test

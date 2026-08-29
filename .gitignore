@@ -1,0 +1,5 @@
+api.o
+libmcprotocol.a
+libmcprotocol.dylib
+libmcprotocol.so
+tests/api_test

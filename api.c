@@ -2836,6 +2836,44 @@ bool mc_packet_player_position(McPacket *packet, int protocol,
         && mc_packet_bool(packet, value->on_ground);
 }
 
+bool mc_packet_command(McPacket *packet, int protocol, const char *command,
+    int64_t timestamp_ms, int64_t salt)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol) || command == NULL) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    const char *bare = command[0] == '/' ? command + 1 : command;
+    size_t bare_size = strlen(bare);
+    if (bare_size == 0U || bare_size > 256U) {
+        packet->failed = true;
+        return false;
+    }
+    if (protocol <= 758) {
+        return mc_packet_varint(packet, (int32_t)(bare_size + 1U))
+            && mc_packet_u8(packet, (uint8_t)'/')
+            && mc_packet_bytes(packet, bare, bare_size);
+    }
+    if (!mc_packet_string_n(packet, bare, bare_size)) return false;
+    if (protocol >= 766) return true;
+    if (!mc_packet_i64(packet, timestamp_ms)
+        || !mc_packet_i64(packet, salt)
+        || !mc_packet_varint(packet, 0)) {
+        return false;
+    }
+    if (protocol == 759) {
+        return mc_packet_bool(packet, false);
+    }
+    if (protocol == 760) {
+        return mc_packet_bool(packet, false)
+            && mc_packet_varint(packet, 0)
+            && mc_packet_bool(packet, false);
+    }
+    static const unsigned char acknowledged[3] = {0U, 0U, 0U};
+    return mc_packet_varint(packet, 0)
+        && mc_packet_bytes(packet, acknowledged, sizeof(acknowledged));
+}
+
 static int32_t position_signed(uint64_t value, unsigned int bits)
 {
     uint64_t sign = UINT64_C(1) << (bits - 1U);
@@ -4339,6 +4377,37 @@ int mc_client_send_named(McClient *client, const char *packet_name,
     }
     return mc_client_send(client, packet_id, payload, payload_size,
         error, error_size);
+}
+
+int mc_client_send_command(McClient *client, const char *command,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    struct timespec now;
+    if (clock_gettime(CLOCK_REALTIME, &now) != 0
+        || now.tv_sec > INT64_MAX / 1000) {
+        set_error(error, error_size, "Orologio comando non disponibile");
+        return -1;
+    }
+    int64_t timestamp_ms = (int64_t)now.tv_sec * INT64_C(1000)
+        + (int64_t)now.tv_nsec / INT64_C(1000000);
+    unsigned char storage[384];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_command(&body, client->profile->protocol,
+            command, timestamp_ms, 0)) {
+        set_error(error, error_size, "Comando Minecraft non valido");
+        return -1;
+    }
+    const char *packet_name = client->profile->protocol <= 758
+        ? "chat" : "chat_command";
+    return mc_client_send_named(client, packet_name,
+        body.data, body.length, error, error_size);
 }
 
 int mc_client_send_batch(McClient *client, const McOutboundPacket *packets,

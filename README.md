@@ -183,6 +183,20 @@ Modern command packets contain additional timestamp, salt, signature and
 acknowledgement fields. Build those in the exact order documented for the
 selected release; the transport adds the ID, compression envelope and frame.
 
+Offline command clients can use the release-aware helper instead. It accepts
+the command with or without a leading slash and selects the legacy chat,
+signed-chat-era command or modern unsigned command body automatically:
+
+```c
+if (mc_client_send_command(client, "/list", error, sizeof(error)) != 0) {
+    fprintf(stderr, "%s\n", error);
+}
+```
+
+`mc_packet_command` exposes the same body builder when the application needs
+to batch or inspect the packet. Its explicit timestamp and salt make codec
+tests deterministic.
+
 ### Send movement
 
 The helper handles the extra stance double used by protocols 4 and 5:
