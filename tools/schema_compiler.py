@@ -633,6 +633,95 @@ def validate_biome_switch(compiler: Compiler, schema: Any,
     return False
 
 
+def validate_varint_array(compiler: Compiler, schema: Any,
+                          types: dict[str, Any], item_type: str,
+                          description: str) -> None:
+    count_schema, item_schema = manifest_array(compiler, schema, types, description)
+    if (compiler.resolve(count_schema, types) != "varint" or
+            compiler.resolve(item_schema, types) != item_type):
+        raise ValueError(
+            f"{description} is not a VarInt-counted {item_type} array")
+
+
+def validate_light_byte_arrays(compiler: Compiler, schema: Any,
+                               types: dict[str, Any], description: str) -> None:
+    count_schema, item_schema = manifest_array(compiler, schema, types, description)
+    if compiler.resolve(count_schema, types) != "varint":
+        raise ValueError(f"{description} outer count is not a VarInt")
+    validate_varint_array(
+        compiler, item_schema, types, "u8", f"{description} entry")
+
+
+def validate_registry_heightmaps(compiler: Compiler, schema: Any,
+                                 types: dict[str, Any]) -> None:
+    count_schema, item_schema = manifest_array(
+        compiler, schema, types, "registry heightmaps")
+    if compiler.resolve(count_schema, types) != "varint":
+        raise ValueError("registry heightmap count is not a VarInt")
+    fields = manifest_container(
+        compiler, item_schema, types, "registry heightmap entry")
+    if (
+        [field.get("name") for field in fields] != ["type", "data"]
+        or required_manifest_wire(
+            compiler, fields[0]["type"], types,
+            "registry heightmap type").suffix != "varint"
+    ):
+        raise ValueError("registry heightmap entry changed")
+    validate_varint_array(
+        compiler, fields[1]["type"], types, "i64", "registry heightmap data")
+
+
+def modern_chunk_envelope_projection(
+        compiler: Compiler, packet_name: str,
+        raw_fields: list[dict[str, Any]],
+        types: dict[str, Any]) -> tuple[tuple[ManifestField, ...], str] | None:
+    names = [field.get("name") for field in raw_fields]
+    without_trust = [
+        "x", "z", "heightmaps", "chunkData", "blockEntities",
+        "skyLightMask", "blockLightMask", "emptySkyLightMask",
+        "emptyBlockLightMask", "skyLight", "blockLight",
+    ]
+    with_trust = without_trust[:5] + ["trustEdges"] + without_trust[5:]
+    if names not in (without_trust, with_trust):
+        return None
+    if (required_manifest_wire(
+            compiler, raw_fields[0]["type"], types, "chunk x").suffix != "i32" or
+            required_manifest_wire(
+                compiler, raw_fields[1]["type"], types, "chunk z").suffix != "i32"):
+        raise ValueError("chunk coordinates are not signed 32-bit integers")
+    heightmaps_schema = raw_fields[2]["type"]
+    if heightmaps_schema == "nbt":
+        heightmap_variant = "named_nbt"
+    elif heightmaps_schema == "anonymousNbt":
+        heightmap_variant = "anonymous_nbt"
+    else:
+        validate_registry_heightmaps(compiler, heightmaps_schema, types)
+        heightmap_variant = "registry"
+    if compiler.buffer_suffix(raw_fields[3]["type"], types) != "buffer_varint":
+        raise ValueError("modern chunk data is not a VarInt-length buffer")
+    block_count, block_item = manifest_array(
+        compiler, raw_fields[4]["type"], types, "modern chunk block entities")
+    if (compiler.resolve(block_count, types) != "varint" or
+            block_item != "chunkBlockEntity"):
+        raise ValueError("modern chunk block-entity array changed")
+    offset = 5
+    trust_edges = names == with_trust
+    if trust_edges:
+        if compiler.resolve(raw_fields[offset]["type"], types) != "bool":
+            raise ValueError("chunk trustEdges is not boolean")
+        offset += 1
+    for index in range(4):
+        validate_varint_array(
+            compiler, raw_fields[offset + index]["type"], types, "i64",
+            f"chunk light mask {index}")
+    offset += 4
+    for index in range(2):
+        validate_light_byte_arrays(
+            compiler, raw_fields[offset + index]["type"], types,
+            f"chunk light array {index}")
+    return (), f"chunk:modern:{heightmap_variant}" + (":trust" if trust_edges else "")
+
+
 def chunk_envelope_projection(compiler: Compiler, packet_name: str,
                               raw_fields: list[dict[str, Any]],
                               types: dict[str, Any]) -> tuple[tuple[ManifestField, ...], str]:
@@ -651,6 +740,10 @@ def chunk_envelope_projection(compiler: Compiler, packet_name: str,
     }
     variant = variants.get(tuple(names))
     if variant is None:
+        modern = modern_chunk_envelope_projection(
+            compiler, packet_name, raw_fields, types)
+        if modern is not None:
+            return modern
         raise ValueError(f"packet {packet_name} chunk envelope changed")
     if (required_manifest_wire(
             compiler, raw_fields[0]["type"], types, "chunk x").suffix != "i32" or
@@ -1053,6 +1146,7 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
                 "    size_t biome_count;",
                 "    int32_t biomes[1024];",
                 "    McBytes chunk_data;",
+                "    McBytes auxiliary_data;",
             ])
         elif packet.projection == "inventory:plain_window_items":
             lines.extend([
@@ -1410,9 +1504,153 @@ def render_inventory_projection(profile: ManifestProfile,
     return lines
 
 
+def render_modern_chunk_projection(profile: ManifestProfile,
+                                   packet: ManifestPacket,
+                                   type_name: str) -> list[str]:
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    auxiliary_function = f"perry_mc_{profile.c_profile}_{packet.c_packet}_auxiliary"
+    heightmap_function = f"perry_mc_{profile.c_profile}_{packet.c_packet}_heightmaps"
+    variant = packet.projection
+    trust_edges = variant == "chunk:modern:named_nbt:trust"
+    registry_heightmaps = variant == "chunk:modern:registry"
+    if variant not in {
+        "chunk:modern:named_nbt:trust",
+        "chunk:modern:named_nbt",
+        "chunk:modern:anonymous_nbt",
+        "chunk:modern:registry",
+    }:
+        raise ValueError(f"unknown modern chunk projection renderer {variant}")
+    lines: list[str] = []
+    if registry_heightmaps:
+        lines.extend([
+            f"static bool {heightmap_function}(McReader *reader) {{",
+            "    int32_t heightmap_count = -1;",
+            "    if (reader == NULL || !mc_reader_varint(reader, &heightmap_count) ||",
+            "        heightmap_count < 0 || heightmap_count > 16) return false;",
+            "    for (int32_t heightmap_index = 0;",
+            "         heightmap_index < heightmap_count; ++heightmap_index) {",
+            "        int32_t type = -1;",
+            "        int32_t long_count = -1;",
+            "        if (!mc_reader_varint(reader, &type) || type < 0 ||",
+            "            !mc_reader_varint(reader, &long_count) ||",
+            "            long_count < 0 || long_count > 64 ||",
+            "            !mc_reader_skip(reader, (size_t)long_count * 8U)) return false;",
+            "    }",
+            "    return true;",
+            "}",
+            "",
+        ])
+    lines.extend([
+        f"static bool {auxiliary_function}(McReader *reader) {{",
+        "    if (reader == NULL) return false;",
+    ])
+    if trust_edges:
+        lines.extend([
+            "    bool trust_edges = false;",
+            "    if (!mc_reader_bool(reader, &trust_edges)) return false;",
+        ])
+    lines.extend([
+        "    for (size_t mask_index = 0U; mask_index < 4U; ++mask_index) {",
+        "        int32_t word_count = -1;",
+        "        if (!mc_reader_varint(reader, &word_count) ||",
+        "            word_count < 0 || word_count > 64 ||",
+        "            !mc_reader_skip(reader, (size_t)word_count * 8U)) return false;",
+        "    }",
+        "    for (size_t light_index = 0U; light_index < 2U; ++light_index) {",
+        "        int32_t light_count = -1;",
+        "        if (!mc_reader_varint(reader, &light_count) ||",
+        "            light_count < 0 || light_count > 64) return false;",
+        "        for (int32_t light_entry = 0; light_entry < light_count; ++light_entry) {",
+        "            int32_t byte_count = -1;",
+        "            if (!mc_reader_varint(reader, &byte_count) ||",
+        "                byte_count < 0 || byte_count > 2048 ||",
+        "                !mc_reader_skip(reader, (size_t)byte_count)) return false;",
+        "        }",
+        "    }",
+        "    return mc_reader_remaining(reader) == 0U;",
+        "}",
+        "",
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    int32_t block_entity_count = -1;",
+        "    mc_reader_init(&reader, payload, payload_size);",
+        "    if (!mc_reader_i32(&reader, &decoded.x) ||",
+        "        !mc_reader_i32(&reader, &decoded.z)) return false;",
+    ])
+    if registry_heightmaps:
+        lines.extend([
+            "    const size_t heightmaps_start = reader.offset;",
+            f"    if (!{heightmap_function}(&reader)) return false;",
+            "    decoded.heightmaps.data = reader.data + heightmaps_start;",
+            "    decoded.heightmaps.size = reader.offset - heightmaps_start;",
+        ])
+    else:
+        named_root = "true" if variant.startswith("chunk:modern:named_nbt") else "false"
+        lines.append(
+            f"    if (!mc_reader_nbt(&reader, {named_root}, &decoded.heightmaps)) return false;")
+    lines.extend([
+        "    if (!mc_reader_buffer_varint(&reader, &decoded.chunk_data) ||",
+        "        !mc_reader_varint(&reader, &block_entity_count) ||",
+        "        block_entity_count != 0 ||",
+        "        !mc_reader_bytes(&reader, mc_reader_remaining(&reader),",
+        "                         &decoded.auxiliary_data)) return false;",
+        "    McReader auxiliary_reader;",
+        "    mc_reader_init(&auxiliary_reader,",
+        "                   decoded.auxiliary_data.data, decoded.auxiliary_data.size);",
+        f"    if (!{auxiliary_function}(&auxiliary_reader)) return false;",
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL || value->ground_up ||",
+        "        value->ignore_old_data || value->section_mask_word_count != 0U ||",
+        "        value->section_mask != 0U || value->biome_count != 0U) return false;",
+        "    McReader auxiliary_reader;",
+        "    mc_reader_init(&auxiliary_reader,",
+        "                   value->auxiliary_data.data, value->auxiliary_data.size);",
+        f"    if (!{auxiliary_function}(&auxiliary_reader)) return false;",
+    ])
+    if registry_heightmaps:
+        lines.extend([
+            "    McReader heightmap_reader;",
+            "    mc_reader_init(&heightmap_reader, value->heightmaps.data,",
+            "                   value->heightmaps.size);",
+            f"    if (!{heightmap_function}(&heightmap_reader) ||",
+            "        mc_reader_remaining(&heightmap_reader) != 0U) return false;",
+            "    if (!mc_packet_i32(packet, value->x) ||",
+            "        !mc_packet_i32(packet, value->z) ||",
+            "        !mc_packet_bytes(packet, value->heightmaps.data,",
+            "                         value->heightmaps.size)) return false;",
+        ])
+    else:
+        named_root = "true" if variant.startswith("chunk:modern:named_nbt") else "false"
+        lines.extend([
+            "    if (!mc_packet_i32(packet, value->x) ||",
+            "        !mc_packet_i32(packet, value->z) ||",
+            f"        !mc_packet_nbt(packet, {named_root}, &value->heightmaps)) return false;",
+        ])
+    lines.extend([
+        "    return mc_packet_buffer_varint(packet, &value->chunk_data) &&",
+        "           mc_packet_varint(packet, 0) &&",
+        "           mc_packet_bytes(packet, value->auxiliary_data.data,",
+        "                           value->auxiliary_data.size);",
+        "}",
+        "",
+    ])
+    return lines
+
+
 def render_chunk_projection(profile: ManifestProfile,
                             packet: ManifestPacket,
                             type_name: str) -> list[str]:
+    if packet.projection is not None and packet.projection.startswith("chunk:modern:"):
+        return render_modern_chunk_projection(profile, packet, type_name)
     decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
     encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
     variant = packet.projection
@@ -1570,6 +1808,7 @@ def render_chunk_projection(profile: ManifestProfile,
     elif not has_biomes:
         lines.append("    if (value->biome_count != 0U) return false;")
     lines.extend([
+        "    if (value->auxiliary_data.size != 0U) return false;",
         "    return mc_packet_buffer_varint(packet, &value->chunk_data) &&",
         "           mc_packet_varint(packet, 0);",
         "}",

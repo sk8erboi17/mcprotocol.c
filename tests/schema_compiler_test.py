@@ -67,6 +67,7 @@ DOCUMENT = {
         "Slot": PLAIN_SLOT,
         "UntrustedSlot": PLAIN_SLOT,
         "HashedSlot": ["container", []],
+        "chunkBlockEntity": ["container", []],
     },
     "play": {
         "toClient": {
@@ -92,6 +93,7 @@ DOCUMENT = {
                                         "0x9": "window_items",
                                         "0xa": "window_click",
                                         "0xb": "map_chunk",
+                                        "0xc": "modern_chunk",
                                     },
                                 },
                             ],
@@ -114,6 +116,7 @@ DOCUMENT = {
                                         "window_items": "packet_window_items",
                                         "window_click": "packet_window_click",
                                         "map_chunk": "packet_map_chunk",
+                                        "modern_chunk": "packet_modern_chunk",
                                     },
                                 },
                             ],
@@ -375,6 +378,77 @@ DOCUMENT = {
                         },
                     ],
                 ],
+                "packet_modern_chunk": [
+                    "container",
+                    [
+                        {"name": "x", "type": "i32"},
+                        {"name": "z", "type": "i32"},
+                        {
+                            "name": "heightmaps",
+                            "type": [
+                                "array",
+                                {
+                                    "countType": "varint",
+                                    "type": [
+                                        "container",
+                                        [
+                                            {"name": "type", "type": "varint"},
+                                            {
+                                                "name": "data",
+                                                "type": [
+                                                    "array",
+                                                    {"countType": "varint", "type": "i64"},
+                                                ],
+                                            },
+                                        ],
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            "name": "chunkData",
+                            "type": ["buffer", {"countType": "varint"}],
+                        },
+                        {
+                            "name": "blockEntities",
+                            "type": [
+                                "array",
+                                {"countType": "varint", "type": "chunkBlockEntity"},
+                            ],
+                        },
+                        *[
+                            {
+                                "name": name,
+                                "type": [
+                                    "array",
+                                    {"countType": "varint", "type": "i64"},
+                                ],
+                            }
+                            for name in (
+                                "skyLightMask",
+                                "blockLightMask",
+                                "emptySkyLightMask",
+                                "emptyBlockLightMask",
+                            )
+                        ],
+                        *[
+                            {
+                                "name": name,
+                                "type": [
+                                    "array",
+                                    {
+                                        "countType": "varint",
+                                        "type": [
+                                            "array",
+                                            {"countType": "varint", "type": "u8"},
+                                        ],
+                                    },
+                                ],
+                            }
+                            for name in ("skyLight", "blockLight")
+                        ],
+                    ],
+                ],
             }
         }
     },
@@ -491,6 +565,18 @@ def main() -> None:
     )
     assert chunk.projection == "chunk:1_17"
 
+    modern_chunk = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "modern_chunk",
+            "expected_id": 12,
+            "projection": "chunk_envelope",
+        },
+    )
+    assert modern_chunk.projection == "chunk:modern:registry"
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -499,7 +585,14 @@ def main() -> None:
         999,
         "0" * 64,
         (("movement_speed", 22, "synthetic registry contract"),),
-        (sample, attributes, *scoreboard_packets, *inventory_packets, chunk),
+        (
+            sample,
+            attributes,
+            *scoreboard_packets,
+            *inventory_packets,
+            chunk,
+            modern_chunk,
+        ),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
     source = COMPILER.render_manifest_source(profile, "0" * 40)
@@ -524,6 +617,10 @@ def main() -> None:
     assert "mc_reader_nbt(&reader, true, &decoded.heightmaps)" in source
     assert "mask_word_count > 1" in source
     assert "mc_packet_buffer_varint(packet, &value->chunk_data)" in source
+    assert "decoded.auxiliary_data" in source
+    assert "modern_chunk_heightmaps" in source
+    assert "heightmap_count > 16" in source
+    assert "byte_count > 2048" in source
 
     outputs = {
         "protocol_test.h": header,

@@ -203,11 +203,11 @@ manifest may use source-validated field overrides, integer constants, and the
 `single_attribute_no_modifiers`, `scoreboard_objective`, `scoreboard_score`,
 `scoreboard_reset`, `plain_item_slot`, `plain_item_contents`,
 `plain_window_items`, `empty_window_click`, and `chunk_envelope` projections for
-schema-checked conditional packets. The chunk projection covers the 1.13--1.17
-envelope variants while exposing section data, biomes and heightmaps without
-interpreting release-specific block palettes, and deliberately accepts only an
-empty block-entity array. Plain-item projections deliberately reject
-componentful slots instead of exposing an unchecked opaque tail.
+schema-checked conditional packets. The chunk projection covers 1.13 through
+the current schema while exposing section data, heightmaps and validated light
+data without interpreting release-specific block palettes, and deliberately
+accepts only an empty block-entity array. Plain-item projections deliberately
+reject componentful slots instead of exposing an unchecked opaque tail.
 
 ### Send a command or chat packet
 
