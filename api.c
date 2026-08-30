@@ -2906,6 +2906,32 @@ bool mc_packet_player_abilities(McPacket *packet, int protocol,
             && mc_packet_float(packet, value->walking_speed));
 }
 
+bool mc_packet_attack_entity(McPacket *packet, int protocol, int32_t entity_id)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol) || entity_id <= 0) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol >= 775) return mc_packet_varint(packet, entity_id);
+    if (protocol <= 5) {
+        return mc_packet_i32(packet, entity_id) && mc_packet_i8(packet, 1);
+    }
+    return mc_packet_varint(packet, entity_id)
+        && mc_packet_varint(packet, 1)
+        && (protocol < 735 || mc_packet_bool(packet, false));
+}
+
+bool mc_packet_respawn_request(McPacket *packet, int protocol)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    return protocol <= 5
+        ? mc_packet_i8(packet, 0)
+        : mc_packet_varint(packet, 0);
+}
+
 bool mc_packet_command(McPacket *packet, int protocol, const char *command,
     int64_t timestamp_ms, int64_t salt)
 {
@@ -4497,6 +4523,49 @@ int mc_client_send_player_abilities(McClient *client,
         return -1;
     }
     return mc_client_send_named(client, "abilities",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_attack_entity(McClient *client, int32_t entity_id,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[16];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_attack_entity(
+            &body, client->profile->protocol, entity_id)) {
+        set_error(error, error_size, "Bersaglio attacco Minecraft non valido");
+        return -1;
+    }
+    const char *packet_name = client->profile->protocol >= 775
+        ? "attack" : "use_entity";
+    return mc_client_send_named(client, packet_name,
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_request_respawn(McClient *client,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[5];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_respawn_request(&body, client->profile->protocol)) {
+        set_error(error, error_size, "Richiesta respawn Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "client_command",
         body.data, body.length, error, error_size);
 }
 

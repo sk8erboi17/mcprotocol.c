@@ -206,6 +206,47 @@ static void expect_player_abilities(int protocol)
     assert(packet.failed);
 }
 
+static void attack_and_respawn_bodies_are_versioned(void)
+{
+    static const struct {
+        int protocol;
+        unsigned char bytes[5];
+        size_t size;
+    } attacks[] = {
+        {5, {0x00U, 0x00U, 0x01U, 0x2cU, 0x01U}, 5U},
+        {47, {0xacU, 0x02U, 0x01U}, 3U},
+        {578, {0xacU, 0x02U, 0x01U}, 3U},
+        {735, {0xacU, 0x02U, 0x01U, 0x00U}, 4U},
+        {774, {0xacU, 0x02U, 0x01U, 0x00U}, 4U},
+        {775, {0xacU, 0x02U}, 2U},
+        {776, {0xacU, 0x02U}, 2U},
+    };
+    unsigned char storage[16];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(attacks) / sizeof(attacks[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_attack_entity(&packet, attacks[index].protocol, 300));
+        assert(packet.length == attacks[index].size);
+        assert(memcmp(packet.data, attacks[index].bytes, packet.length) == 0);
+
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_respawn_request(&packet, attacks[index].protocol));
+        assert(packet.length == 1U && packet.data[0] == 0U);
+    }
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_attack_entity(&packet, 776, 0));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_attack_entity(&packet, 6, 1));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_respawn_request(&packet, 6));
+    assert(packet.failed);
+    assert(!mc_packet_attack_entity(NULL, 776, 1));
+    assert(!mc_packet_respawn_request(NULL, 776));
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -266,6 +307,7 @@ int main(int argc, char **argv)
     expect_player_abilities(578);
     expect_player_abilities(735);
     expect_player_abilities(776);
-    puts("PASS command, abilities, NBT and length-prefixed buffer codecs");
+    attack_and_respawn_bodies_are_versioned();
+    puts("PASS command, abilities, combat, respawn, NBT and buffer codecs");
     return 0;
 }

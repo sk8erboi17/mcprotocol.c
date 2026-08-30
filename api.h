@@ -260,6 +260,11 @@ bool mc_packet_player_position(McPacket *packet, int protocol,
  * contains flags plus both speed floats; 1.16+ contains flags only. */
 bool mc_packet_player_abilities(McPacket *packet, int protocol,
     const McPlayerAbilities *value);
+/* Builds a primary attack against one entity. Legacy use_entity packets use
+ * action 1 and add the sneaking flag from 1.16; 26.1+ has a dedicated body. */
+bool mc_packet_attack_entity(McPacket *packet, int protocol, int32_t entity_id);
+/* Builds client_command's perform-respawn action for the selected release. */
+bool mc_packet_respawn_request(McPacket *packet, int protocol);
 /* Builds the body used to execute a command for the selected release. The
  * command may include one leading slash. timestamp_ms and salt are used only
  * by signed-chat-era protocols; offline callers may pass salt zero. */
@@ -368,6 +373,12 @@ int mc_client_send_command(McClient *client, const char *command,
 /* Sends the serverbound abilities state while the client is in PLAY. */
 int mc_client_send_player_abilities(McClient *client,
     const McPlayerAbilities *abilities, char *error, size_t error_size);
+/* Sends one primary entity attack while the client is in PLAY. */
+int mc_client_attack_entity(McClient *client, int32_t entity_id,
+    char *error, size_t error_size);
+/* Requests respawn through the release-aware client_command packet. */
+int mc_client_request_respawn(McClient *client,
+    char *error, size_t error_size);
 /* Encodes every packet with the current compression settings and writes the
  * resulting frames contiguously. This preserves packet order while avoiding a
  * send syscall per packet. A zero-length batch is a successful no-op. */
