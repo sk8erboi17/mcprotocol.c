@@ -163,6 +163,7 @@ Available symmetric field codecs are:
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
+| `empty_window_click` | Release-aware click with empty changed/carried slots | inventory moves and outside drops |
 | `attack_entity` | Release-aware primary entity attack | legacy use-entity and dedicated modern attack |
 | `respawn_request` | Release-aware perform-respawn action | client command after death |
 

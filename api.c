@@ -2877,6 +2877,50 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
         && mc_packet_varint(packet, 0) && mc_packet_varint(packet, 0));
 }
 
+bool mc_packet_empty_window_click(McPacket *packet, int protocol,
+    const McEmptyWindowClick *value)
+{
+    if (packet == NULL || value == NULL || !mc_protocol_supported(protocol)
+        || value->state_id < 0 || value->mode < 0 || value->mode > 6
+        || (protocol <= 5
+            && (value->window_id < INT8_MIN || value->window_id > INT8_MAX))
+        || (protocol >= 47 && protocol <= 765
+            && (value->window_id < 0
+                || value->window_id > (int32_t)UINT8_MAX))
+        || (protocol >= 766 && value->window_id < 0)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol <= 5) {
+        if (!mc_packet_i8(packet, (int8_t)value->window_id)) return false;
+    } else if (protocol <= 765) {
+        if (!mc_packet_u8(packet, (uint8_t)value->window_id)) return false;
+    } else if (!mc_packet_varint(packet, value->window_id)) {
+        return false;
+    }
+    if (protocol >= 756 && !mc_packet_varint(packet, value->state_id)) {
+        return false;
+    }
+    if (!mc_packet_i16(packet, value->slot)
+        || !mc_packet_i8(packet, value->mouse_button)) {
+        return false;
+    }
+    if (protocol <= 754) {
+        return mc_packet_i16(packet, value->action_number)
+            && mc_packet_i8(packet, (int8_t)value->mode)
+            && mc_packet_plain_item(packet, protocol, 0, 0);
+    }
+    if (!(protocol == 755
+            ? mc_packet_i8(packet, (int8_t)value->mode)
+            : mc_packet_varint(packet, value->mode))
+        || !mc_packet_varint(packet, 0)) {
+        return false;
+    }
+    return protocol < 770
+        ? mc_packet_plain_item(packet, protocol, 0, 0)
+        : mc_packet_bool(packet, false);
+}
+
 bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
     int32_t item_id, int32_t count,
     const McItemComponentPatch *added, size_t added_count,

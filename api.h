@@ -242,6 +242,15 @@ typedef struct {
 } McBlockPlace;
 
 typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    int16_t slot;
+    int8_t mouse_button;
+    int16_t action_number;
+    int32_t mode;
+} McEmptyWindowClick;
+
+typedef struct {
     unsigned char bytes[16];
 } McUuid;
 
@@ -278,6 +287,11 @@ bool mc_packet_nbt(McPacket *packet, bool named_root, const McBytes *encoded);
  * sentinel for the selected release; non-empty stacks require item_id > 0. */
 bool mc_packet_plain_item(McPacket *packet, int protocol,
     int32_t item_id, int32_t count);
+/* Builds a release-aware inventory click with no changed-slot claims and an
+ * empty carried/clicked item. state_id is used from 1.17.1 onward;
+ * action_number is used through 1.16.5. */
+bool mc_packet_empty_window_click(McPacket *packet, int protocol,
+    const McEmptyWindowClick *value);
 /* Encodes a serverbound UntrustedSlot item with raw, length-prefixed added
  * component payloads and removed component type IDs (1.20.5+). */
 bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,

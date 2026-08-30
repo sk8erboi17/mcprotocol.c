@@ -423,6 +423,58 @@ static void untrusted_component_items_match_node(void)
         NULL, 776, 937, 1, &enchantment, 1U, NULL, 0U));
 }
 
+static void empty_window_clicks_are_versioned(void)
+{
+    static const struct {
+        int protocol;
+        unsigned char bytes[9];
+        size_t size;
+    } cases[] = {
+        {4, {0x00U,0x00U,0x24U,0x00U,0x00U,0x01U,0x00U,0xffU,0xffU}, 9U},
+        {47, {0x00U,0x00U,0x24U,0x00U,0x00U,0x01U,0x00U,0xffU,0xffU}, 9U},
+        {754, {0x00U,0x00U,0x24U,0x00U,0x00U,0x01U,0x00U,0x00U}, 8U},
+        {755, {0x00U,0x00U,0x24U,0x00U,0x00U,0x00U}, 7U},
+        {756, {0x00U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U}, 8U},
+        {765, {0x00U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U}, 8U},
+        {766, {0x00U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U}, 8U},
+        {769, {0x00U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U}, 8U},
+        {770, {0x00U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U}, 8U},
+        {776, {0x00U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U}, 8U},
+    };
+    const McEmptyWindowClick click = {
+        .window_id = 0,
+        .state_id = 17,
+        .slot = 36,
+        .mouse_button = 0,
+        .action_number = 1,
+        .mode = 0,
+    };
+    unsigned char storage[16];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_empty_window_click(
+            &packet, cases[index].protocol, &click));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+
+    McEmptyWindowClick invalid = click;
+    invalid.mode = 7;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_empty_window_click(&packet, 776, &invalid));
+    assert(packet.failed);
+    invalid = click;
+    invalid.window_id = 256;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_empty_window_click(&packet, 765, &invalid));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_empty_window_click(&packet, 6, &click));
+    assert(packet.failed);
+    assert(!mc_packet_empty_window_click(NULL, 776, &click));
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -487,6 +539,7 @@ int main(int argc, char **argv)
     block_dig_bodies_are_versioned();
     block_place_bodies_are_versioned();
     untrusted_component_items_match_node();
-    puts("PASS command, abilities, block actions, component items, combat, respawn, NBT and buffer codecs");
+    empty_window_clicks_are_versioned();
+    puts("PASS command, abilities, block actions, window clicks, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }
