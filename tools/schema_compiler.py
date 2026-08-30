@@ -1564,7 +1564,7 @@ def render_minecart_metadata_projection(
     decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
     encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
     mask = manifest_macro("PERRY_MC", profile.c_profile, packet.c_packet, "FIELD")
-    optional_serializer = 14 if legacy else 15
+    display_serializer = 1 if legacy else 15
     lines = [
         f"bool {decode_function}(",
         f"    const void *payload, size_t payload_size, {type_name} *value) {{",
@@ -1605,7 +1605,7 @@ def render_minecart_metadata_projection(
         f"            seen |= {mask}_DAMAGE;",
         "            break;",
         "        case 11U:",
-        f"            if (serializer != {optional_serializer} || saw_display_state ||",
+        f"            if (serializer != {display_serializer} || saw_display_state ||",
         "                !mc_reader_varint(&reader, &decoded.display_block_state) ||",
         "                decoded.display_block_state < 0) return false;",
         "            saw_display_state = true;",
@@ -1672,7 +1672,7 @@ def render_minecart_metadata_projection(
         "        (!mc_packet_u8(packet, UINT8_C(10)) || !mc_packet_varint(packet, 3) ||",
         "         !mc_packet_float(packet, value->damage))) return false;",
         f"    if ((value->fields & {mask}_CUSTOM_DISPLAY_BLOCK) != 0U &&",
-        f"        (!mc_packet_u8(packet, UINT8_C(11)) || !mc_packet_varint(packet, {optional_serializer}) ||",
+        f"        (!mc_packet_u8(packet, UINT8_C(11)) || !mc_packet_varint(packet, {display_serializer}) ||",
         "         !mc_packet_varint(packet, value->has_custom_display_block",
         "                                      ? value->display_block_state : 0))) return false;",
         f"    if ((value->fields & {mask}_DISPLAY_OFFSET) != 0U &&",

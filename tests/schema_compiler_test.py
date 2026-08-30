@@ -816,6 +816,19 @@ def main() -> None:
     primed_tnt_source = COMPILER.render_manifest_source(
         primed_tnt_profile, "0" * 40
     )
+    legacy_minecart_profile = COMPILER.ManifestProfile(
+        "legacy_minecart_test",
+        "legacy_minecart_test",
+        769,
+        "synthetic",
+        769,
+        "0" * 64,
+        (),
+        (legacy_minecart_metadata,),
+    )
+    legacy_minecart_source = COMPILER.render_manifest_source(
+        legacy_minecart_profile, "0" * 40
+    )
     assert "PERRY_MC_TEST_MOVEMENT_SPEED INT32_C(22)" in header
     assert "mc_reader_varlong(&reader, &decoded.duration)" in source
     assert "mc_reader_buffer_i32(&reader, &decoded.legacy_blob)" in source
@@ -860,6 +873,12 @@ def main() -> None:
     assert "PERRY_MC_TEST_ENTITY_METADATA_FIELD_CUSTOM_DISPLAY_BLOCK" in header
     assert "bool has_custom_display_block" in header
     assert "serializer != 15" in source
+    assert "case 11U:\n            if (serializer != 1 || saw_display_state" in legacy_minecart_source
+    assert (
+        "mc_packet_u8(packet, UINT8_C(11)) || !mc_packet_varint(packet, 1)"
+        in legacy_minecart_source
+    )
+    assert "serializer != 14 || saw_display_state" not in legacy_minecart_source
     assert "mc_packet_u8(packet, UINT8_C(11))" in source
     assert "mc_packet_u8(packet, UINT8_C(0xff))" in source
 
