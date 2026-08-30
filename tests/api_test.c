@@ -247,6 +247,49 @@ static void attack_and_respawn_bodies_are_versioned(void)
     assert(!mc_packet_respawn_request(NULL, 776));
 }
 
+static void block_dig_bodies_are_versioned(void)
+{
+    static const struct {
+        int protocol;
+        McBlockDig dig;
+        unsigned char bytes[11];
+        size_t size;
+    } cases[] = {
+        {5, {0, {-9, 64, 11}, 1, 7},
+            {0x00U,0xffU,0xffU,0xffU,0xf7U,0x40U,0x00U,0x00U,0x00U,0x0bU,0x01U}, 11U},
+        {47, {0, {-9, 64, 11}, 1, 7},
+            {0x00U,0xffU,0xffU,0xfdU,0xc1U,0x00U,0x00U,0x00U,0x0bU,0x01U}, 10U},
+        {758, {0, {-9, -60, 11}, 1, 7},
+            {0x00U,0xffU,0xffU,0xfdU,0xc0U,0x00U,0x00U,0xbfU,0xc4U,0x01U}, 10U},
+        {759, {0, {-9, -60, 11}, 1, 7},
+            {0x00U,0xffU,0xffU,0xfdU,0xc0U,0x00U,0x00U,0xbfU,0xc4U,0x01U,0x07U}, 11U},
+        {776, {4, {0, 0, 0}, 0, 0},
+            {0x04U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U}, 11U},
+    };
+    unsigned char storage[16];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_block_dig(
+            &packet, cases[index].protocol, &cases[index].dig));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+
+    const McBlockDig invalid_status = {7, {0, 0, 0}, 0, 0};
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_block_dig(&packet, 776, &invalid_status));
+    assert(packet.failed);
+    const McBlockDig invalid_legacy_y = {0, {0, -1, 0}, 1, 0};
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_block_dig(&packet, 5, &invalid_legacy_y));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_block_dig(&packet, 6, &cases[0].dig));
+    assert(packet.failed);
+    assert(!mc_packet_block_dig(NULL, 776, &cases[4].dig));
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -308,6 +351,7 @@ int main(int argc, char **argv)
     expect_player_abilities(735);
     expect_player_abilities(776);
     attack_and_respawn_bodies_are_versioned();
-    puts("PASS command, abilities, combat, respawn, NBT and buffer codecs");
+    block_dig_bodies_are_versioned();
+    puts("PASS command, abilities, block dig, combat, respawn, NBT and buffer codecs");
     return 0;
 }

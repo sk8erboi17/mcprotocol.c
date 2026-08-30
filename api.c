@@ -2906,6 +2906,32 @@ bool mc_packet_player_abilities(McPacket *packet, int protocol,
             && mc_packet_float(packet, value->walking_speed));
 }
 
+bool mc_packet_block_dig(McPacket *packet, int protocol,
+    const McBlockDig *value)
+{
+    if (packet == NULL || value == NULL || !mc_protocol_supported(protocol)
+        || value->status < 0 || value->status > 6
+        || value->face < 0 || value->face > 5 || value->sequence < 0) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol <= 5) {
+        if (value->location.y < 0 || value->location.y > (int32_t)UINT8_MAX) {
+            packet->failed = true;
+            return false;
+        }
+        return mc_packet_i8(packet, (int8_t)value->status)
+            && mc_packet_i32(packet, value->location.x)
+            && mc_packet_u8(packet, (uint8_t)value->location.y)
+            && mc_packet_i32(packet, value->location.z)
+            && mc_packet_i8(packet, value->face);
+    }
+    return mc_packet_varint(packet, value->status)
+        && mc_packet_position(packet, protocol, value->location)
+        && mc_packet_i8(packet, value->face)
+        && (protocol < 759 || mc_packet_varint(packet, value->sequence));
+}
+
 bool mc_packet_attack_entity(McPacket *packet, int protocol, int32_t entity_id)
 {
     if (packet == NULL || !mc_protocol_supported(protocol) || entity_id <= 0) {
@@ -4523,6 +4549,26 @@ int mc_client_send_player_abilities(McClient *client,
         return -1;
     }
     return mc_client_send_named(client, "abilities",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_dig_block(McClient *client, const McBlockDig *dig,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[16];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_block_dig(&body, client->profile->protocol, dig)) {
+        set_error(error, error_size, "Azione block_dig Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "block_dig",
         body.data, body.length, error, error_size);
 }
 
