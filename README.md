@@ -160,6 +160,7 @@ Available symmetric field codecs are:
 | `uuid` | 16 network bytes | player IDs, profiles and resource packs |
 | `position` | Release-aware packed block position | block use, digging and block updates |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
+| `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |

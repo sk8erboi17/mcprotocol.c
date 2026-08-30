@@ -2877,6 +2877,13 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
         && mc_packet_varint(packet, 0) && mc_packet_varint(packet, 0));
 }
 
+bool mc_packet_set_creative_slot(McPacket *packet, int protocol,
+    int16_t slot, int32_t item_id, int32_t count)
+{
+    return mc_packet_i16(packet, slot)
+        && mc_packet_plain_item(packet, protocol, item_id, count);
+}
+
 bool mc_packet_window_click(McPacket *packet, int protocol,
     const McWindowClick *value)
 {
@@ -4899,6 +4906,27 @@ int mc_client_close_window(McClient *client, int32_t window_id,
         return -1;
     }
     return mc_client_send_named(client, "close_window",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_set_creative_slot(McClient *client, int16_t slot,
+    int32_t item_id, int32_t count, char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[32];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_set_creative_slot(&body, client->profile->protocol,
+            slot, item_id, count)) {
+        set_error(error, error_size, "Slot creativo Minecraft non valido");
+        return -1;
+    }
+    return mc_client_send_named(client, "set_creative_slot",
         body.data, body.length, error, error_size);
 }
 

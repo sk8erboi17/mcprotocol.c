@@ -621,6 +621,44 @@ static void close_windows_and_container_ids_are_versioned(void)
     assert(!mc_packet_close_window(NULL, 768, 0));
 }
 
+static void creative_slots_match_node_release_boundaries(void)
+{
+    static const struct {
+        int protocol;
+        unsigned char bytes[9];
+        size_t size;
+    } cases[] = {
+        {4, {0x00U,0x25U,0x00U,0x03U,0x07U,0x00U,0x00U,0xffU,0xffU}, 9U},
+        {47, {0x00U,0x25U,0x00U,0x03U,0x07U,0x00U,0x00U,0x00U}, 8U},
+        {340, {0x00U,0x25U,0x00U,0x03U,0x07U,0x00U,0x00U,0x00U}, 8U},
+        {393, {0x00U,0x25U,0x00U,0x03U,0x07U,0x00U}, 6U},
+        {401, {0x00U,0x25U,0x00U,0x03U,0x07U,0x00U}, 6U},
+        {404, {0x00U,0x25U,0x01U,0x03U,0x07U,0x00U}, 6U},
+        {765, {0x00U,0x25U,0x01U,0x03U,0x07U,0x00U}, 6U},
+        {766, {0x00U,0x25U,0x07U,0x03U,0x00U,0x00U}, 6U},
+        {770, {0x00U,0x25U,0x07U,0x03U,0x00U,0x00U}, 6U},
+        {775, {0x00U,0x25U,0x07U,0x03U,0x00U,0x00U}, 6U},
+        {776, {0x00U,0x25U,0x07U,0x03U,0x00U,0x00U}, 6U},
+    };
+    unsigned char storage[16];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_set_creative_slot(
+            &packet, cases[index].protocol, 37, 3, 7));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_set_creative_slot(&packet, 776, 37, 0, 1));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_set_creative_slot(&packet, 776, 37, 3, 128));
+    assert(packet.failed);
+    assert(!mc_packet_set_creative_slot(NULL, 776, 37, 3, 7));
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -688,6 +726,7 @@ int main(int argc, char **argv)
     empty_window_clicks_are_versioned();
     legacy_window_clicks_include_predicted_stacks();
     close_windows_and_container_ids_are_versioned();
-    puts("PASS command, abilities, block actions, window clicks/close, component items, combat, respawn, NBT and buffer codecs");
+    creative_slots_match_node_release_boundaries();
+    puts("PASS command, abilities, block actions, inventory, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }

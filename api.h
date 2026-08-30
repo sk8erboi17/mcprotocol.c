@@ -305,6 +305,10 @@ bool mc_packet_nbt(McPacket *packet, bool named_root, const McBytes *encoded);
  * sentinel for the selected release; non-empty stacks require item_id > 0. */
 bool mc_packet_plain_item(McPacket *packet, int protocol,
     int32_t item_id, int32_t count);
+/* Builds a release-aware creative inventory mutation. The slot is the
+ * canonical player-inventory slot and the item is metadata-free. */
+bool mc_packet_set_creative_slot(McPacket *packet, int protocol,
+    int16_t slot, int32_t item_id, int32_t count);
 /* Builds a release-aware inventory click with no changed-slot claims and an
  * empty carried/clicked item. state_id is used from 1.17.1 onward;
  * action_number is used through 1.16.5. */
@@ -464,6 +468,9 @@ int mc_client_place_block(McClient *client, const McBlockPlace *place,
 /* Closes one inventory menu while the client is in PLAY. */
 int mc_client_close_window(McClient *client, int32_t window_id,
     char *error, size_t error_size);
+/* Writes one metadata-free stack into a creative player-inventory slot. */
+int mc_client_set_creative_slot(McClient *client, int16_t slot,
+    int32_t item_id, int32_t count, char *error, size_t error_size);
 /* Sends one primary entity attack while the client is in PLAY. */
 int mc_client_attack_entity(McClient *client, int32_t entity_id,
     char *error, size_t error_size);
