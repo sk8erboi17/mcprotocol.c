@@ -2884,6 +2884,16 @@ bool mc_packet_set_creative_slot(McPacket *packet, int protocol,
         && mc_packet_plain_item(packet, protocol, item_id, count);
 }
 
+bool mc_packet_held_item_slot(McPacket *packet, int protocol, int16_t slot)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol)
+        || slot < 0 || slot > 8) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    return mc_packet_i16(packet, slot);
+}
+
 bool mc_packet_window_click(McPacket *packet, int protocol,
     const McWindowClick *value)
 {
@@ -3008,7 +3018,11 @@ bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
 bool mc_packet_player_position(McPacket *packet, int protocol,
     const McPlayerPosition *value)
 {
-    if (!mc_protocol_supported(protocol) || value == NULL) {
+    if (packet == NULL || !mc_protocol_supported(protocol) || value == NULL
+        || !isfinite(value->x) || !isfinite(value->y)
+        || !isfinite(value->z) || !isfinite(value->yaw)
+        || !isfinite(value->pitch)
+        || (protocol <= 5 && !isfinite(value->y + 1.62))) {
         if (packet != NULL) packet->failed = true;
         return false;
     }
@@ -4841,6 +4855,27 @@ int mc_client_send_command(McClient *client, const char *command,
         body.data, body.length, error, error_size);
 }
 
+int mc_client_send_player_position(McClient *client,
+    const McPlayerPosition *position, char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[48];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_player_position(
+            &body, client->profile->protocol, position)) {
+        set_error(error, error_size, "Posizione Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "position_look",
+        body.data, body.length, error, error_size);
+}
+
 int mc_client_send_player_abilities(McClient *client,
     const McPlayerAbilities *abilities, char *error, size_t error_size)
 {
@@ -4964,6 +4999,46 @@ int mc_client_set_creative_slot(McClient *client, int16_t slot,
         return -1;
     }
     return mc_client_send_named(client, "set_creative_slot",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_select_hotbar_slot(McClient *client, int16_t slot,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[2];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_held_item_slot(&body, client->profile->protocol, slot)) {
+        set_error(error, error_size, "Slot hotbar Minecraft non valido");
+        return -1;
+    }
+    return mc_client_send_named(client, "held_item_slot",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_click_window(McClient *client, const McWindowClick *click,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[32];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_window_click(&body, client->profile->protocol, click)) {
+        set_error(error, error_size, "Click finestra Minecraft non valido");
+        return -1;
+    }
+    return mc_client_send_named(client, "window_click",
         body.data, body.length, error, error_size);
 }
 
@@ -5526,7 +5601,13 @@ static int handle_play(McClient *client, int32_t packet_id, McCursor body,
             McPacket movement;
             mc_packet_init(&movement, storage, sizeof(storage));
             McPlayerPosition response = {
-                .x = x, .y = y, .z = z,
+                .x = x,
+                /* 1.7 clientbound Position carries eye/stance Y, while its
+                 * serverbound reply requires feet Y followed by stance Y. */
+                .y = client->profile->protocol <= 5
+                    ? y - 1.6200000047683716
+                    : y,
+                .z = z,
                 .yaw = yaw, .pitch = pitch, .on_ground = true
             };
             mc_packet_player_position(&movement,

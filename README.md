@@ -162,6 +162,7 @@ Available symmetric field codecs are:
 | `block_change` | Complete release-aware block-change body | authoritative block-state observations from 1.7 through current |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
+| `held_item_slot` | Validated hotbar index as a big-endian short | selected-slot changes in every release |
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
@@ -254,7 +255,12 @@ tests deterministic.
 
 ### Send movement
 
-The helper handles the extra stance double used by protocols 4 and 5:
+The helper handles the extra stance double used by protocols 4 and 5. The
+automatic teleport reply also converts their clientbound eye/stance Y back to
+feet Y before producing the source-validated serverbound order `feet, stance`.
+The inherited `minecraft-data` 1.7 field labels reverse those two names; the
+canonical `PacketPlayInPosition` source and server admission semantics decide
+the reviewed correction:
 
 ```c
 unsigned char storage[64];

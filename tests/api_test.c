@@ -1,6 +1,7 @@
 #include "api.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -324,6 +325,108 @@ static void block_changes_are_versioned(void)
     assert(!mc_reader_block_change(&reader, 5, &position, &state_id));
     assert(reader.failed);
     assert(!mc_reader_block_change(NULL, 776, &position, &state_id));
+}
+
+static void player_positions_are_versioned(void)
+{
+    unsigned char storage[64];
+    McPacket packet;
+    const McPlayerPosition position = {
+        .x = -8.5,
+        .y = 64.0,
+        .z = 9.5,
+        .yaw = 12.0F,
+        .pitch = 34.0F,
+        .on_ground = true,
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_player_position(&packet, 4, &position));
+    McReader reader;
+    double value = 0.0;
+    float rotation = 0.0F;
+    bool on_ground = false;
+    mc_reader_init(&reader, storage, packet.length);
+    assert(mc_reader_double(&reader, &value) && value == position.x);
+    assert(mc_reader_double(&reader, &value) && fabs(value - position.y) < 1.0e-12);
+    assert(mc_reader_double(&reader, &value) &&
+        fabs(value - (position.y + 1.62)) < 1.0e-12);
+    assert(mc_reader_double(&reader, &value) && value == position.z);
+    assert(mc_reader_float(&reader, &rotation) && rotation == position.yaw);
+    assert(mc_reader_float(&reader, &rotation) && rotation == position.pitch);
+    assert(mc_reader_bool(&reader, &on_ground) && on_ground);
+    assert(mc_reader_remaining(&reader) == 0U);
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_player_position(&packet, 47, &position));
+    assert(packet.length == 33U);
+}
+
+static void movement_and_hotbar_bodies_match_node(void)
+{
+    /* Bodies excluding ID. The 1.7 position pair follows the canonical
+     * PacketPlayInPosition source (feet Y, then stance Y); minecraft-data's
+     * inherited field labels are reversed and must not dictate wire order. */
+    static const unsigned char position_1_7[] = {
+        0xc0U,0x21U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x40U,0x50U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x40U,0x50U,0x67U,0xaeU,0x14U,0x7aU,0xe1U,0x48U,
+        0x40U,0x23U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x42U,0xb4U,0x00U,0x00U,0x41U,0xa0U,0x00U,0x00U,0x01U,
+    };
+    static const unsigned char position_1_8[] = {
+        0xc0U,0x21U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x40U,0x50U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x40U,0x23U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x42U,0xb4U,0x00U,0x00U,0x41U,0xa0U,0x00U,0x00U,0x01U,
+    };
+    static const unsigned char position_26_2[] = {
+        0xc0U,0x21U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0xc0U,0x4eU,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x40U,0x23U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,
+        0x42U,0xb4U,0x00U,0x00U,0x41U,0xa0U,0x00U,0x00U,0x01U,
+    };
+    static const struct {
+        int protocol;
+        double y;
+        const unsigned char *bytes;
+        size_t size;
+    } cases[] = {
+        {4, 64.0, position_1_7, sizeof(position_1_7)},
+        {47, 64.0, position_1_8, sizeof(position_1_8)},
+        {776, -60.0, position_26_2, sizeof(position_26_2)},
+    };
+    unsigned char storage[64];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        const McPlayerPosition position = {
+            -8.5, cases[index].y, 9.5, 90.0F, 20.0F, true
+        };
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_player_position(
+            &packet, cases[index].protocol, &position));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+
+    const McPlayerPosition non_finite = {
+        NAN, 64.0, 9.5, 0.0F, 0.0F, true
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_player_position(&packet, 47, &non_finite));
+    assert(packet.failed);
+    assert(!mc_packet_player_position(NULL, 47, &non_finite));
+
+    static const unsigned char held_slot[] = {0x00U, 0x07U};
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_held_item_slot(&packet, cases[index].protocol, 7));
+        assert(packet.length == sizeof(held_slot));
+        assert(memcmp(packet.data, held_slot, packet.length) == 0);
+    }
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_held_item_slot(&packet, 776, 9));
+    assert(packet.failed);
+    assert(!mc_packet_held_item_slot(NULL, 776, 0));
 }
 
 static void block_place_bodies_are_versioned(void)
@@ -757,12 +860,14 @@ int main(int argc, char **argv)
     attack_and_respawn_bodies_are_versioned();
     block_dig_bodies_are_versioned();
     block_changes_are_versioned();
+    player_positions_are_versioned();
+    movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
     untrusted_component_items_match_node();
     empty_window_clicks_are_versioned();
     legacy_window_clicks_include_predicted_stacks();
     close_windows_and_container_ids_are_versioned();
     creative_slots_match_node_release_boundaries();
-    puts("PASS command, abilities, block actions, inventory, component items, combat, respawn, NBT and buffer codecs");
+    puts("PASS command, movement, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }
