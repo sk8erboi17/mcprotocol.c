@@ -366,6 +366,10 @@ bool mc_packet_empty_window_click(McPacket *packet, int protocol,
  * are deliberately empty, so clicked_item_count must be zero. */
 bool mc_packet_window_click(McPacket *packet, int protocol,
     const McWindowClick *value);
+/* Builds one container-menu button click. Window IDs become unsigned in
+ * 1.21.1 and VarInt in 1.21.3; button IDs become VarInt in 1.21.1. */
+bool mc_packet_container_button(McPacket *packet, int protocol,
+    int32_t window_id, int32_t button_id);
 /* Builds a release-aware close-window body. Container IDs use one unsigned
  * byte through 1.21.1 and VarInt from 1.21.3 onward. */
 bool mc_packet_close_window(McPacket *packet, int protocol, int32_t window_id);
@@ -560,6 +564,9 @@ int mc_client_select_hotbar_slot(McClient *client, int16_t slot,
 /* Sends a release-aware inventory click while in PLAY. */
 int mc_client_click_window(McClient *client, const McWindowClick *click,
     char *error, size_t error_size);
+/* Activates one button/recipe in the current container menu. */
+int mc_client_click_container_button(McClient *client,
+    int32_t window_id, int32_t button_id, char *error, size_t error_size);
 /* Sends one primary entity attack while the client is in PLAY. */
 int mc_client_attack_entity(McClient *client, int32_t entity_id,
     char *error, size_t error_size);

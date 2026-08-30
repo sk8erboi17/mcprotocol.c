@@ -872,6 +872,50 @@ static void legacy_window_clicks_include_predicted_stacks(void)
     assert(packet.failed);
 }
 
+static void container_buttons_match_node_and_source(void)
+{
+    static const unsigned char legacy[] = {0x02U, 0x01U};
+    static const unsigned char one_twenty_one_one[] = {
+        0xc8U, 0xacU, 0x02U,
+    };
+    static const unsigned char modern[] = {
+        0xacU, 0x02U, 0xacU, 0x02U,
+    };
+    static const struct {
+        int protocol;
+        int32_t window_id;
+        int32_t button_id;
+        const unsigned char *bytes;
+        size_t size;
+    } cases[] = {
+        {4, 2, 1, legacy, sizeof(legacy)},
+        {767, 200, 300, one_twenty_one_one, sizeof(one_twenty_one_one)},
+        {768, 300, 300, modern, sizeof(modern)},
+        /* minecraft-data 1.21.11 incorrectly labels buttonId i8; Mojang's
+         * ServerboundContainerButtonClickPacket uses VAR_INT here. */
+        {774, 300, 300, modern, sizeof(modern)},
+        {775, 300, 300, modern, sizeof(modern)},
+    };
+    unsigned char storage[16];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_container_button(&packet,
+            cases[index].protocol, cases[index].window_id,
+            cases[index].button_id));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_container_button(&packet, 766, 128, 0));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_container_button(&packet, 767, 256, 0));
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_container_button(&packet, 776, 0, -1));
+    assert(!mc_packet_container_button(NULL, 776, 0, 0));
+}
+
 static void close_windows_and_container_ids_are_versioned(void)
 {
     unsigned char storage[16];
@@ -1027,6 +1071,7 @@ int main(int argc, char **argv)
     untrusted_component_items_match_node();
     empty_window_clicks_are_versioned();
     legacy_window_clicks_include_predicted_stacks();
+    container_buttons_match_node_and_source();
     close_windows_and_container_ids_are_versioned();
     creative_slots_match_node_release_boundaries();
     puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");

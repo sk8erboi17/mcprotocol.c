@@ -2974,6 +2974,27 @@ bool mc_packet_empty_window_click(McPacket *packet, int protocol,
     return mc_packet_window_click(packet, protocol, &click);
 }
 
+bool mc_packet_container_button(McPacket *packet, int protocol,
+    int32_t window_id, int32_t button_id)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol)
+        || window_id < 0 || button_id < 0
+        || (protocol <= 766
+            && (window_id > INT8_MAX || button_id > INT8_MAX))
+        || (protocol == 767 && window_id > (int32_t)UINT8_MAX)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol <= 766) {
+        return mc_packet_i8(packet, (int8_t)window_id)
+            && mc_packet_i8(packet, (int8_t)button_id);
+    }
+    return (protocol == 767
+            ? mc_packet_u8(packet, (uint8_t)window_id)
+            : mc_packet_varint(packet, window_id))
+        && mc_packet_varint(packet, button_id);
+}
+
 bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
     int32_t item_id, int32_t count,
     const McItemComponentPatch *added, size_t added_count,
@@ -5267,6 +5288,27 @@ int mc_client_click_window(McClient *client, const McWindowClick *click,
         return -1;
     }
     return mc_client_send_named(client, "window_click",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_click_container_button(McClient *client,
+    int32_t window_id, int32_t button_id, char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[10];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_container_button(
+            &body, client->profile->protocol, window_id, button_id)) {
+        set_error(error, error_size, "Bottone container Minecraft non valido");
+        return -1;
+    }
+    return mc_client_send_named(client, "enchant_item",
         body.data, body.length, error, error_size);
 }
 
