@@ -513,6 +513,7 @@ def manifest_minecart_metadata_projection(
     raw_fields: list[dict[str, Any]],
     types: dict[str, Any],
     layout: Any,
+    first_index: Any,
 ) -> tuple[tuple[ManifestField, ...], str]:
     if (
         len(raw_fields) != 2
@@ -524,16 +525,49 @@ def manifest_minecart_metadata_projection(
     entity_wire = required_manifest_wire(
         compiler, raw_fields[0].get("type"), types, "minecart metadata entity ID"
     )
-    if entity_wire.suffix != "varint":
-        raise ValueError(f"packet {packet_name} minecart metadata entity ID is not VarInt")
-    if layout not in {"block_state_and_flag", "optional_block_state"}:
+    if entity_wire.suffix not in {"i32", "varint"}:
+        raise ValueError(
+            f"packet {packet_name} minecart metadata entity ID is not i32/VarInt"
+        )
+    if layout not in {
+        "packed_block_state_and_flag",
+        "block_state_and_flag",
+        "optional_block_state",
+    }:
         raise ValueError(
             "source_validated_minecart_metadata requires metadata_layout "
-            "block_state_and_flag or optional_block_state"
+            "packed_block_state_and_flag, block_state_and_flag or optional_block_state"
+        )
+    expected_first_index = (
+        17
+        if compiler.protocol <= 47
+        else 5
+        if compiler.protocol <= 110
+        else 6
+        if compiler.protocol <= 404
+        else 7
+        if compiler.protocol <= 754
+        else 8
+    )
+    if not isinstance(first_index, int) or first_index != expected_first_index:
+        raise ValueError(
+            "source_validated_minecart_metadata requires metadata_first_index "
+            f"{expected_first_index} for protocol {compiler.protocol}"
+        )
+    expected_layout = (
+        "packed_block_state_and_flag"
+        if compiler.protocol <= 47
+        else "block_state_and_flag"
+        if compiler.protocol < 770
+        else "optional_block_state"
+    )
+    if layout != expected_layout:
+        raise ValueError(
+            f"protocol {compiler.protocol} requires minecart metadata layout {expected_layout}"
         )
     return (
         (ManifestField("entityId", "entity_id", entity_wire),),
-        f"minecart_metadata:{layout}",
+        f"minecart_metadata:{layout}:{first_index}:{entity_wire.suffix}",
     )
 
 
@@ -1128,6 +1162,7 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
                 raw_fields,
                 types,
                 spec.get("metadata_layout"),
+                spec.get("metadata_first_index"),
             )
             return ManifestPacket(
                 name,
@@ -1554,17 +1589,45 @@ def render_minecart_metadata_projection(
     packet: ManifestPacket,
     type_name: str,
 ) -> list[str]:
-    layout = packet.projection
-    if layout not in {
-        "minecart_metadata:block_state_and_flag",
-        "minecart_metadata:optional_block_state",
-    }:
-        raise ValueError(f"unknown minecart metadata projection {layout}")
-    legacy = layout == "minecart_metadata:block_state_and_flag"
+    parts = packet.projection.split(":") if packet.projection is not None else []
+    if (
+        len(parts) != 4
+        or parts[0] != "minecart_metadata"
+        or parts[1]
+        not in {
+            "packed_block_state_and_flag",
+            "block_state_and_flag",
+            "optional_block_state",
+        }
+        or parts[2] not in {"5", "6", "7", "8", "17"}
+        or parts[3] not in {"i32", "varint"}
+    ):
+        raise ValueError(f"unknown minecart metadata projection {packet.projection}")
+    layout = parts[1]
+    first_index = int(parts[2])
+    entity_wire = parts[3]
+    packed = layout == "packed_block_state_and_flag"
+    has_display_flag = layout != "optional_block_state"
+    int_serializer = 2 if packed else 1
+    float_serializer = 3 if packed or profile.protocol >= 761 else 2
+    bool_serializer = (
+        0
+        if packed
+        else 6
+        if profile.protocol <= 340
+        else 7
+        if profile.protocol <= 760
+        else 8
+    )
+    display_serializer = int_serializer if has_display_flag else 15
+    display_index = first_index + 3
+    offset_index = first_index + 4
+    flag_index = first_index + 5
+    value_reader = "mc_reader_i32" if packed else "mc_reader_varint"
+    value_writer = "mc_packet_i32" if packed else "mc_packet_varint"
     decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
     encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
     mask = manifest_macro("PERRY_MC", profile.c_profile, packet.c_packet, "FIELD")
-    display_serializer = 1 if legacy else 15
     lines = [
         f"bool {decode_function}(",
         f"    const void *payload, size_t payload_size, {type_name} *value) {{",
@@ -1573,65 +1636,100 @@ def render_minecart_metadata_projection(
         f"    {type_name} decoded = {{0}};",
         "    uint32_t seen = 0U;",
         "    bool saw_display_state = false;",
-        *(["    bool saw_display_flag = false;"] if legacy else []),
+        *(["    bool saw_display_flag = false;"] if has_display_flag else []),
         "    bool terminated = false;",
+        *(["    uint8_t byte_value = 0U;"] if packed else []),
         "    mc_reader_init(&reader, payload, payload_size);",
-        "    if (!mc_reader_varint(&reader, &decoded.entity_id) || decoded.entity_id <= 0)",
+        f"    if (!mc_reader_{entity_wire}(&reader, &decoded.entity_id) || decoded.entity_id <= 0)",
         "        return false;",
         "    while (mc_reader_remaining(&reader) != 0U) {",
         "        uint8_t index = 0U;",
         "        int32_t serializer = -1;",
-        "        if (!mc_reader_u8(&reader, &index)) return false;",
-        "        if (index == UINT8_C(0xff)) {",
-        "            terminated = true;",
-        "            break;",
-        "        }",
-        "        if (!mc_reader_varint(&reader, &serializer)) return false;",
+    ]
+    if packed:
+        lines.extend([
+            "        uint8_t header = 0U;",
+            "        if (!mc_reader_u8(&reader, &header)) return false;",
+            "        if (header == UINT8_C(0x7f)) {",
+            "            terminated = true;",
+            "            break;",
+            "        }",
+            "        index = (uint8_t)(header & UINT8_C(0x1f));",
+            "        serializer = (int32_t)(header >> 5U);",
+        ])
+    else:
+        lines.extend([
+            "        if (!mc_reader_u8(&reader, &index)) return false;",
+            "        if (index == UINT8_C(0xff)) {",
+            "            terminated = true;",
+            "            break;",
+            "        }",
+        ])
+        if profile.protocol <= 340:
+            lines.extend([
+                "        uint8_t serializer_u8 = 0U;",
+                "        if (!mc_reader_u8(&reader, &serializer_u8)) return false;",
+                "        serializer = serializer_u8;",
+            ])
+        else:
+            lines.append("        if (!mc_reader_varint(&reader, &serializer)) return false;")
+    lines.extend([
         "        switch (index) {",
-        "        case 8U:",
-        f"            if (serializer != 1 || (seen & {mask}_HURT_TIME) != 0U ||",
-        "                !mc_reader_varint(&reader, &decoded.hurt_time)) return false;",
+        f"        case {first_index}U:",
+        f"            if (serializer != {int_serializer} || (seen & {mask}_HURT_TIME) != 0U ||",
+        f"                !{value_reader}(&reader, &decoded.hurt_time)) return false;",
         f"            seen |= {mask}_HURT_TIME;",
         "            break;",
-        "        case 9U:",
-        f"            if (serializer != 1 || (seen & {mask}_HURT_DIRECTION) != 0U ||",
-        "                !mc_reader_varint(&reader, &decoded.hurt_direction)) return false;",
+        f"        case {first_index + 1}U:",
+        f"            if (serializer != {int_serializer} || (seen & {mask}_HURT_DIRECTION) != 0U ||",
+        f"                !{value_reader}(&reader, &decoded.hurt_direction)) return false;",
         f"            seen |= {mask}_HURT_DIRECTION;",
         "            break;",
-        "        case 10U:",
-        f"            if (serializer != 3 || (seen & {mask}_DAMAGE) != 0U ||",
+        f"        case {first_index + 2}U:",
+        f"            if (serializer != {float_serializer} || (seen & {mask}_DAMAGE) != 0U ||",
         "                !mc_reader_float(&reader, &decoded.damage) ||",
         "                !isfinite(decoded.damage)) return false;",
         f"            seen |= {mask}_DAMAGE;",
         "            break;",
-        "        case 11U:",
+        f"        case {display_index}U:",
         f"            if (serializer != {display_serializer} || saw_display_state ||",
-        "                !mc_reader_varint(&reader, &decoded.display_block_state) ||",
+        f"                !{value_reader}(&reader, &decoded.display_block_state) ||",
         "                decoded.display_block_state < 0) return false;",
         "            saw_display_state = true;",
         f"            seen |= {mask}_CUSTOM_DISPLAY_BLOCK;",
-    ]
-    if not legacy:
+    ])
+    if not has_display_flag:
         lines.append(
             "            decoded.has_custom_display_block = decoded.display_block_state != 0;"
         )
     lines.extend([
         "            break;",
-        "        case 12U:",
-        f"            if (serializer != 1 || (seen & {mask}_DISPLAY_OFFSET) != 0U ||",
-        "                !mc_reader_varint(&reader, &decoded.display_offset)) return false;",
+        f"        case {offset_index}U:",
+        f"            if (serializer != {int_serializer} || (seen & {mask}_DISPLAY_OFFSET) != 0U ||",
+        f"                !{value_reader}(&reader, &decoded.display_offset)) return false;",
         f"            seen |= {mask}_DISPLAY_OFFSET;",
         "            break;",
     ])
-    if legacy:
-        lines.extend([
-            "        case 13U:",
-            "            if (serializer != 8 || saw_display_flag ||",
-            "                !mc_reader_bool(&reader, &decoded.has_custom_display_block))",
-            "                return false;",
-            "            saw_display_flag = true;",
-            "            break;",
-        ])
+    if has_display_flag:
+        if packed:
+            lines.extend([
+                f"        case {flag_index}U:",
+                f"            if (serializer != {bool_serializer} || saw_display_flag ||",
+                "                !mc_reader_u8(&reader, &byte_value) || byte_value > 1U)",
+                "                return false;",
+                "            decoded.has_custom_display_block = byte_value != 0U;",
+                "            saw_display_flag = true;",
+                "            break;",
+            ])
+        else:
+            lines.extend([
+                f"        case {flag_index}U:",
+                f"            if (serializer != {bool_serializer} || saw_display_flag ||",
+                "                !mc_reader_bool(&reader, &decoded.has_custom_display_block))",
+                "                return false;",
+                "            saw_display_flag = true;",
+                "            break;",
+            ])
     lines.extend([
         "        default:",
         "            return false;",
@@ -1640,7 +1738,7 @@ def render_minecart_metadata_projection(
         "    if (!terminated || mc_reader_remaining(&reader) != 0U || seen == 0U)",
         "        return false;",
     ])
-    if legacy:
+    if has_display_flag:
         lines.extend([
             "    if (saw_display_state != saw_display_flag) return false;",
         ])
@@ -1656,37 +1754,80 @@ def render_minecart_metadata_projection(
         f"        value->fields == 0U || (value->fields & ~{mask}_ALL) != 0U ||",
         "        !isfinite(value->damage) || value->display_block_state < 0 ||",
     ])
-    if not legacy:
+    if not has_display_flag:
         lines.append(
             "        (value->has_custom_display_block && value->display_block_state == 0) ||"
         )
-    lines.extend([
-        "        !mc_packet_varint(packet, value->entity_id)) return false;",
-        f"    if ((value->fields & {mask}_HURT_TIME) != 0U &&",
-        "        (!mc_packet_u8(packet, UINT8_C(8)) || !mc_packet_varint(packet, 1) ||",
-        "         !mc_packet_varint(packet, value->hurt_time))) return false;",
-        f"    if ((value->fields & {mask}_HURT_DIRECTION) != 0U &&",
-        "        (!mc_packet_u8(packet, UINT8_C(9)) || !mc_packet_varint(packet, 1) ||",
-        "         !mc_packet_varint(packet, value->hurt_direction))) return false;",
-        f"    if ((value->fields & {mask}_DAMAGE) != 0U &&",
-        "        (!mc_packet_u8(packet, UINT8_C(10)) || !mc_packet_varint(packet, 3) ||",
-        "         !mc_packet_float(packet, value->damage))) return false;",
-        f"    if ((value->fields & {mask}_CUSTOM_DISPLAY_BLOCK) != 0U &&",
-        f"        (!mc_packet_u8(packet, UINT8_C(11)) || !mc_packet_varint(packet, {display_serializer}) ||",
-        "         !mc_packet_varint(packet, value->has_custom_display_block",
-        "                                      ? value->display_block_state : 0))) return false;",
-        f"    if ((value->fields & {mask}_DISPLAY_OFFSET) != 0U &&",
-        "        (!mc_packet_u8(packet, UINT8_C(12)) || !mc_packet_varint(packet, 1) ||",
-        "         !mc_packet_varint(packet, value->display_offset))) return false;",
-    ])
-    if legacy:
+    lines.append(
+        f"        !mc_packet_{entity_wire}(packet, value->entity_id)) return false;"
+    )
+
+    def header_failures(index: int, serializer: int) -> list[str]:
+        if packed:
+            header = (serializer << 5) | index
+            return [f"!mc_packet_u8(packet, UINT8_C(0x{header:02x}))"]
+        failures = [f"!mc_packet_u8(packet, UINT8_C({index}))"]
+        failures.append(
+            f"!mc_packet_u8(packet, UINT8_C({serializer}))"
+            if profile.protocol <= 340
+            else f"!mc_packet_varint(packet, {serializer})"
+        )
+        return failures
+
+    def emit_field(field: str, index: int, serializer: int, writer: str) -> None:
+        failures = header_failures(index, serializer) + [f"!{writer}"]
         lines.extend([
-            f"    if ((value->fields & {mask}_CUSTOM_DISPLAY_BLOCK) != 0U &&",
-            "        (!mc_packet_u8(packet, UINT8_C(13)) || !mc_packet_varint(packet, 8) ||",
-            "         !mc_packet_bool(packet, value->has_custom_display_block))) return false;",
+            f"    if ((value->fields & {mask}_{field}) != 0U &&",
+            "        (" + " || ".join(failures) + ")) return false;",
         ])
+
+    emit_field(
+        "HURT_TIME",
+        first_index,
+        int_serializer,
+        f"{value_writer}(packet, value->hurt_time)",
+    )
+    emit_field(
+        "HURT_DIRECTION",
+        first_index + 1,
+        int_serializer,
+        f"{value_writer}(packet, value->hurt_direction)",
+    )
+    emit_field(
+        "DAMAGE",
+        first_index + 2,
+        float_serializer,
+        "mc_packet_float(packet, value->damage)",
+    )
+    display_value = (
+        "value->has_custom_display_block ? value->display_block_state : 0"
+    )
+    emit_field(
+        "CUSTOM_DISPLAY_BLOCK",
+        display_index,
+        display_serializer,
+        f"{value_writer}(packet, {display_value})",
+    )
+    emit_field(
+        "DISPLAY_OFFSET",
+        offset_index,
+        int_serializer,
+        f"{value_writer}(packet, value->display_offset)",
+    )
+    if has_display_flag:
+        flag_writer = (
+            "mc_packet_u8(packet, value->has_custom_display_block ? UINT8_C(1) : UINT8_C(0))"
+            if packed
+            else "mc_packet_bool(packet, value->has_custom_display_block)"
+        )
+        emit_field(
+            "CUSTOM_DISPLAY_BLOCK",
+            flag_index,
+            bool_serializer,
+            flag_writer,
+        )
     lines.extend([
-        "    return mc_packet_u8(packet, UINT8_C(0xff)) && !packet->failed;",
+        f"    return mc_packet_u8(packet, UINT8_C({'0x7f' if packed else '0xff'})) && !packet->failed;",
         "}",
         "",
     ])

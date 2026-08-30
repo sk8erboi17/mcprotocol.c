@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import subprocess
 import sys
@@ -686,15 +687,16 @@ def main() -> None:
             "expected_id": 15,
             "projection": "source_validated_minecart_metadata",
             "metadata_layout": "optional_block_state",
+            "metadata_first_index": 8,
             "source_validation": (
                 "Vanilla minecart accessors and EntityDataSerializers wire IDs"
             ),
         },
     )
-    assert minecart_metadata.projection == "minecart_metadata:optional_block_state"
+    assert minecart_metadata.projection == "minecart_metadata:optional_block_state:8:varint"
     assert [field.wire.suffix for field in minecart_metadata.fields] == ["varint"]
     legacy_minecart_metadata = COMPILER.compile_manifest_packet(
-        compiler,
+        COMPILER.Compiler(DOCUMENT, 769, {}),
         {
             "state": "play",
             "direction": "toClient",
@@ -702,13 +704,40 @@ def main() -> None:
             "expected_id": 15,
             "projection": "source_validated_minecart_metadata",
             "metadata_layout": "block_state_and_flag",
+            "metadata_first_index": 8,
             "source_validation": "Vanilla 1.21.4 minecart accessor layout",
         },
     )
-    assert legacy_minecart_metadata.projection == "minecart_metadata:block_state_and_flag"
+    assert legacy_minecart_metadata.projection == (
+        "minecart_metadata:block_state_and_flag:8:varint"
+    )
+    packed_document = copy.deepcopy(DOCUMENT)
+    packed_document["play"]["toClient"]["types"]["packet_entity_metadata"][1][0][
+        "type"
+    ] = "i32"
+    packed_minecart_metadata = COMPILER.compile_manifest_packet(
+        COMPILER.Compiler(packed_document, 4, {}),
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "entity_metadata",
+            "expected_id": 15,
+            "projection": "source_validated_minecart_metadata",
+            "metadata_layout": "packed_block_state_and_flag",
+            "metadata_first_index": 17,
+            "source_validation": "Vanilla 1.8 packed DataWatcher layout",
+        },
+    )
+    assert packed_minecart_metadata.projection == (
+        "minecart_metadata:packed_block_state_and_flag:17:i32"
+    )
     for incomplete in (
-        {"metadata_layout": "optional_block_state"},
-        {"source_validation": "source checked"},
+        {"metadata_layout": "optional_block_state", "metadata_first_index": 8},
+        {"source_validation": "source checked", "metadata_first_index": 8},
+        {
+            "metadata_layout": "optional_block_state",
+            "source_validation": "source checked",
+        },
     ):
         try:
             COMPILER.compile_manifest_packet(
@@ -829,6 +858,25 @@ def main() -> None:
     legacy_minecart_source = COMPILER.render_manifest_source(
         legacy_minecart_profile, "0" * 40
     )
+    legacy_minecart_header = COMPILER.render_manifest_header(
+        legacy_minecart_profile, "0" * 40
+    )
+    packed_minecart_profile = COMPILER.ManifestProfile(
+        "packed_minecart_test",
+        "packed_minecart_test",
+        4,
+        "synthetic",
+        4,
+        "0" * 64,
+        (),
+        (packed_minecart_metadata,),
+    )
+    packed_minecart_source = COMPILER.render_manifest_source(
+        packed_minecart_profile, "0" * 40
+    )
+    packed_minecart_header = COMPILER.render_manifest_header(
+        packed_minecart_profile, "0" * 40
+    )
     assert "PERRY_MC_TEST_MOVEMENT_SPEED INT32_C(22)" in header
     assert "mc_reader_varlong(&reader, &decoded.duration)" in source
     assert "mc_reader_buffer_i32(&reader, &decoded.legacy_blob)" in source
@@ -879,34 +927,48 @@ def main() -> None:
         in legacy_minecart_source
     )
     assert "serializer != 14 || saw_display_state" not in legacy_minecart_source
+    assert "header == UINT8_C(0x7f)" in packed_minecart_source
+    assert "mc_packet_u8(packet, UINT8_C(0x51))" in packed_minecart_source
+    assert "mc_reader_i32(&reader, &decoded.entity_id)" in packed_minecart_source
+    assert "mc_packet_i32(packet, value->entity_id)" in packed_minecart_source
+    assert "mc_packet_i32(packet, value->hurt_time)" in packed_minecart_source
     assert "mc_packet_u8(packet, UINT8_C(11))" in source
     assert "mc_packet_u8(packet, UINT8_C(0xff))" in source
 
     outputs = {
         "protocol_test.h": header,
         "protocol_test.c": source,
+        "protocol_legacy_minecart_test.h": legacy_minecart_header,
+        "protocol_legacy_minecart_test.c": legacy_minecart_source,
+        "protocol_packed_minecart_test.h": packed_minecart_header,
+        "protocol_packed_minecart_test.c": packed_minecart_source,
         "schema_stamp.json": "{}\n",
     }
     with tempfile.TemporaryDirectory(prefix="mcprotocol-schema-") as temporary:
         output = Path(temporary)
         COMPILER.write_manifest_outputs(outputs, output, check=False)
         COMPILER.write_manifest_outputs(outputs, output, check=True)
-        subprocess.run(
-            [
-                "cc",
-                "-std=c11",
-                "-Wall",
-                "-Wextra",
-                "-Werror",
-                f"-I{ROOT}",
-                f"-I{output}",
-                "-c",
-                str(output / "protocol_test.c"),
-                "-o",
-                str(output / "protocol_test.o"),
-            ],
-            check=True,
-        )
+        for source_name in (
+            "protocol_test.c",
+            "protocol_legacy_minecart_test.c",
+            "protocol_packed_minecart_test.c",
+        ):
+            subprocess.run(
+                [
+                    "cc",
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    f"-I{ROOT}",
+                    f"-I{output}",
+                    "-c",
+                    str(output / source_name),
+                    "-o",
+                    str(output / source_name.replace(".c", ".o")),
+                ],
+                check=True,
+            )
         (output / "protocol_unexpected.c").write_text("stale\n", encoding="utf-8")
         try:
             COMPILER.write_manifest_outputs(outputs, output, check=True)
