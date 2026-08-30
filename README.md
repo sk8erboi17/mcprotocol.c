@@ -172,7 +172,9 @@ Available symmetric field codecs are:
 `tools/schema_compiler.py` turns a pinned `minecraft-data` `protocol.json` into
 deterministic packet-ID constants, C structs and allocation-free body codecs in
 `generated/`. It rejects unsupported schema nodes instead of guessing or
-emitting an opaque remainder. Because the pinned `minecraft-data` checkout
+emitting an opaque remainder. Both `anonymousNbt` and `anonOptionalNbt` map to
+the validated borrowed-NBT codec; the latter preserves the root `END` marker
+used for an absent value. Because the pinned `minecraft-data` checkout
 currently inherits 26.2 protocol data from 26.1, the reviewed wire-only delta
 is explicit in `schema/overlays/776.json`; it cannot become gameplay state.
 The initial vertical slice covers the 26.2

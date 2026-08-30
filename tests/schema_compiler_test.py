@@ -94,6 +94,7 @@ DOCUMENT = {
                                         "0xa": "window_click",
                                         "0xb": "map_chunk",
                                         "0xc": "modern_chunk",
+                                        "0xd": "tile_entity_data",
                                     },
                                 },
                             ],
@@ -117,6 +118,7 @@ DOCUMENT = {
                                         "window_click": "packet_window_click",
                                         "map_chunk": "packet_map_chunk",
                                         "modern_chunk": "packet_modern_chunk",
+                                        "tile_entity_data": "packet_tile_entity_data",
                                     },
                                 },
                             ],
@@ -146,6 +148,14 @@ DOCUMENT = {
                             "name": "modernBlob",
                             "type": ["buffer", {"countType": "varint"}],
                         },
+                    ],
+                ],
+                "packet_tile_entity_data": [
+                    "container",
+                    [
+                        {"name": "location", "type": "position"},
+                        {"name": "action", "type": "varint"},
+                        {"name": "nbtData", "type": "anonOptionalNbt"},
                     ],
                 ],
                 "packet_attributes": [
@@ -577,6 +587,19 @@ def main() -> None:
     )
     assert modern_chunk.projection == "chunk:modern:registry"
 
+    tile_entity = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "tile_entity_data",
+            "expected_id": 13,
+        },
+    )
+    assert [field.wire.suffix for field in tile_entity.fields] == [
+        "position", "varint", "nbt"
+    ]
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -592,6 +615,7 @@ def main() -> None:
             *inventory_packets,
             chunk,
             modern_chunk,
+            tile_entity,
         ),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
@@ -621,6 +645,9 @@ def main() -> None:
     assert "modern_chunk_heightmaps" in source
     assert "heightmap_count > 16" in source
     assert "byte_count > 2048" in source
+    assert "PerryMcTestTileEntityData" in header
+    assert "mc_reader_nbt(&reader, false, &decoded.nbt_data)" in source
+    assert "mc_packet_nbt(packet, false, &value->nbt_data)" in source
 
     outputs = {
         "protocol_test.h": header,

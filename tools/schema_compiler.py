@@ -36,6 +36,7 @@ PRIMITIVES = {
     "UUID": ("McUuid", "uuid"),
     "uuid": ("McUuid", "uuid"),
     "anonymousNbt": ("McBytes", "nbt"),
+    "anonOptionalNbt": ("McBytes", "nbt"),
 }
 
 STATE_ORDER = ("handshaking", "status", "login", "configuration", "play")
