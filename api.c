@@ -3058,6 +3058,89 @@ bool mc_packet_client_information(McPacket *packet, int protocol,
         || mc_packet_varint(packet, value->particle_status);
 }
 
+static bool entity_action_id(int protocol, McEntityActionKind action,
+    int32_t *wire_id)
+{
+    if (wire_id == NULL) return false;
+    switch (action) {
+    case MC_ENTITY_ACTION_START_SNEAKING:
+        if (protocol >= 771) return false;
+        *wire_id = protocol <= 5 ? 1 : 0;
+        return true;
+    case MC_ENTITY_ACTION_STOP_SNEAKING:
+        if (protocol >= 771) return false;
+        *wire_id = protocol <= 5 ? 2 : 1;
+        return true;
+    case MC_ENTITY_ACTION_LEAVE_BED:
+        *wire_id = protocol <= 5 ? 3 : protocol >= 771 ? 0 : 2;
+        return true;
+    case MC_ENTITY_ACTION_START_SPRINTING:
+        *wire_id = protocol <= 5 ? 4 : protocol >= 771 ? 1 : 3;
+        return true;
+    case MC_ENTITY_ACTION_STOP_SPRINTING:
+        *wire_id = protocol <= 5 ? 5 : protocol >= 771 ? 2 : 4;
+        return true;
+    case MC_ENTITY_ACTION_START_HORSE_JUMP:
+        *wire_id = protocol <= 5 ? 6 : protocol >= 771 ? 3 : 5;
+        return true;
+    case MC_ENTITY_ACTION_STOP_HORSE_JUMP:
+        *wire_id = protocol <= 5 ? 7 : protocol >= 771 ? 4 : 6;
+        return true;
+    case MC_ENTITY_ACTION_OPEN_VEHICLE_INVENTORY:
+        *wire_id = protocol <= 5 ? 8 : protocol >= 771 ? 5 : 7;
+        return true;
+    case MC_ENTITY_ACTION_START_ELYTRA_FLYING:
+        if (protocol < 107) return false;
+        *wire_id = protocol >= 771 ? 6 : 8;
+        return true;
+    }
+    return false;
+}
+
+bool mc_packet_entity_action(McPacket *packet, int protocol,
+    const McEntityAction *value)
+{
+    int32_t action_id = -1;
+    if (packet == NULL || !mc_protocol_supported(protocol) || value == NULL
+        || value->entity_id < 0 || value->jump_boost < 0
+        || !entity_action_id(protocol, value->action, &action_id)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    return protocol <= 5
+        ? mc_packet_i32(packet, value->entity_id)
+            && mc_packet_i8(packet, (int8_t)action_id)
+            && mc_packet_i32(packet, value->jump_boost)
+        : mc_packet_varint(packet, value->entity_id)
+            && mc_packet_varint(packet, action_id)
+            && mc_packet_varint(packet, value->jump_boost);
+}
+
+bool mc_packet_player_input(McPacket *packet, int protocol, uint8_t flags)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol) || protocol < 768
+        || (flags & UINT8_C(0x80)) != 0U) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    return mc_packet_u8(packet, flags);
+}
+
+bool mc_packet_arm_animation(McPacket *packet, int protocol,
+    int32_t entity_id, int32_t hand)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol)
+        || (protocol <= 5 && entity_id < 0)
+        || (protocol >= 107 && (hand < 0 || hand > 1))) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol <= 5) {
+        return mc_packet_i32(packet, entity_id) && mc_packet_i8(packet, 1);
+    }
+    return protocol == 47 || mc_packet_varint(packet, hand);
+}
+
 bool mc_packet_player_position(McPacket *packet, int protocol,
     const McPlayerPosition *value)
 {
@@ -4936,6 +5019,67 @@ int mc_client_send_client_information(McClient *client,
         return -1;
     }
     return mc_client_send_named(client, "settings",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_send_entity_action(McClient *client,
+    const McEntityAction *action, char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[16];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_entity_action(&body, client->profile->protocol, action)) {
+        set_error(error, error_size, "Entity Action Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "entity_action",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_send_player_input(McClient *client, uint8_t flags,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[1];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_player_input(&body, client->profile->protocol, flags)) {
+        set_error(error, error_size, "Player Input Minecraft non valido");
+        return -1;
+    }
+    return mc_client_send_named(client, "player_input",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_swing_arm(McClient *client, int32_t entity_id, int32_t hand,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[5];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_arm_animation(
+            &body, client->profile->protocol, entity_id, hand)) {
+        set_error(error, error_size, "Arm Animation Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "arm_animation",
         body.data, body.length, error, error_size);
 }
 

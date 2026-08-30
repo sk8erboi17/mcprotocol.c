@@ -405,6 +405,87 @@ static void client_information_bodies_match_node(void)
     assert(!mc_packet_client_information(NULL, 776, &information));
 }
 
+static void player_action_bodies_match_node(void)
+{
+    static const unsigned char sneak_1_7[] = {
+        0x00U,0x00U,0x00U,0x2aU,0x01U,0x00U,0x00U,0x00U,0x00U,
+    };
+    static const unsigned char sneak_1_8[] = {0x2aU,0x00U,0x00U};
+    static const unsigned char sprint_1_21_5[] = {0x2aU,0x03U,0x00U};
+    static const unsigned char sprint_1_21_6[] = {0x2aU,0x01U,0x00U};
+    static const struct {
+        int protocol;
+        McEntityActionKind action;
+        const unsigned char *bytes;
+        size_t size;
+    } action_cases[] = {
+        {4, MC_ENTITY_ACTION_START_SNEAKING,
+            sneak_1_7, sizeof(sneak_1_7)},
+        {47, MC_ENTITY_ACTION_START_SNEAKING,
+            sneak_1_8, sizeof(sneak_1_8)},
+        {770, MC_ENTITY_ACTION_START_SPRINTING,
+            sprint_1_21_5, sizeof(sprint_1_21_5)},
+        {771, MC_ENTITY_ACTION_START_SPRINTING,
+            sprint_1_21_6, sizeof(sprint_1_21_6)},
+    };
+    unsigned char storage[32];
+    McPacket packet;
+    for (size_t index = 0U;
+            index < sizeof(action_cases) / sizeof(action_cases[0]); ++index) {
+        const McEntityAction action = {
+            .entity_id = 42,
+            .action = action_cases[index].action,
+            .jump_boost = 0,
+        };
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_entity_action(
+            &packet, action_cases[index].protocol, &action));
+        assert(packet.length == action_cases[index].size);
+        assert(memcmp(packet.data,
+            action_cases[index].bytes, packet.length) == 0);
+    }
+
+    const McEntityAction removed_sneak = {
+        .entity_id = 42,
+        .action = MC_ENTITY_ACTION_START_SNEAKING,
+        .jump_boost = 0,
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_entity_action(&packet, 771, &removed_sneak));
+    assert(packet.failed);
+    McEntityAction early_elytra = removed_sneak;
+    early_elytra.action = MC_ENTITY_ACTION_START_ELYTRA_FLYING;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_entity_action(&packet, 47, &early_elytra));
+    assert(!mc_packet_entity_action(NULL, 776, &removed_sneak));
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_player_input(&packet, 768, MC_PLAYER_INPUT_SHIFT));
+    assert(packet.length == 1U && packet.data[0] == 0x20U);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_player_input(&packet, 767, MC_PLAYER_INPUT_SHIFT));
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_player_input(&packet, 776, UINT8_C(0x80)));
+    assert(!mc_packet_player_input(NULL, 776, 0U));
+
+    static const unsigned char arm_1_7[] = {
+        0x00U,0x00U,0x00U,0x2aU,0x01U,
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_arm_animation(&packet, 4, 42, 0));
+    assert(packet.length == sizeof(arm_1_7));
+    assert(memcmp(packet.data, arm_1_7, packet.length) == 0);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_arm_animation(&packet, 47, 0, 0));
+    assert(packet.length == 0U);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_arm_animation(&packet, 107, 0, 0));
+    assert(packet.length == 1U && packet.data[0] == 0x00U);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_arm_animation(&packet, 776, 0, 2));
+    assert(!mc_packet_arm_animation(NULL, 776, 0, 0));
+}
+
 static void player_positions_are_versioned(void)
 {
     unsigned char storage[64];
@@ -939,6 +1020,7 @@ int main(int argc, char **argv)
     block_dig_bodies_are_versioned();
     block_changes_are_versioned();
     client_information_bodies_match_node();
+    player_action_bodies_match_node();
     player_positions_are_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
@@ -947,6 +1029,6 @@ int main(int argc, char **argv)
     legacy_window_clicks_include_predicted_stacks();
     close_windows_and_container_ids_are_versioned();
     creative_slots_match_node_release_boundaries();
-    puts("PASS command, client information, movement, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
+    puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }

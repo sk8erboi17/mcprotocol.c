@@ -230,6 +230,34 @@ typedef struct {
     int32_t particle_status;
 } McClientInformation;
 
+typedef enum {
+    MC_ENTITY_ACTION_START_SNEAKING = 0,
+    MC_ENTITY_ACTION_STOP_SNEAKING,
+    MC_ENTITY_ACTION_LEAVE_BED,
+    MC_ENTITY_ACTION_START_SPRINTING,
+    MC_ENTITY_ACTION_STOP_SPRINTING,
+    MC_ENTITY_ACTION_START_HORSE_JUMP,
+    MC_ENTITY_ACTION_STOP_HORSE_JUMP,
+    MC_ENTITY_ACTION_OPEN_VEHICLE_INVENTORY,
+    MC_ENTITY_ACTION_START_ELYTRA_FLYING
+} McEntityActionKind;
+
+typedef struct {
+    int32_t entity_id;
+    McEntityActionKind action;
+    int32_t jump_boost;
+} McEntityAction;
+
+typedef enum {
+    MC_PLAYER_INPUT_FORWARD = 1U << 0,
+    MC_PLAYER_INPUT_BACKWARD = 1U << 1,
+    MC_PLAYER_INPUT_LEFT = 1U << 2,
+    MC_PLAYER_INPUT_RIGHT = 1U << 3,
+    MC_PLAYER_INPUT_JUMP = 1U << 4,
+    MC_PLAYER_INPUT_SHIFT = 1U << 5,
+    MC_PLAYER_INPUT_SPRINT = 1U << 6
+} McPlayerInputFlag;
+
 typedef struct {
     uint8_t flags;
     float flying_speed;
@@ -351,6 +379,16 @@ bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
  * sent in PLAY through 1.20.1 and in CONFIGURATION from 1.20.2 onward. */
 bool mc_packet_client_information(McPacket *packet, int protocol,
     const McClientInformation *value);
+/* Builds the canonical player-command action and translates the 1.7 offset
+ * and 1.21.6 removal of sneak actions from entity_action. */
+bool mc_packet_entity_action(McPacket *packet, int protocol,
+    const McEntityAction *value);
+/* Builds the bitset-based Player Input packet introduced in 1.21.2. */
+bool mc_packet_player_input(McPacket *packet, int protocol, uint8_t flags);
+/* Builds one main/off-hand swing. entity_id is used only by 1.7; 1.8 has an
+ * empty body and 1.9+ encodes hand as a VarInt. */
+bool mc_packet_arm_animation(McPacket *packet, int protocol,
+    int32_t entity_id, int32_t hand);
 /* Builds the body of the serverbound position_look packet, including the
  * stance field used only by 1.7. Packet ID/framing remain mc_client_send's job. */
 bool mc_packet_player_position(McPacket *packet, int protocol,
@@ -489,6 +527,15 @@ int mc_client_send_command(McClient *client, const char *command,
  * completing modern CONFIGURATION. */
 int mc_client_send_client_information(McClient *client,
     const McClientInformation *information, char *error, size_t error_size);
+/* Sends one release-aware player command while in PLAY. */
+int mc_client_send_entity_action(McClient *client,
+    const McEntityAction *action, char *error, size_t error_size);
+/* Sends one 1.21.2+ Player Input bitset while in PLAY. */
+int mc_client_send_player_input(McClient *client, uint8_t flags,
+    char *error, size_t error_size);
+/* Sends one release-aware arm swing while in PLAY. */
+int mc_client_swing_arm(McClient *client, int32_t entity_id, int32_t hand,
+    char *error, size_t error_size);
 /* Sends one release-aware player position/look update while in PLAY. */
 int mc_client_send_player_position(McClient *client,
     const McPlayerPosition *position, char *error, size_t error_size);

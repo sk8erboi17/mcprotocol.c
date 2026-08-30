@@ -166,6 +166,8 @@ Available symmetric field codecs are:
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `held_item_slot` | Validated hotbar index as a big-endian short | selected-slot changes in every release |
 | `client_information` | Release-aware locale, view, chat, skin and preference fields | PLAY settings through 1.20.1 and CONFIGURATION settings afterward |
+| `entity_action`, `player_input` | Canonical actions and modern input bitsets | sneaking, sprinting and vehicle/player controls across the 1.21.6 enum change |
+| `arm_animation` | Release-aware legacy entity swing, empty 1.8 body or modern hand | primary/off-hand animation |
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
