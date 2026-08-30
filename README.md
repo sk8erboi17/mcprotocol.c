@@ -156,7 +156,7 @@ Available symmetric field codecs are:
 | `float`, `double` | Big-endian IEEE 754 | rotation, velocity, coordinates and borders |
 | `varint`, `varlong` | Minecraft signed variable integer | packet fields, entity IDs, enums, lengths and sequences |
 | `string_n`, `string` | VarInt byte length plus bytes | usernames, chat, commands, identifiers and channels |
-| `bytes`, `skip` | Raw borrowed bytes | bitsets, signatures, plugin data and schema-owned structures |
+| `bytes`, `skip`, `buffer_i32`, `buffer_varint` | Raw or length-prefixed borrowed bytes | bitsets, legacy chunks, signatures and plugin data |
 | `uuid` | 16 network bytes | player IDs, profiles and resource packs |
 | `position` | Release-aware packed block position | block use, digging and block updates |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |

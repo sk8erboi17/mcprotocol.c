@@ -98,6 +98,17 @@ class Compiler:
                 continue
             return schema
 
+    def buffer_suffix(self, schema: Any, types: dict[str, Any]) -> str | None:
+        resolved = self.resolve(schema, types)
+        if not isinstance(resolved, list) or not resolved or resolved[0] != "buffer":
+            return None
+        if len(resolved) != 2 or not isinstance(resolved[1], dict):
+            raise ValueError(f"invalid buffer schema: {resolved!r}")
+        count_type = self.resolve(resolved[1].get("countType"), types)
+        if count_type not in {"i32", "varint"}:
+            raise ValueError(f"unsupported buffer count type: {count_type!r}")
+        return f"buffer_{count_type}"
+
     def packet_table(self, state: str, direction: str) -> tuple[dict[str, int], dict[str, Any]]:
         types = self.direction_types(state, direction)
         packet = self.resolve(types["packet"], types)
@@ -129,6 +140,8 @@ class Compiler:
             if schema not in PRIMITIVES:
                 raise ValueError(f"unsupported scalar type: {schema}")
             return [f"{indent}{PRIMITIVES[schema][0]} {name};"]
+        if self.buffer_suffix(schema, types) is not None:
+            return [f"{indent}McBytes {name};"]
         if not isinstance(schema, list) or not schema:
             raise ValueError(f"invalid schema node for {name}: {schema!r}")
         if schema[0] != "container":
@@ -160,6 +173,11 @@ class Compiler:
             if suffix == "nbt":
                 return [f"    if (!mc_reader_nbt(reader, false, &value->{expression})) return false;"]
             return [f"    if (!mc_reader_{suffix}(reader, &value->{expression})) return false;"]
+        buffer_suffix = self.buffer_suffix(schema, types)
+        if buffer_suffix is not None:
+            if encode:
+                return [f"    if (!mc_packet_{buffer_suffix}(packet, &value->{expression})) return false;"]
+            return [f"    if (!mc_reader_{buffer_suffix}(reader, &value->{expression})) return false;"]
         if not isinstance(schema, list) or not schema or schema[0] != "container":
             kind = schema[0] if isinstance(schema, list) and schema else repr(schema)
             raise ValueError(f"unsupported schema node {kind} for {expression}")
@@ -330,6 +348,9 @@ def manifest_wire(compiler: Compiler, schema: Any,
     resolved = compiler.resolve(schema, types)
     if resolved == "position":
         return ManifestWire("position", "McPosition", "position", True)
+    buffer_suffix = compiler.buffer_suffix(resolved, types)
+    if buffer_suffix is not None:
+        return ManifestWire(buffer_suffix, "McBytes", buffer_suffix)
     if not isinstance(resolved, str) or resolved not in PRIMITIVES:
         return None
     c_type, suffix = PRIMITIVES[resolved]
@@ -944,7 +965,9 @@ def manifest_writer(profile: ManifestProfile, field: ManifestField) -> str:
         )
     if field.wire.suffix == "nbt":
         return f"mc_packet_nbt(packet, false, &value->{field.c_field})"
-    address = "&" if field.wire.suffix == "uuid" else ""
+    address = "&" if field.wire.suffix in {
+        "uuid", "buffer_i32", "buffer_varint"
+    } else ""
     if field.wire.protocol_argument:
         return (
             f"mc_packet_{field.wire.suffix}(packet, {profile.protocol}, "

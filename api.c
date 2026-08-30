@@ -2535,6 +2535,26 @@ bool mc_packet_varlong(McPacket *packet, int64_t value)
     return true;
 }
 
+bool mc_packet_buffer_i32(McPacket *packet, const McBytes *value)
+{
+    if (packet == NULL || value == NULL || value->size > (size_t)INT32_MAX) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    return mc_packet_i32(packet, (int32_t)value->size)
+        && mc_packet_bytes(packet, value->data, value->size);
+}
+
+bool mc_packet_buffer_varint(McPacket *packet, const McBytes *value)
+{
+    if (packet == NULL || value == NULL || value->size > (size_t)INT32_MAX) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    return mc_packet_varint(packet, (int32_t)value->size)
+        && mc_packet_bytes(packet, value->data, value->size);
+}
+
 bool mc_packet_string_n(McPacket *packet, const char *value, size_t size)
 {
     if (value == NULL) {
@@ -2760,6 +2780,26 @@ bool mc_reader_varlong(McReader *reader, int64_t *value)
     }
     if (reader != NULL) reader->failed = true;
     return false;
+}
+
+bool mc_reader_buffer_i32(McReader *reader, McBytes *value)
+{
+    int32_t size = -1;
+    if (value == NULL || !mc_reader_i32(reader, &size) || size < 0) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    return mc_reader_bytes(reader, (size_t)size, value);
+}
+
+bool mc_reader_buffer_varint(McReader *reader, McBytes *value)
+{
+    int32_t size = -1;
+    if (value == NULL || !mc_reader_varint(reader, &size) || size < 0) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    return mc_reader_bytes(reader, (size_t)size, value);
 }
 
 bool mc_reader_string(McReader *reader, McBytes *value)

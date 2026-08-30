@@ -46,6 +46,42 @@ static void nbt_writer_validates_complete_values(void)
     assert(packet.length == 0U);
 }
 
+static void length_prefixed_buffers_round_trip(void)
+{
+    static const unsigned char bytes[] = {0x00U, 0x7fU, 0x80U, 0xffU};
+    unsigned char storage[32];
+    const McBytes expected = {bytes, sizeof(bytes)};
+    McPacket packet;
+    McReader reader;
+    McBytes decoded = {0};
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_buffer_i32(&packet, &expected));
+    mc_reader_init(&reader, packet.data, packet.length);
+    assert(mc_reader_buffer_i32(&reader, &decoded));
+    assert(mc_reader_remaining(&reader) == 0U);
+    assert(decoded.size == expected.size);
+    assert(memcmp(decoded.data, expected.data, expected.size) == 0);
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_buffer_varint(&packet, &expected));
+    mc_reader_init(&reader, packet.data, packet.length);
+    assert(mc_reader_buffer_varint(&reader, &decoded));
+    assert(mc_reader_remaining(&reader) == 0U);
+    assert(decoded.size == expected.size);
+    assert(memcmp(decoded.data, expected.data, expected.size) == 0);
+
+    static const unsigned char negative_i32[] = {0xffU, 0xffU, 0xffU, 0xffU};
+    mc_reader_init(&reader, negative_i32, sizeof(negative_i32));
+    assert(!mc_reader_buffer_i32(&reader, &decoded));
+    assert(reader.failed);
+
+    static const unsigned char truncated_varint[] = {3U, 1U, 2U};
+    mc_reader_init(&reader, truncated_varint, sizeof(truncated_varint));
+    assert(!mc_reader_buffer_varint(&reader, &decoded));
+    assert(reader.failed);
+}
+
 static void expect_command(int protocol)
 {
     unsigned char storage[384];
@@ -225,10 +261,11 @@ int main(int argc, char **argv)
     }
     invalid_commands_fail_sticky();
     nbt_writer_validates_complete_values();
+    length_prefixed_buffers_round_trip();
     expect_player_abilities(4);
     expect_player_abilities(578);
     expect_player_abilities(735);
     expect_player_abilities(776);
-    puts("PASS command, abilities and validated NBT writer codecs");
+    puts("PASS command, abilities, NBT and length-prefixed buffer codecs");
     return 0;
 }

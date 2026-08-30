@@ -133,6 +133,14 @@ DOCUMENT = {
                             ],
                         },
                         {"name": "duration", "type": "varint"},
+                        {
+                            "name": "legacyBlob",
+                            "type": ["buffer", {"countType": "i32"}],
+                        },
+                        {
+                            "name": "modernBlob",
+                            "type": ["buffer", {"countType": "varint"}],
+                        },
                     ],
                 ],
                 "packet_attributes": [
@@ -360,6 +368,8 @@ def main() -> None:
         "u8",
         "varint",
         "varlong",
+        "buffer_i32",
+        "buffer_varint",
     ]
 
     attributes = COMPILER.compile_manifest_packet(
@@ -448,6 +458,8 @@ def main() -> None:
     source = COMPILER.render_manifest_source(profile, "0" * 40)
     assert "PERRY_MC_TEST_MOVEMENT_SPEED INT32_C(22)" in header
     assert "mc_reader_varlong(&reader, &decoded.duration)" in source
+    assert "mc_reader_buffer_i32(&reader, &decoded.legacy_blob)" in source
+    assert "mc_packet_buffer_varint(packet, &value->modern_blob)" in source
     assert "decoded.property_count != 1" in source
     assert "decoded.modifier_count != 0" in source
     assert "mc_reader_nbt(&reader, false, &decoded.display_text)" in source
