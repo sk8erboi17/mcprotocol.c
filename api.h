@@ -233,6 +233,11 @@ typedef struct {
     int32_t hand;
     int32_t held_item_id;
     int32_t held_item_count;
+    int32_t held_item_damage;
+    /* Optional complete, uncompressed named-root NBT for the client-reported
+     * held stack embedded by 1.7/1.8 block_place packets. It is gzip-compressed
+     * for 1.7 and written directly for 1.8. */
+    McBytes held_item_nbt;
     float cursor_x;
     float cursor_y;
     float cursor_z;
@@ -311,7 +316,9 @@ bool mc_packet_player_abilities(McPacket *packet, int protocol,
 bool mc_packet_block_dig(McPacket *packet, int protocol,
     const McBlockDig *value);
 /* Builds block_place/use_item_on bodies across the legacy embedded-stack,
- * byte-cursor, hand-first, sequence and world-border-hit boundaries. */
+ * byte-cursor, hand-first, sequence and world-border-hit boundaries. The
+ * legacy held stack may include damage and named-root NBT; modern protocols
+ * ignore those client-reported fields. */
 bool mc_packet_block_place(McPacket *packet, int protocol,
     const McBlockPlace *value);
 /* Builds a primary attack against one entity. Legacy use_entity packets use

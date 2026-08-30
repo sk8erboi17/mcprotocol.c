@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 
 static void expect_string(McReader *reader, const char *expected)
 {
@@ -359,6 +360,62 @@ static void block_place_bodies_are_versioned(void)
         assert(packet.length == cases[index].size);
         assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
     }
+
+    static const unsigned char reported_nbt[] = {
+        0x0aU,0x00U,0x00U,
+        0x0aU,0x00U,0x07U,'d','i','s','p','l','a','y',
+        0x08U,0x00U,0x04U,'N','a','m','e',
+        0x00U,0x0dU,'r','e','p','o','r','t','e','d','-','o','n','l','y',
+        0x00U,0x00U,
+    };
+    const McBlockPlace tagged = {
+        .location = {-9, 64, 11},
+        .direction = 1,
+        .held_item_id = 276,
+        .held_item_count = 1,
+        .held_item_damage = 7,
+        .held_item_nbt = {reported_nbt, sizeof(reported_nbt)},
+        .cursor_x = 0.5F,
+        .cursor_y = 0.5F,
+        .cursor_z = 0.5F,
+    };
+    unsigned char tagged_storage[256];
+    mc_packet_init(&packet, tagged_storage, sizeof(tagged_storage));
+    assert(mc_packet_block_place(&packet, 47, &tagged));
+    assert(packet.length == 9U + 5U + sizeof(reported_nbt) + 3U);
+    static const unsigned char tagged_header[] = {
+        0x01U,0x14U,0x01U,0x00U,0x07U,
+    };
+    assert(memcmp(packet.data + 9U,
+        tagged_header, sizeof(tagged_header)) == 0);
+    assert(memcmp(packet.data + 14U,
+        reported_nbt, sizeof(reported_nbt)) == 0);
+
+    mc_packet_init(&packet, tagged_storage, sizeof(tagged_storage));
+    assert(mc_packet_block_place(&packet, 5, &tagged));
+    assert(memcmp(packet.data + 10U,
+        tagged_header, sizeof(tagged_header)) == 0);
+    const size_t gzip_size = ((size_t)packet.data[15U] << 8U)
+        | (size_t)packet.data[16U];
+    assert(gzip_size > 0U && 17U + gzip_size + 3U == packet.length);
+    unsigned char inflated[sizeof(reported_nbt)];
+    z_stream stream;
+    memset(&stream, 0, sizeof(stream));
+    stream.next_in = packet.data + 17U;
+    stream.avail_in = (uInt)gzip_size;
+    stream.next_out = inflated;
+    stream.avail_out = (uInt)sizeof(inflated);
+    assert(inflateInit2(&stream, 15 + 16) == Z_OK);
+    assert(inflate(&stream, Z_FINISH) == Z_STREAM_END);
+    assert(inflateEnd(&stream) == Z_OK);
+    assert(stream.total_out == (uLong)sizeof(reported_nbt));
+    assert(memcmp(inflated, reported_nbt, sizeof(reported_nbt)) == 0);
+
+    McBlockPlace malformed_tag = tagged;
+    malformed_tag.held_item_nbt.size = sizeof(reported_nbt) - 1U;
+    mc_packet_init(&packet, tagged_storage, sizeof(tagged_storage));
+    assert(!mc_packet_block_place(&packet, 47, &malformed_tag));
+    assert(packet.failed);
 
     McBlockPlace invalid = {
         .location = {0, 0, 0}, .direction = 6, .cursor_x = 0.5F,

@@ -3043,6 +3043,80 @@ static bool packet_block_place_cursor(McPacket *packet, int protocol,
         && mc_packet_float(packet, z);
 }
 
+static bool packet_legacy_reported_item(McPacket *packet, int protocol,
+    const McBlockPlace *value)
+{
+    if (value->held_item_count == 0) {
+        if (value->held_item_id != 0 || value->held_item_damage != 0
+            || value->held_item_nbt.size != 0U) {
+            packet->failed = true;
+            return false;
+        }
+        return mc_packet_u16(packet, UINT16_MAX);
+    }
+    if (value->held_item_id <= 0 || value->held_item_id > (int32_t)INT16_MAX
+        || value->held_item_count < 0 || value->held_item_count > 127
+        || value->held_item_damage < 0
+        || value->held_item_damage > (int32_t)UINT16_MAX
+        || (value->held_item_nbt.size != 0U
+            && value->held_item_nbt.data == NULL)) {
+        packet->failed = true;
+        return false;
+    }
+    if (!mc_packet_u16(packet, (uint16_t)value->held_item_id)
+        || !mc_packet_u8(packet, (uint8_t)value->held_item_count)
+        || !mc_packet_u16(packet, (uint16_t)value->held_item_damage)) {
+        return false;
+    }
+    if (value->held_item_nbt.size == 0U) {
+        return protocol <= 5
+            ? mc_packet_i16(packet, -1)
+            : mc_packet_u8(packet, (uint8_t)MC_NBT_END);
+    }
+    McReader reader;
+    McBytes encoded = {0};
+    mc_reader_init(&reader,
+        value->held_item_nbt.data, value->held_item_nbt.size);
+    if (!mc_reader_nbt(&reader, true, &encoded)
+        || mc_reader_remaining(&reader) != 0U) {
+        packet->failed = true;
+        return false;
+    }
+    if (protocol > 5) {
+        return mc_packet_bytes(packet,
+            value->held_item_nbt.data, value->held_item_nbt.size);
+    }
+
+    z_stream stream;
+    memset(&stream, 0, sizeof(stream));
+    const uLong bound = compressBound((uLong)value->held_item_nbt.size) + 32U;
+    if (bound > (uLong)INT16_MAX) {
+        packet->failed = true;
+        return false;
+    }
+    unsigned char *compressed = malloc((size_t)bound);
+    if (compressed == NULL) {
+        packet->failed = true;
+        return false;
+    }
+    stream.next_in = (Bytef *)(uintptr_t)value->held_item_nbt.data;
+    stream.avail_in = (uInt)value->held_item_nbt.size;
+    stream.next_out = compressed;
+    stream.avail_out = (uInt)bound;
+    int status = deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+        15 + 16, 8, Z_DEFAULT_STRATEGY);
+    if (status == Z_OK) status = deflate(&stream, Z_FINISH);
+    const size_t compressed_size = (size_t)stream.total_out;
+    if (stream.state != NULL) (void)deflateEnd(&stream);
+    const bool ok = status == Z_STREAM_END
+        && compressed_size <= (size_t)INT16_MAX
+        && mc_packet_i16(packet, (int16_t)compressed_size)
+        && mc_packet_bytes(packet, compressed, compressed_size);
+    free(compressed);
+    if (!ok) packet->failed = true;
+    return ok;
+}
+
 bool mc_packet_block_place(McPacket *packet, int protocol,
     const McBlockPlace *value)
 {
@@ -3066,8 +3140,7 @@ bool mc_packet_block_place(McPacket *packet, int protocol,
     }
     if (protocol <= 47) {
         return mc_packet_i8(packet, (int8_t)value->direction)
-            && mc_packet_plain_item(packet, protocol,
-                value->held_item_id, value->held_item_count)
+            && packet_legacy_reported_item(packet, protocol, value)
             && packet_block_place_cursor(packet, protocol,
                 value->cursor_x, value->cursor_y, value->cursor_z);
     }
