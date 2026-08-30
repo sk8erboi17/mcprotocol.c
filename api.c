@@ -3311,16 +3311,23 @@ bool mc_reader_block_change(McReader *reader, int protocol,
     }
     if (protocol <= 5) {
         uint8_t y = 0U;
+        uint8_t metadata = 0U;
+        int32_t block_id = -1;
         if (!mc_reader_i32(reader, &decoded.x)
             || !mc_reader_u8(reader, &y)
-            || !mc_reader_i32(reader, &decoded.z)) {
+            || !mc_reader_i32(reader, &decoded.z)
+            || !mc_reader_varint(reader, &block_id)
+            || !mc_reader_u8(reader, &metadata)
+            || block_id < 0 || block_id > (INT32_MAX >> 4U)
+            || metadata > 15U) {
+            reader->failed = true;
             return false;
         }
         decoded.y = (int32_t)y;
+        decoded_state = (block_id << 4U) | (int32_t)metadata;
     } else if (!mc_reader_position(reader, protocol, &decoded)) {
         return false;
-    }
-    if (!mc_reader_varint(reader, &decoded_state) || decoded_state < 0) {
+    } else if (!mc_reader_varint(reader, &decoded_state) || decoded_state < 0) {
         reader->failed = true;
         return false;
     }

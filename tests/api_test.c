@@ -294,7 +294,7 @@ static void block_dig_bodies_are_versioned(void)
 static void block_changes_are_versioned(void)
 {
     static const unsigned char legacy[] = {
-        0xffU,0xffU,0xffU,0xf7U,0x40U,0x00U,0x00U,0x00U,0x0bU,0x80U,0x01U,
+        0xffU,0xffU,0xffU,0xf7U,0x40U,0x00U,0x00U,0x00U,0x0bU,0x80U,0x01U,0x07U,
     };
     McReader reader;
     McPosition position = {0};
@@ -302,7 +302,7 @@ static void block_changes_are_versioned(void)
     mc_reader_init(&reader, legacy, sizeof(legacy));
     assert(mc_reader_block_change(&reader, 4, &position, &state_id));
     assert(position.x == -9 && position.y == 64 && position.z == 11);
-    assert(state_id == 128 && mc_reader_remaining(&reader) == 0U);
+    assert(state_id == ((128 << 4) | 7) && mc_reader_remaining(&reader) == 0U);
 
     unsigned char modern[16];
     McPacket packet;

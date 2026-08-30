@@ -379,7 +379,8 @@ bool mc_reader_buffer_varint(McReader *reader, McBytes *value);
 bool mc_reader_string(McReader *reader, McBytes *value);
 bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
 /* Decodes one complete clientbound block_change body. Protocols 1.7.x use
- * x:i32/y:u8/z:i32 while 1.8+ use the release-aware packed position. */
+ * x:i32/y:u8/z:i32 plus separate block-id/metadata fields; their returned
+ * state_id is (block_id << 4) | metadata. 1.8+ returns the wire state ID. */
 bool mc_reader_block_change(McReader *reader, int protocol,
     McPosition *position, int32_t *state_id);
 bool mc_reader_uuid(McReader *reader, McUuid *value);
