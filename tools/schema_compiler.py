@@ -507,6 +507,36 @@ def manifest_minecart_steps_projection(
     return fields, f"minecart_steps:{step_names[1]}"
 
 
+def manifest_minecart_metadata_projection(
+    compiler: Compiler,
+    packet_name: str,
+    raw_fields: list[dict[str, Any]],
+    types: dict[str, Any],
+    layout: Any,
+) -> tuple[tuple[ManifestField, ...], str]:
+    if (
+        len(raw_fields) != 2
+        or raw_fields[0].get("name") != "entityId"
+        or raw_fields[1].get("name") != "metadata"
+        or raw_fields[1].get("type") != "entityMetadata"
+    ):
+        raise ValueError(f"packet {packet_name} minecart metadata envelope changed")
+    entity_wire = required_manifest_wire(
+        compiler, raw_fields[0].get("type"), types, "minecart metadata entity ID"
+    )
+    if entity_wire.suffix != "varint":
+        raise ValueError(f"packet {packet_name} minecart metadata entity ID is not VarInt")
+    if layout not in {"block_state_and_flag", "optional_block_state"}:
+        raise ValueError(
+            "source_validated_minecart_metadata requires metadata_layout "
+            "block_state_and_flag or optional_block_state"
+        )
+    return (
+        (ManifestField("entityId", "entity_id", entity_wire),),
+        f"minecart_metadata:{layout}",
+    )
+
+
 def required_manifest_wire(compiler: Compiler, schema: Any,
                            types: dict[str, Any], description: str) -> ManifestWire:
     wire = manifest_wire(compiler, schema, types)
@@ -1045,6 +1075,28 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
                 fields,
                 variant,
             )
+        if projection == "source_validated_minecart_metadata":
+            source_validation = spec.get("source_validation")
+            if not isinstance(source_validation, str) or not source_validation.strip():
+                raise ValueError(
+                    "source_validated_minecart_metadata requires source_validation"
+                )
+            fields, variant = manifest_minecart_metadata_projection(
+                compiler,
+                name,
+                raw_fields,
+                types,
+                spec.get("metadata_layout"),
+            )
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
         if projection in {
             "scoreboard_objective", "scoreboard_score", "scoreboard_reset"
         }:
@@ -1225,6 +1277,22 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
     lines.append("")
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
+        if (
+            packet.projection is not None
+            and packet.projection.startswith("minecart_metadata:")
+        ):
+            mask_prefix = manifest_macro(
+                "PERRY_MC", profile.c_profile, packet.c_packet, "FIELD"
+            )
+            lines.extend([
+                f"#define {mask_prefix}_HURT_TIME (UINT32_C(1) << 0U)",
+                f"#define {mask_prefix}_HURT_DIRECTION (UINT32_C(1) << 1U)",
+                f"#define {mask_prefix}_DAMAGE (UINT32_C(1) << 2U)",
+                f"#define {mask_prefix}_CUSTOM_DISPLAY_BLOCK (UINT32_C(1) << 3U)",
+                f"#define {mask_prefix}_DISPLAY_OFFSET (UINT32_C(1) << 4U)",
+                f"#define {mask_prefix}_ALL ((UINT32_C(1) << 5U) - UINT32_C(1))",
+                "",
+            ])
         lines.append(f"typedef struct {type_name} {{")
         if packet.projection is not None and packet.projection.startswith("chunk:"):
             lines.extend([
@@ -1258,6 +1326,20 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
                 "        int8_t pitch;",
                 "        float weight;",
                 "    } steps[65];",
+            ])
+        elif (
+            packet.projection is not None
+            and packet.projection.startswith("minecart_metadata:")
+        ):
+            lines.extend([
+                "    int32_t entity_id;",
+                "    int32_t hurt_time;",
+                "    int32_t hurt_direction;",
+                "    float damage;",
+                "    int32_t display_block_state;",
+                "    int32_t display_offset;",
+                "    uint32_t fields;",
+                "    bool has_custom_display_block;",
             ])
         elif packet.projection == "inventory:plain_window_items":
             lines.extend([
@@ -1376,6 +1458,150 @@ def render_minecart_steps_projection(
         "}",
         "",
     ]
+
+
+def render_minecart_metadata_projection(
+    profile: ManifestProfile,
+    packet: ManifestPacket,
+    type_name: str,
+) -> list[str]:
+    layout = packet.projection
+    if layout not in {
+        "minecart_metadata:block_state_and_flag",
+        "minecart_metadata:optional_block_state",
+    }:
+        raise ValueError(f"unknown minecart metadata projection {layout}")
+    legacy = layout == "minecart_metadata:block_state_and_flag"
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    mask = manifest_macro("PERRY_MC", profile.c_profile, packet.c_packet, "FIELD")
+    optional_serializer = 14 if legacy else 15
+    lines = [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    uint32_t seen = 0U;",
+        "    bool saw_display_state = false;",
+        *(["    bool saw_display_flag = false;"] if legacy else []),
+        "    bool terminated = false;",
+        "    mc_reader_init(&reader, payload, payload_size);",
+        "    if (!mc_reader_varint(&reader, &decoded.entity_id) || decoded.entity_id <= 0)",
+        "        return false;",
+        "    while (mc_reader_remaining(&reader) != 0U) {",
+        "        uint8_t index = 0U;",
+        "        int32_t serializer = -1;",
+        "        if (!mc_reader_u8(&reader, &index)) return false;",
+        "        if (index == UINT8_C(0xff)) {",
+        "            terminated = true;",
+        "            break;",
+        "        }",
+        "        if (!mc_reader_varint(&reader, &serializer)) return false;",
+        "        switch (index) {",
+        "        case 8U:",
+        f"            if (serializer != 1 || (seen & {mask}_HURT_TIME) != 0U ||",
+        "                !mc_reader_varint(&reader, &decoded.hurt_time)) return false;",
+        f"            seen |= {mask}_HURT_TIME;",
+        "            break;",
+        "        case 9U:",
+        f"            if (serializer != 1 || (seen & {mask}_HURT_DIRECTION) != 0U ||",
+        "                !mc_reader_varint(&reader, &decoded.hurt_direction)) return false;",
+        f"            seen |= {mask}_HURT_DIRECTION;",
+        "            break;",
+        "        case 10U:",
+        f"            if (serializer != 3 || (seen & {mask}_DAMAGE) != 0U ||",
+        "                !mc_reader_float(&reader, &decoded.damage) ||",
+        "                !isfinite(decoded.damage)) return false;",
+        f"            seen |= {mask}_DAMAGE;",
+        "            break;",
+        "        case 11U:",
+        f"            if (serializer != {optional_serializer} || saw_display_state ||",
+        "                !mc_reader_varint(&reader, &decoded.display_block_state) ||",
+        "                decoded.display_block_state < 0) return false;",
+        "            saw_display_state = true;",
+        f"            seen |= {mask}_CUSTOM_DISPLAY_BLOCK;",
+    ]
+    if not legacy:
+        lines.append(
+            "            decoded.has_custom_display_block = decoded.display_block_state != 0;"
+        )
+    lines.extend([
+        "            break;",
+        "        case 12U:",
+        f"            if (serializer != 1 || (seen & {mask}_DISPLAY_OFFSET) != 0U ||",
+        "                !mc_reader_varint(&reader, &decoded.display_offset)) return false;",
+        f"            seen |= {mask}_DISPLAY_OFFSET;",
+        "            break;",
+    ])
+    if legacy:
+        lines.extend([
+            "        case 13U:",
+            "            if (serializer != 8 || saw_display_flag ||",
+            "                !mc_reader_bool(&reader, &decoded.has_custom_display_block))",
+            "                return false;",
+            "            saw_display_flag = true;",
+            "            break;",
+        ])
+    lines.extend([
+        "        default:",
+        "            return false;",
+        "        }",
+        "    }",
+        "    if (!terminated || mc_reader_remaining(&reader) != 0U || seen == 0U)",
+        "        return false;",
+    ])
+    if legacy:
+        lines.extend([
+            "    if (saw_display_state != saw_display_flag) return false;",
+        ])
+    lines.extend([
+        "    decoded.fields = seen;",
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL || value->entity_id <= 0 ||",
+        f"        value->fields == 0U || (value->fields & ~{mask}_ALL) != 0U ||",
+        "        !isfinite(value->damage) || value->display_block_state < 0 ||",
+    ])
+    if not legacy:
+        lines.append(
+            "        (value->has_custom_display_block && value->display_block_state == 0) ||"
+        )
+    lines.extend([
+        "        !mc_packet_varint(packet, value->entity_id)) return false;",
+        f"    if ((value->fields & {mask}_HURT_TIME) != 0U &&",
+        "        (!mc_packet_u8(packet, UINT8_C(8)) || !mc_packet_varint(packet, 1) ||",
+        "         !mc_packet_varint(packet, value->hurt_time))) return false;",
+        f"    if ((value->fields & {mask}_HURT_DIRECTION) != 0U &&",
+        "        (!mc_packet_u8(packet, UINT8_C(9)) || !mc_packet_varint(packet, 1) ||",
+        "         !mc_packet_varint(packet, value->hurt_direction))) return false;",
+        f"    if ((value->fields & {mask}_DAMAGE) != 0U &&",
+        "        (!mc_packet_u8(packet, UINT8_C(10)) || !mc_packet_varint(packet, 3) ||",
+        "         !mc_packet_float(packet, value->damage))) return false;",
+        f"    if ((value->fields & {mask}_CUSTOM_DISPLAY_BLOCK) != 0U &&",
+        f"        (!mc_packet_u8(packet, UINT8_C(11)) || !mc_packet_varint(packet, {optional_serializer}) ||",
+        "         !mc_packet_varint(packet, value->has_custom_display_block",
+        "                                      ? value->display_block_state : 0))) return false;",
+        f"    if ((value->fields & {mask}_DISPLAY_OFFSET) != 0U &&",
+        "        (!mc_packet_u8(packet, UINT8_C(12)) || !mc_packet_varint(packet, 1) ||",
+        "         !mc_packet_varint(packet, value->display_offset))) return false;",
+    ])
+    if legacy:
+        lines.extend([
+            f"    if ((value->fields & {mask}_CUSTOM_DISPLAY_BLOCK) != 0U &&",
+            "        (!mc_packet_u8(packet, UINT8_C(13)) || !mc_packet_varint(packet, 8) ||",
+            "         !mc_packet_bool(packet, value->has_custom_display_block))) return false;",
+        ])
+    lines.extend([
+        "    return mc_packet_u8(packet, UINT8_C(0xff)) && !packet->failed;",
+        "}",
+        "",
+    ])
+    return lines
 
 
 def render_scoreboard_projection(profile: ManifestProfile,
@@ -1998,11 +2224,19 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
         f'#include "protocol_{profile.c_profile}.h"',
         "",
     ]
+    if any(
+        packet.projection is not None
+        and packet.projection.startswith("minecart_metadata:")
+        for packet in profile.packets
+    ):
+        lines.extend(["#include <math.h>", ""])
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
         if packet.projection is not None:
             if packet.projection.startswith("minecart_steps:"):
                 renderer = render_minecart_steps_projection
+            elif packet.projection.startswith("minecart_metadata:"):
+                renderer = render_minecart_metadata_projection
             elif packet.projection.startswith("inventory:"):
                 renderer = render_inventory_projection
             elif packet.projection.startswith("scoreboard_"):

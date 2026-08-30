@@ -69,6 +69,7 @@ DOCUMENT = {
         "UntrustedSlot": PLAIN_SLOT,
         "HashedSlot": ["container", []],
         "chunkBlockEntity": ["container", []],
+        "entityMetadata": "native",
         "vec3f": [
             "container",
             [
@@ -105,6 +106,7 @@ DOCUMENT = {
                                         "0xc": "modern_chunk",
                                         "0xd": "tile_entity_data",
                                         "0xe": "move_minecart",
+                                        "0xf": "entity_metadata",
                                     },
                                 },
                             ],
@@ -130,6 +132,7 @@ DOCUMENT = {
                                         "modern_chunk": "packet_modern_chunk",
                                         "tile_entity_data": "packet_tile_entity_data",
                                         "move_minecart": "packet_move_minecart",
+                                        "entity_metadata": "packet_entity_metadata",
                                     },
                                 },
                             ],
@@ -192,6 +195,13 @@ DOCUMENT = {
                                 },
                             ],
                         },
+                    ],
+                ],
+                "packet_entity_metadata": [
+                    "container",
+                    [
+                        {"name": "entityId", "type": "varint"},
+                        {"name": "metadata", "type": "entityMetadata"},
                     ],
                 ],
                 "packet_attributes": [
@@ -667,6 +677,56 @@ def main() -> None:
     else:
         raise AssertionError("minecart projection accepted no source validation")
 
+    minecart_metadata = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "entity_metadata",
+            "expected_id": 15,
+            "projection": "source_validated_minecart_metadata",
+            "metadata_layout": "optional_block_state",
+            "source_validation": (
+                "Vanilla minecart accessors and EntityDataSerializers wire IDs"
+            ),
+        },
+    )
+    assert minecart_metadata.projection == "minecart_metadata:optional_block_state"
+    assert [field.wire.suffix for field in minecart_metadata.fields] == ["varint"]
+    legacy_minecart_metadata = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "entity_metadata",
+            "expected_id": 15,
+            "projection": "source_validated_minecart_metadata",
+            "metadata_layout": "block_state_and_flag",
+            "source_validation": "Vanilla 1.21.4 minecart accessor layout",
+        },
+    )
+    assert legacy_minecart_metadata.projection == "minecart_metadata:block_state_and_flag"
+    for incomplete in (
+        {"metadata_layout": "optional_block_state"},
+        {"source_validation": "source checked"},
+    ):
+        try:
+            COMPILER.compile_manifest_packet(
+                compiler,
+                {
+                    "state": "play",
+                    "direction": "toClient",
+                    "name": "entity_metadata",
+                    "expected_id": 15,
+                    "projection": "source_validated_minecart_metadata",
+                    **incomplete,
+                },
+            )
+        except ValueError as error:
+            assert "requires" in str(error)
+        else:
+            raise AssertionError("minecart metadata accepted an incomplete source contract")
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -684,6 +744,7 @@ def main() -> None:
             modern_chunk,
             tile_entity,
             minecart,
+            minecart_metadata,
         ),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
@@ -724,6 +785,11 @@ def main() -> None:
     assert "mc_reader_i8(&reader, &decoded.steps[index].yaw)" in source
     assert "mc_packet_double(packet, value->steps[index].movement_z)" in source
     assert "mc_packet_i8(packet, value->steps[index].pitch)" in source
+    assert "PERRY_MC_TEST_ENTITY_METADATA_FIELD_CUSTOM_DISPLAY_BLOCK" in header
+    assert "bool has_custom_display_block" in header
+    assert "serializer != 15" in source
+    assert "mc_packet_u8(packet, UINT8_C(11))" in source
+    assert "mc_packet_u8(packet, UINT8_C(0xff))" in source
 
     outputs = {
         "protocol_test.h": header,
