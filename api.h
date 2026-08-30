@@ -245,6 +245,11 @@ typedef struct {
     unsigned char bytes[16];
 } McUuid;
 
+typedef struct {
+    int32_t type_id;
+    McBytes data;
+} McItemComponentPatch;
+
 void mc_packet_init(McPacket *packet, void *storage, size_t capacity);
 bool mc_packet_bytes(McPacket *packet, const void *data, size_t size);
 bool mc_packet_bool(McPacket *packet, bool value);
@@ -273,6 +278,12 @@ bool mc_packet_nbt(McPacket *packet, bool named_root, const McBytes *encoded);
  * sentinel for the selected release; non-empty stacks require item_id > 0. */
 bool mc_packet_plain_item(McPacket *packet, int protocol,
     int32_t item_id, int32_t count);
+/* Encodes a serverbound UntrustedSlot item with raw, length-prefixed added
+ * component payloads and removed component type IDs (1.20.5+). */
+bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
+    int32_t item_id, int32_t count,
+    const McItemComponentPatch *added, size_t added_count,
+    const int32_t *removed, size_t removed_count);
 /* Builds the body of the serverbound position_look packet, including the
  * stance field used only by 1.7. Packet ID/framing remain mc_client_send's job. */
 bool mc_packet_player_position(McPacket *packet, int protocol,

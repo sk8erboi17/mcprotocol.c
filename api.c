@@ -2877,6 +2877,47 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
         && mc_packet_varint(packet, 0) && mc_packet_varint(packet, 0));
 }
 
+bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
+    int32_t item_id, int32_t count,
+    const McItemComponentPatch *added, size_t added_count,
+    const int32_t *removed, size_t removed_count)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol) || protocol < 766
+        || count < 0 || count > 127 || (count != 0 && item_id <= 0)
+        || added_count > (size_t)INT32_MAX || removed_count > (size_t)INT32_MAX
+        || (added_count != 0U && added == NULL)
+        || (removed_count != 0U && removed == NULL)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (!mc_packet_varint(packet, count) || count == 0) {
+        return count == 0 && !packet->failed;
+    }
+    if (!mc_packet_varint(packet, item_id)
+        || !mc_packet_varint(packet, (int32_t)added_count)
+        || !mc_packet_varint(packet, (int32_t)removed_count)) {
+        return false;
+    }
+    for (size_t index = 0U; index < added_count; ++index) {
+        if (added[index].type_id < 0
+            || added[index].data.size > (size_t)INT32_MAX
+            || (added[index].data.size != 0U
+                && added[index].data.data == NULL)
+            || !mc_packet_varint(packet, added[index].type_id)
+            || !mc_packet_buffer_varint(packet, &added[index].data)) {
+            packet->failed = true;
+            return false;
+        }
+    }
+    for (size_t index = 0U; index < removed_count; ++index) {
+        if (removed[index] < 0 || !mc_packet_varint(packet, removed[index])) {
+            packet->failed = true;
+            return false;
+        }
+    }
+    return true;
+}
+
 bool mc_packet_player_position(McPacket *packet, int protocol,
     const McPlayerPosition *value)
 {

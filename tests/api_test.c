@@ -378,6 +378,51 @@ static void block_place_bodies_are_versioned(void)
     assert(!mc_packet_block_place(NULL, 776, &invalid));
 }
 
+static void untrusted_component_items_match_node(void)
+{
+    static const unsigned char enchantment_data[] = {0x01U, 0x21U, 0x05U};
+    const McItemComponentPatch enchantment = {
+        .type_id = 13,
+        .data = {enchantment_data, sizeof(enchantment_data)},
+    };
+    static const unsigned char expected[] = {
+        0x01U,0xa9U,0x07U,0x01U,0x00U,0x0dU,0x03U,0x01U,0x21U,0x05U,
+    };
+    unsigned char storage[32];
+    McPacket packet;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_untrusted_component_item(
+        &packet, 776, 937, 1, &enchantment, 1U, NULL, 0U));
+    assert(packet.length == sizeof(expected));
+    assert(memcmp(packet.data, expected, sizeof(expected)) == 0);
+
+    static const int32_t removed[] = {42};
+    static const unsigned char removed_expected[] = {
+        0x01U,0xddU,0x09U,0x00U,0x01U,0x2aU,
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_untrusted_component_item(
+        &packet, 776, 1245, 1, NULL, 0U, removed, 1U));
+    assert(packet.length == sizeof(removed_expected));
+    assert(memcmp(packet.data, removed_expected, sizeof(removed_expected)) == 0);
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_untrusted_component_item(
+        &packet, 776, 0, 0, NULL, 0U, NULL, 0U));
+    assert(packet.length == 1U && packet.data[0] == 0U);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_untrusted_component_item(
+        &packet, 765, 937, 1, &enchantment, 1U, NULL, 0U));
+    assert(packet.failed);
+    const McItemComponentPatch invalid = {.type_id = -1, .data = {NULL, 0U}};
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_untrusted_component_item(
+        &packet, 776, 937, 1, &invalid, 1U, NULL, 0U));
+    assert(packet.failed);
+    assert(!mc_packet_untrusted_component_item(
+        NULL, 776, 937, 1, &enchantment, 1U, NULL, 0U));
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -441,6 +486,7 @@ int main(int argc, char **argv)
     attack_and_respawn_bodies_are_versioned();
     block_dig_bodies_are_versioned();
     block_place_bodies_are_versioned();
-    puts("PASS command, abilities, block actions, combat, respawn, NBT and buffer codecs");
+    untrusted_component_items_match_node();
+    puts("PASS command, abilities, block actions, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }
