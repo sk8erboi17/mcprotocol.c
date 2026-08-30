@@ -291,6 +291,18 @@ typedef struct {
 } McBlockPlace;
 
 typedef struct {
+    int32_t hand;
+    int32_t held_item_id;
+    int32_t held_item_count;
+    int32_t held_item_damage;
+    /* Used only by the legacy block_place sentinel representation. */
+    McBytes held_item_nbt;
+    int32_t sequence;
+    float yaw;
+    float pitch;
+} McUseItem;
+
+typedef struct {
     int32_t window_id;
     int32_t state_id;
     int16_t slot;
@@ -411,6 +423,10 @@ bool mc_packet_block_dig(McPacket *packet, int protocol,
  * ignore those client-reported fields. */
 bool mc_packet_block_place(McPacket *packet, int protocol,
     const McBlockPlace *value);
+/* Builds a use-item action. 1.7/1.8 use the block_place sentinel and its
+ * reported held stack; newer releases add sequence and then rotation. */
+bool mc_packet_use_item(McPacket *packet, int protocol,
+    const McUseItem *value);
 /* Builds a primary attack against one entity. Legacy use_entity packets use
  * action 1 and add the sneaking flag from 1.16; 26.1+ has a dedicated body. */
 bool mc_packet_attack_entity(McPacket *packet, int protocol, int32_t entity_id);
@@ -551,6 +567,9 @@ int mc_client_dig_block(McClient *client, const McBlockDig *dig,
     char *error, size_t error_size);
 /* Sends one release-aware block placement while the client is in PLAY. */
 int mc_client_place_block(McClient *client, const McBlockPlace *place,
+    char *error, size_t error_size);
+/* Uses the held item without targeting a block while in PLAY. */
+int mc_client_use_item(McClient *client, const McUseItem *use,
     char *error, size_t error_size);
 /* Closes one inventory menu while the client is in PLAY. */
 int mc_client_close_window(McClient *client, int32_t window_id,

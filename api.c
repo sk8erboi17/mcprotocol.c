@@ -3365,6 +3365,42 @@ bool mc_packet_block_place(McPacket *packet, int protocol,
         && (protocol < 759 || mc_packet_varint(packet, value->sequence));
 }
 
+bool mc_packet_use_item(McPacket *packet, int protocol,
+    const McUseItem *value)
+{
+    if (packet == NULL || value == NULL || !mc_protocol_supported(protocol)
+        || value->hand < 0 || value->hand > 1 || value->sequence < 0
+        || !isfinite(value->yaw) || !isfinite(value->pitch)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol <= 47) {
+        const McBlockPlace legacy = {
+            .held_item_id = value->held_item_id,
+            .held_item_count = value->held_item_count,
+            .held_item_damage = value->held_item_damage,
+            .held_item_nbt = value->held_item_nbt,
+        };
+        if (protocol <= 5) {
+            if (!mc_packet_i32(packet, -1)
+                || !mc_packet_u8(packet, UINT8_MAX)
+                || !mc_packet_i32(packet, -1)) {
+                return false;
+            }
+        } else if (!mc_packet_position(packet, protocol,
+                (McPosition){-1, -1, -1})) {
+            return false;
+        }
+        return mc_packet_i8(packet, -1)
+            && packet_legacy_reported_item(packet, protocol, &legacy)
+            && packet_block_place_cursor(packet, protocol, 0.0F, 0.0F, 0.0F);
+    }
+    return mc_packet_varint(packet, value->hand)
+        && (protocol < 759 || mc_packet_varint(packet, value->sequence))
+        && (protocol < 767 || (mc_packet_float(packet, value->yaw)
+            && mc_packet_float(packet, value->pitch)));
+}
+
 bool mc_packet_attack_entity(McPacket *packet, int protocol, int32_t entity_id)
 {
     if (packet == NULL || !mc_protocol_supported(protocol) || entity_id <= 0) {
@@ -5204,6 +5240,52 @@ int mc_client_place_block(McClient *client, const McBlockPlace *place,
         return -1;
     }
     const int result = mc_client_send_named(client, "block_place",
+        body.data, body.length, error, error_size);
+    free(storage);
+    return result;
+}
+
+int mc_client_use_item(McClient *client, const McUseItem *use,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL || use == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    size_t capacity = 64U;
+    if (client->profile->protocol <= 47 && use->held_item_nbt.size != 0U) {
+        if (client->profile->protocol <= 5) {
+            const uLong bound = compressBound((uLong)use->held_item_nbt.size);
+            if (bound > (uLong)MC_MAX_PACKET - 64U) {
+                set_error(error, error_size, "NBT use_item troppo grande");
+                return -1;
+            }
+            capacity = (size_t)bound + 64U;
+        } else {
+            if (use->held_item_nbt.size > (size_t)MC_MAX_PACKET - 64U) {
+                set_error(error, error_size, "NBT use_item troppo grande");
+                return -1;
+            }
+            capacity = use->held_item_nbt.size + 64U;
+        }
+    }
+    unsigned char *storage = malloc(capacity);
+    if (storage == NULL) {
+        set_error(error, error_size, "Allocazione use_item fallita");
+        return -1;
+    }
+    McPacket body;
+    mc_packet_init(&body, storage, capacity);
+    if (!mc_packet_use_item(&body, client->profile->protocol, use)) {
+        free(storage);
+        set_error(error, error_size, "Azione use_item Minecraft non valida");
+        return -1;
+    }
+    const char *packet_name = client->profile->protocol <= 47
+        ? "block_place" : "use_item";
+    const int result = mc_client_send_named(client, packet_name,
         body.data, body.length, error, error_size);
     free(storage);
     return result;

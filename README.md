@@ -172,6 +172,7 @@ Available symmetric field codecs are:
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
 | `block_place` | Release-aware use-on-block body, including optional 1.7/1.8 reported damage and named-root NBT | placement and container activation |
+| `use_item` | Legacy block-place sentinel or modern hand/sequence/rotation body | consuming or activating the held item without a block target |
 | `window_click` / `empty_window_click` | Release-aware click with a legacy predicted stack or empty changed/carried slots | crafting, inventory moves and outside drops |
 | `container_button` | Release-aware menu ID plus button/recipe ID | enchantment and stonecutter selections |
 | `close_window` | Release-aware container ID body across the 1.21.3 VarInt boundary | closing inventory and workstation menus |

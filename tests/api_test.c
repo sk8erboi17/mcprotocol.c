@@ -736,6 +736,66 @@ static void block_place_bodies_are_versioned(void)
     assert(!mc_packet_block_place(NULL, 776, &invalid));
 }
 
+static void use_item_bodies_match_node(void)
+{
+    static const unsigned char body_1_7[] = {
+        0xffU,0xffU,0xffU,0xffU,0xffU,0xffU,0xffU,0xffU,
+        0xffU,0xffU,0xffU,0xffU,0x00U,0x00U,0x00U,
+    };
+    static const unsigned char body_1_8[] = {
+        0xffU,0xffU,0xffU,0xffU,0xffU,0xffU,0xffU,0xffU,
+        0xffU,0xffU,0xffU,0x00U,0x00U,0x00U,
+    };
+    static const unsigned char body_1_9[] = {0x00U};
+    static const unsigned char body_1_19[] = {0x00U,0xacU,0x02U};
+    static const unsigned char body_1_21_1[] = {
+        0x00U,0xacU,0x02U,0x42U,0xb4U,0x00U,0x00U,
+        0x41U,0xa0U,0x00U,0x00U,
+    };
+    static const struct {
+        int protocol;
+        const unsigned char *bytes;
+        size_t size;
+    } cases[] = {
+        {4, body_1_7, sizeof(body_1_7)},
+        {47, body_1_8, sizeof(body_1_8)},
+        {107, body_1_9, sizeof(body_1_9)},
+        {759, body_1_19, sizeof(body_1_19)},
+        {767, body_1_21_1, sizeof(body_1_21_1)},
+        {776, body_1_21_1, sizeof(body_1_21_1)},
+    };
+    McUseItem use = {
+        .hand = 0,
+        .held_item_id = 0,
+        .held_item_count = 0,
+        .held_item_damage = 0,
+        .sequence = 300,
+        .yaw = 90.0F,
+        .pitch = 20.0F,
+    };
+    unsigned char storage[64];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_use_item(&packet, cases[index].protocol, &use));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+    use.hand = 2;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_use_item(&packet, 776, &use));
+    assert(packet.failed);
+    use.hand = 0;
+    use.sequence = -1;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_use_item(&packet, 759, &use));
+    use.sequence = 0;
+    use.yaw = NAN;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_use_item(&packet, 767, &use));
+    assert(!mc_packet_use_item(NULL, 776, &use));
+}
+
 static void untrusted_component_items_match_node(void)
 {
     static const unsigned char enchantment_data[] = {0x01U, 0x21U, 0x05U};
@@ -1068,6 +1128,7 @@ int main(int argc, char **argv)
     player_positions_are_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
+    use_item_bodies_match_node();
     untrusted_component_items_match_node();
     empty_window_clicks_are_versioned();
     legacy_window_clicks_include_predicted_stacks();
