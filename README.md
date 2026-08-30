@@ -224,7 +224,8 @@ and `chunk_envelope` projections for schema-checked conditional packets. The
 minecart projection requires a non-empty `source_validation` explanation. It
 checks the known `minecraft-data` envelope while following Vanilla's actual
 `MinecartStep.STREAM_CODEC`: six doubles, two signed rotation bytes, and one
-float per step, with an allocation-free limit of 64 steps. The chunk projection
+float per step. Its allocation-free 65-step limit covers Perry's bounded 64
+rail iterations plus the optional rail-alignment step. The chunk projection
 covers 1.13 through the current schema while exposing section data, heightmaps and validated light
 data without interpreting release-specific block palettes, and deliberately
 accepts only an empty block-entity array. Plain-item projections deliberately

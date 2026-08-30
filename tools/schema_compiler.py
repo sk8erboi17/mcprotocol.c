@@ -1257,7 +1257,7 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
                 "        int8_t yaw;",
                 "        int8_t pitch;",
                 "        float weight;",
-                "    } steps[64];",
+                "    } steps[65];",
             ])
         elif packet.projection == "inventory:plain_window_items":
             lines.extend([

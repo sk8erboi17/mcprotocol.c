@@ -719,7 +719,7 @@ def main() -> None:
     assert "double position_x" in header
     assert "double movement_z" in header
     assert "int8_t yaw" in header
-    assert "steps[64]" in header
+    assert "steps[65]" in header
     assert "mc_reader_double(&reader, &decoded.steps[index].position_x)" in source
     assert "mc_reader_i8(&reader, &decoded.steps[index].yaw)" in source
     assert "mc_packet_double(packet, value->steps[index].movement_z)" in source
