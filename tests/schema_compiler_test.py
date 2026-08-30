@@ -79,6 +79,29 @@ DOCUMENT = {
                 {"name": "z", "type": "f32"},
             ],
         ],
+        "Particle": [
+            "container",
+            [
+                {
+                    "name": "type",
+                    "type": [
+                        "mapper",
+                        {"type": "varint", "mappings": {"58": "note"}},
+                    ],
+                },
+                {
+                    "name": "data",
+                    "type": [
+                        "switch",
+                        {
+                            "compareTo": "type",
+                            "fields": {},
+                            "default": "void",
+                        },
+                    ],
+                },
+            ],
+        ],
     },
     "play": {
         "toClient": {
@@ -108,6 +131,7 @@ DOCUMENT = {
                                         "0xd": "tile_entity_data",
                                         "0xe": "move_minecart",
                                         "0xf": "entity_metadata",
+                                        "0x10": "world_particles",
                                     },
                                 },
                             ],
@@ -134,6 +158,7 @@ DOCUMENT = {
                                         "tile_entity_data": "packet_tile_entity_data",
                                         "move_minecart": "packet_move_minecart",
                                         "entity_metadata": "packet_entity_metadata",
+                                        "world_particles": "packet_world_particles",
                                     },
                                 },
                             ],
@@ -203,6 +228,22 @@ DOCUMENT = {
                     [
                         {"name": "entityId", "type": "varint"},
                         {"name": "metadata", "type": "entityMetadata"},
+                    ],
+                ],
+                "packet_world_particles": [
+                    "container",
+                    [
+                        {"name": "longDistance", "type": "bool"},
+                        {"name": "alwaysShow", "type": "bool"},
+                        {"name": "x", "type": "f64"},
+                        {"name": "y", "type": "f64"},
+                        {"name": "z", "type": "f64"},
+                        {"name": "offsetX", "type": "f32"},
+                        {"name": "offsetY", "type": "f32"},
+                        {"name": "offsetZ", "type": "f32"},
+                        {"name": "velocityOffset", "type": "f32"},
+                        {"name": "amount", "type": "i32"},
+                        {"name": "particle", "type": "Particle"},
                     ],
                 ],
                 "packet_attributes": [
@@ -807,6 +848,130 @@ def main() -> None:
         else:
             raise AssertionError("primed TNT metadata accepted an incomplete source contract")
 
+    note_particle_spec = {
+        "state": "play",
+        "direction": "toClient",
+        "name": "world_particles",
+        "expected_id": 16,
+        "projection": "source_validated_note_particle",
+        "particle_name": "note",
+        "particle_id": 58,
+        "source_validation": "synthetic release source pins NOTE as data-free ID 58",
+    }
+    note_particle = COMPILER.compile_manifest_packet(compiler, note_particle_spec)
+    assert note_particle.projection == "note_particle:tail_varint_double_always:58"
+    assert [field.wire.suffix for field in note_particle.fields] == [
+        "bool", "bool", "double", "double", "double", "float", "float",
+        "float", "float", "i32",
+    ]
+    try:
+        COMPILER.compile_manifest_packet(
+            compiler,
+            {**note_particle_spec, "particle_id": 65},
+        )
+    except ValueError as error:
+        assert "registry_override_reason" in str(error)
+    else:
+        raise AssertionError("NOTE registry drift accepted without a source reason")
+    note_particle_registry_override = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            **note_particle_spec,
+            "particle_id": 65,
+            "registry_override_reason": "26.2 adds registry entries before NOTE",
+        },
+    )
+    assert note_particle_registry_override.projection == (
+        "note_particle:tail_varint_double_always:65"
+    )
+
+    tail_document = copy.deepcopy(DOCUMENT)
+    del tail_document["play"]["toClient"]["types"]["packet_world_particles"][1][1]
+    tail_note_particle = COMPILER.compile_manifest_packet(
+        COMPILER.Compiler(tail_document, 766, {}), note_particle_spec
+    )
+    assert tail_note_particle.projection == "note_particle:tail_varint_double:58"
+
+    named_document = copy.deepcopy(DOCUMENT)
+    named_document["play"]["toClient"]["types"]["packet_world_particles"] = [
+        "container",
+        [
+            {"name": "particleName", "type": "string"},
+            {"name": "x", "type": "f32"},
+            {"name": "y", "type": "f32"},
+            {"name": "z", "type": "f32"},
+            {"name": "offsetX", "type": "f32"},
+            {"name": "offsetY", "type": "f32"},
+            {"name": "offsetZ", "type": "f32"},
+            {"name": "particleData", "type": "f32"},
+            {"name": "particles", "type": "i32"},
+        ],
+    ]
+    named_note_particle = COMPILER.compile_manifest_packet(
+        COMPILER.Compiler(named_document, 4, {}),
+        {key: value for key, value in note_particle_spec.items() if key != "particle_id"},
+    )
+    assert named_note_particle.projection == "note_particle:name_f32"
+
+    head_document = copy.deepcopy(DOCUMENT)
+    head_document["play"]["toClient"]["types"]["packet_world_particles"] = [
+        "container",
+        [
+            {"name": "particleId", "type": "i32"},
+            {"name": "longDistance", "type": "bool"},
+            {"name": "x", "type": "f32"},
+            {"name": "y", "type": "f32"},
+            {"name": "z", "type": "f32"},
+            {"name": "offsetX", "type": "f32"},
+            {"name": "offsetY", "type": "f32"},
+            {"name": "offsetZ", "type": "f32"},
+            {"name": "particleData", "type": "f32"},
+            {"name": "particles", "type": "i32"},
+            {
+                "name": "data",
+                "type": [
+                    "switch",
+                    {
+                        "compareTo": "particleId",
+                        "fields": {"36": "varint"},
+                        "default": "void",
+                    },
+                ],
+            },
+        ],
+    ]
+    head_note_particle = COMPILER.compile_manifest_packet(
+        COMPILER.Compiler(head_document, 47, {}),
+        {**note_particle_spec, "particle_id": 23},
+    )
+    assert head_note_particle.projection == "note_particle:head_i32_float:23"
+
+    head_varint_document = copy.deepcopy(head_document)
+    head_fields = head_varint_document["play"]["toClient"]["types"][
+        "packet_world_particles"
+    ][1]
+    head_fields[0]["type"] = "varint"
+    for field in head_fields[2:5]:
+        field["type"] = "f64"
+    head_varint_note_particle = COMPILER.compile_manifest_packet(
+        COMPILER.Compiler(head_varint_document, 759, {}),
+        {**note_particle_spec, "particle_id": 46},
+    )
+    assert head_varint_note_particle.projection == (
+        "note_particle:head_varint_double:46"
+    )
+
+    try:
+        COMPILER.compile_manifest_packet(
+            compiler,
+            {key: value for key, value in note_particle_spec.items()
+             if key != "source_validation"},
+        )
+    except ValueError as error:
+        assert "requires source_validation" in str(error)
+    else:
+        raise AssertionError("NOTE particle projection accepted no source validation")
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -825,6 +990,7 @@ def main() -> None:
             tile_entity,
             minecart,
             minecart_metadata,
+            note_particle,
         ),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
@@ -877,6 +1043,36 @@ def main() -> None:
     packed_minecart_header = COMPILER.render_manifest_header(
         packed_minecart_profile, "0" * 40
     )
+    note_profiles = (
+        COMPILER.ManifestProfile(
+            "named_note_test", "named_note_test", 4, "synthetic", 4,
+            "0" * 64, (), (named_note_particle,),
+        ),
+        COMPILER.ManifestProfile(
+            "head_note_test", "head_note_test", 47, "synthetic", 47,
+            "0" * 64, (), (head_note_particle,),
+        ),
+        COMPILER.ManifestProfile(
+            "head_varint_note_test", "head_varint_note_test", 759,
+            "synthetic", 759, "0" * 64, (), (head_varint_note_particle,),
+        ),
+        COMPILER.ManifestProfile(
+            "tail_note_test", "tail_note_test", 766, "synthetic", 766,
+            "0" * 64, (), (tail_note_particle,),
+        ),
+        COMPILER.ManifestProfile(
+            "override_note_test", "override_note_test", 776, "synthetic", 775,
+            "0" * 64, (), (note_particle_registry_override,),
+        ),
+    )
+    note_outputs = {}
+    for note_profile in note_profiles:
+        note_outputs[f"protocol_{note_profile.c_profile}.h"] = (
+            COMPILER.render_manifest_header(note_profile, "0" * 40)
+        )
+        note_outputs[f"protocol_{note_profile.c_profile}.c"] = (
+            COMPILER.render_manifest_source(note_profile, "0" * 40)
+        )
     assert "PERRY_MC_TEST_MOVEMENT_SPEED INT32_C(22)" in header
     assert "mc_reader_varlong(&reader, &decoded.duration)" in source
     assert "mc_reader_buffer_i32(&reader, &decoded.legacy_blob)" in source
@@ -934,6 +1130,23 @@ def main() -> None:
     assert "mc_packet_i32(packet, value->hurt_time)" in packed_minecart_source
     assert "mc_packet_u8(packet, UINT8_C(11))" in source
     assert "mc_packet_u8(packet, UINT8_C(0xff))" in source
+    assert "particle_id != INT32_C(58)" in source
+    assert "mc_packet_varint(packet, INT32_C(58))" in source
+    assert 'memcmp(particle_name.data, "note", 4U)' in note_outputs[
+        "protocol_named_note_test.c"
+    ]
+    assert 'mc_packet_string_n(packet, "note", 4U)' in note_outputs[
+        "protocol_named_note_test.c"
+    ]
+    assert "mc_packet_i32(packet, INT32_C(23))" in note_outputs[
+        "protocol_head_note_test.c"
+    ]
+    assert "mc_packet_varint(packet, INT32_C(46))" in note_outputs[
+        "protocol_head_varint_note_test.c"
+    ]
+    assert "mc_packet_varint(packet, INT32_C(65))" in note_outputs[
+        "protocol_override_note_test.c"
+    ]
 
     outputs = {
         "protocol_test.h": header,
@@ -942,6 +1155,7 @@ def main() -> None:
         "protocol_legacy_minecart_test.c": legacy_minecart_source,
         "protocol_packed_minecart_test.h": packed_minecart_header,
         "protocol_packed_minecart_test.c": packed_minecart_source,
+        **note_outputs,
         "schema_stamp.json": "{}\n",
     }
     with tempfile.TemporaryDirectory(prefix="mcprotocol-schema-") as temporary:
@@ -952,6 +1166,7 @@ def main() -> None:
             "protocol_test.c",
             "protocol_legacy_minecart_test.c",
             "protocol_packed_minecart_test.c",
+            *sorted(name for name in note_outputs if name.endswith(".c")),
         ):
             subprocess.run(
                 [
@@ -978,8 +1193,8 @@ def main() -> None:
             raise AssertionError("staleness check accepted an unexpected generated file")
 
     print(
-        "PASS schema compiler manifest, overrides, minecart, scoreboard/inventory/chunk "
-        "projections and staleness"
+        "PASS schema compiler manifest, overrides, minecart, NOTE particle, "
+        "scoreboard/inventory/chunk projections and staleness"
     )
 
 

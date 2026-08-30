@@ -612,6 +612,229 @@ def manifest_primed_tnt_metadata_projection(
     )
 
 
+def manifest_note_particle_projection(
+    compiler: Compiler,
+    packet_name: str,
+    raw_fields: list[dict[str, Any]],
+    types: dict[str, Any],
+    particle_name: Any,
+    particle_id: Any,
+    registry_override_reason: Any,
+) -> tuple[tuple[ManifestField, ...], str]:
+    """Project the data-free NOTE particle without accepting opaque options.
+
+    Particle packets use several envelopes across Java releases.  The NOTE
+    option itself has no trailing payload, but the generic Particle schema can
+    carry registry-dependent data.  This projection therefore validates the
+    complete envelope and pins the NOTE selector supplied by release sources.
+    """
+    if particle_name != "note":
+        raise ValueError(
+            "source_validated_note_particle requires particle_name note"
+        )
+    names = [field.get("name") for field in raw_fields]
+    name_layout = names == [
+        "particleName", "x", "y", "z", "offsetX", "offsetY", "offsetZ",
+        "particleData", "particles",
+    ]
+    head_layout = names == [
+        "particleId", "longDistance", "x", "y", "z", "offsetX", "offsetY",
+        "offsetZ", "particleData", "particles", "data",
+    ]
+    tail_without_always = names == [
+        "longDistance", "x", "y", "z", "offsetX", "offsetY", "offsetZ",
+        "velocityOffset", "amount", "particle",
+    ]
+    tail_with_always = names == [
+        "longDistance", "alwaysShow", "x", "y", "z", "offsetX", "offsetY",
+        "offsetZ", "velocityOffset", "amount", "particle",
+    ]
+    if not any((name_layout, head_layout, tail_without_always, tail_with_always)):
+        raise ValueError(f"packet {packet_name} NOTE particle envelope changed")
+
+    if name_layout:
+        if particle_id is not None or registry_override_reason is not None:
+            raise ValueError(
+                "named NOTE particle projection does not accept a particle ID override"
+            )
+        particle_name_wire = required_manifest_wire(
+            compiler, raw_fields[0].get("type"), types, "NOTE particle name"
+        )
+        if particle_name_wire.suffix != "string":
+            raise ValueError(f"packet {packet_name} NOTE particle name is not a string")
+        selected_fields = raw_fields[1:]
+        layout = "name_f32"
+    else:
+        if (
+            not isinstance(particle_id, int)
+            or isinstance(particle_id, bool)
+            or particle_id < 0
+            or particle_id > 0x7fffffff
+        ):
+            raise ValueError(
+                "source_validated_note_particle requires a non-negative particle_id"
+            )
+        selected_fields = raw_fields[1:-1] if head_layout else raw_fields[:-1]
+        if head_layout:
+            if registry_override_reason is not None:
+                raise ValueError(
+                    "head-selector NOTE particle projection does not accept a registry override"
+                )
+            selector_wire = required_manifest_wire(
+                compiler, raw_fields[0].get("type"), types, "NOTE particle ID"
+            )
+            if selector_wire.suffix not in {"i32", "varint"}:
+                raise ValueError(
+                    f"packet {packet_name} NOTE particle ID is not i32/VarInt"
+                )
+            data_schema = raw_fields[-1].get("type")
+            resolved_data = compiler.resolve(data_schema, types)
+            if (
+                isinstance(resolved_data, list)
+                and len(resolved_data) == 2
+                and resolved_data[0] == "switch"
+            ):
+                data_switch = resolved_data
+            elif (
+                isinstance(data_schema, list)
+                and len(data_schema) == 2
+                and isinstance(data_schema[0], str)
+            ):
+                parameterized = types.get(
+                    data_schema[0], compiler.document.get("types", {}).get(data_schema[0])
+                )
+                data_switch = (
+                    compiler.resolve(parameterized, types)
+                    if parameterized is not None
+                    else None
+                )
+            else:
+                data_switch = None
+            if (
+                not isinstance(data_switch, list)
+                or len(data_switch) != 2
+                or data_switch[0] != "switch"
+                or not isinstance(data_switch[1], dict)
+                or not isinstance(data_switch[1].get("fields"), dict)
+            ):
+                raise ValueError(f"packet {packet_name} NOTE particle data schema changed")
+            option_schema = data_switch[1].get("default", "void")
+            for raw_id, candidate_schema in data_switch[1]["fields"].items():
+                try:
+                    candidate_id = int(raw_id, 0)
+                except (TypeError, ValueError):
+                    continue
+                if candidate_id == particle_id:
+                    option_schema = candidate_schema
+                    break
+            if compiler.resolve(option_schema, types) != "void":
+                raise ValueError(
+                    f"packet {packet_name} particle ID {particle_id} is not data-free"
+                )
+            coordinate_wire = required_manifest_wire(
+                compiler, raw_fields[2].get("type"), types, "NOTE particle coordinate"
+            )
+            layout = f"head_{selector_wire.suffix}_{coordinate_wire.suffix}"
+        else:
+            particle_fields = manifest_container(
+                compiler,
+                raw_fields[-1].get("type"),
+                types,
+                f"packet {packet_name} particle option",
+            )
+            if [field.get("name") for field in particle_fields] != ["type", "data"]:
+                raise ValueError(f"packet {packet_name} Particle option changed")
+            selector_schema = particle_fields[0].get("type")
+            if (
+                not isinstance(selector_schema, list)
+                or len(selector_schema) != 2
+                or selector_schema[0] != "mapper"
+                or not isinstance(selector_schema[1], dict)
+                or not isinstance(selector_schema[1].get("mappings"), dict)
+            ):
+                raise ValueError(f"packet {packet_name} Particle selector changed")
+            selector_wire = required_manifest_wire(
+                compiler, selector_schema, types, "NOTE Particle selector"
+            )
+            if selector_wire.suffix != "varint":
+                raise ValueError(f"packet {packet_name} Particle selector is not VarInt")
+            mappings = selector_schema[1]["mappings"]
+            schema_note_ids = [
+                int(raw_id, 0)
+                for raw_id, name in mappings.items()
+                if name == "note"
+            ]
+            if len(schema_note_ids) != 1:
+                raise ValueError(f"packet {packet_name} schema has no unique NOTE particle")
+            if particle_id != schema_note_ids[0] and (
+                not isinstance(registry_override_reason, str)
+                or not registry_override_reason.strip()
+            ):
+                raise ValueError(
+                    f"packet {packet_name} NOTE registry ID {particle_id} differs from schema "
+                    f"ID {schema_note_ids[0]} without registry_override_reason"
+                )
+            if particle_id == schema_note_ids[0] and registry_override_reason is not None:
+                raise ValueError(
+                    f"packet {packet_name} has an unnecessary registry_override_reason"
+                )
+            data_schema = compiler.resolve(particle_fields[1].get("type"), types)
+            if (
+                not isinstance(data_schema, list)
+                or len(data_schema) != 2
+                or data_schema[0] != "switch"
+                or not isinstance(data_schema[1], dict)
+                or not isinstance(data_schema[1].get("fields"), dict)
+            ):
+                raise ValueError(f"packet {packet_name} Particle data switch changed")
+            note_schema = data_schema[1]["fields"].get(
+                "note", data_schema[1].get("default", "void")
+            )
+            if compiler.resolve(note_schema, types) != "void":
+                raise ValueError(f"packet {packet_name} NOTE Particle gained option data")
+            coordinate_wire = required_manifest_wire(
+                compiler,
+                raw_fields[2 if tail_with_always else 1].get("type"),
+                types,
+                "NOTE particle coordinate",
+            )
+            layout = (
+                f"tail_{selector_wire.suffix}_{coordinate_wire.suffix}"
+                + ("_always" if tail_with_always else "")
+            )
+
+    fields = []
+    for field in selected_fields:
+        source_name = field.get("name")
+        if not isinstance(source_name, str):
+            raise ValueError(f"packet {packet_name} NOTE projection has unnamed field")
+        wire = required_manifest_wire(
+            compiler,
+            field.get("type"),
+            types,
+            f"packet {packet_name} NOTE field {source_name}",
+        )
+        fields.append(ManifestField(source_name, manifest_c_name(source_name), wire))
+
+    suffixes = [field.wire.suffix for field in fields]
+    if name_layout:
+        expected = ["float"] * 7 + ["i32"]
+    elif head_layout:
+        expected = ["bool"] + [coordinate_wire.suffix] * 3 + ["float"] * 4 + ["i32"]
+    else:
+        expected = ["bool"] + (["bool"] if tail_with_always else [])
+        expected += ["double"] * 3 + ["float"] * 4 + ["i32"]
+    if suffixes != expected:
+        raise ValueError(
+            f"packet {packet_name} NOTE particle scalar layout changed: {suffixes}"
+        )
+    return tuple(fields), (
+        f"note_particle:{layout}"
+        if name_layout
+        else f"note_particle:{layout}:{particle_id}"
+    )
+
+
 def required_manifest_wire(compiler: Compiler, schema: Any,
                            types: dict[str, Any], description: str) -> ManifestWire:
     wire = manifest_wire(compiler, schema, types)
@@ -1185,6 +1408,30 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
                 raw_fields,
                 types,
                 spec.get("metadata_layout"),
+            )
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
+        if projection == "source_validated_note_particle":
+            source_validation = spec.get("source_validation")
+            if not isinstance(source_validation, str) or not source_validation.strip():
+                raise ValueError(
+                    "source_validated_note_particle requires source_validation"
+                )
+            fields, variant = manifest_note_particle_projection(
+                compiler,
+                name,
+                raw_fields,
+                types,
+                spec.get("particle_name"),
+                spec.get("particle_id"),
+                spec.get("registry_override_reason"),
             )
             return ManifestPacket(
                 name,
@@ -1924,6 +2171,93 @@ def render_primed_tnt_metadata_projection(
     return lines
 
 
+def render_note_particle_projection(
+    profile: ManifestProfile,
+    packet: ManifestPacket,
+    type_name: str,
+) -> list[str]:
+    parts = packet.projection.split(":") if packet.projection is not None else []
+    layouts = {
+        "name_f32",
+        "head_i32_float",
+        "head_i32_double",
+        "head_varint_double",
+        "tail_varint_double",
+        "tail_varint_double_always",
+    }
+    named = len(parts) == 2 and parts[0] == "note_particle" and parts[1] == "name_f32"
+    numbered = (
+        len(parts) == 3
+        and parts[0] == "note_particle"
+        and parts[1] in layouts
+        and parts[1] != "name_f32"
+        and parts[2].isdigit()
+    )
+    if not named and not numbered:
+        raise ValueError(f"unknown NOTE particle projection {packet.projection}")
+    layout = parts[1]
+    head = layout.startswith("head_")
+    selector_wire = "i32" if layout.startswith("head_i32_") else "varint"
+    particle_id = int(parts[2]) if numbered else None
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    lines = [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+    ]
+    if named:
+        lines.append("    McBytes particle_name = {0};")
+    else:
+        lines.append("    int32_t particle_id = -1;")
+    lines.append("    mc_reader_init(&reader, payload, payload_size);")
+    checks = []
+    if named:
+        checks.extend([
+            "!mc_reader_string(&reader, &particle_name)",
+            "particle_name.size != 4U",
+            'memcmp(particle_name.data, "note", 4U) != 0',
+        ])
+    elif head:
+        checks.extend([
+            f"!mc_reader_{selector_wire}(&reader, &particle_id)",
+            f"particle_id != INT32_C({particle_id})",
+        ])
+    checks.extend(f"!{manifest_reader(profile, field)}" for field in packet.fields)
+    if numbered and not head:
+        checks.extend([
+            f"!mc_reader_{selector_wire}(&reader, &particle_id)",
+            f"particle_id != INT32_C({particle_id})",
+        ])
+    checks.append("mc_reader_remaining(&reader) != 0U")
+    lines.extend([
+        "    if (" + " ||\n        ".join(checks) + ") return false;",
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL) return false;",
+    ])
+    writers = []
+    if named:
+        writers.append('mc_packet_string_n(packet, "note", 4U)')
+    elif head:
+        writers.append(f"mc_packet_{selector_wire}(packet, INT32_C({particle_id}))")
+    writers.extend(manifest_writer(profile, field) for field in packet.fields)
+    if numbered and not head:
+        writers.append(f"mc_packet_{selector_wire}(packet, INT32_C({particle_id}))")
+    lines.extend([
+        "    return " + " &&\n           ".join(writers) + " && !packet->failed;",
+        "}",
+        "",
+    ])
+    return lines
+
+
 def render_scoreboard_projection(profile: ManifestProfile,
                                  packet: ManifestPacket,
                                  type_name: str) -> list[str]:
@@ -2550,6 +2884,11 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
         for packet in profile.packets
     ):
         lines.extend(["#include <math.h>", ""])
+    if any(
+        packet.projection == "note_particle:name_f32"
+        for packet in profile.packets
+    ):
+        lines.extend(["#include <string.h>", ""])
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
         if packet.projection is not None:
@@ -2559,6 +2898,8 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
                 renderer = render_minecart_metadata_projection
             elif packet.projection.startswith("primed_tnt_metadata:"):
                 renderer = render_primed_tnt_metadata_projection
+            elif packet.projection.startswith("note_particle:"):
+                renderer = render_note_particle_projection
             elif packet.projection.startswith("inventory:"):
                 renderer = render_inventory_projection
             elif packet.projection.startswith("scoreboard_"):
