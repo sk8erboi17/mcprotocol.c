@@ -42,6 +42,7 @@ PRIMITIVES = {
 STATE_ORDER = ("handshaking", "status", "login", "configuration", "play")
 DIRECTIONS = {"serverbound": "toServer", "clientbound": "toClient"}
 STATE_CONSTANTS = {
+    "status": "MC_STATE_STATUS",
     "login": "MC_STATE_LOGIN",
     "configuration": "MC_STATE_CONFIGURATION",
     "play": "MC_STATE_PLAY",

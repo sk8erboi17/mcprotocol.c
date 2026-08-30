@@ -17,6 +17,33 @@ static void expect_string(McReader *reader, const char *expected)
     assert(memcmp(value.data, expected, value.size) == 0);
 }
 
+static void status_packet_catalog_is_public(void)
+{
+    static const struct {
+        McPacketDirection direction;
+        int32_t id;
+        const char *name;
+    } expected[] = {
+        {MC_PACKET_SERVERBOUND, 0, "ping_start"},
+        {MC_PACKET_SERVERBOUND, 1, "ping"},
+        {MC_PACKET_CLIENTBOUND, 0, "server_info"},
+        {MC_PACKET_CLIENTBOUND, 1, "ping"},
+    };
+    for (size_t index = 0U; index < sizeof(expected) / sizeof(expected[0]); ++index) {
+        assert(mc_packet_id(4, MC_STATE_STATUS,
+            expected[index].direction, expected[index].name) == expected[index].id);
+        assert(strcmp(mc_packet_name(776, MC_STATE_STATUS,
+            expected[index].direction, expected[index].id), expected[index].name) == 0);
+    }
+
+    size_t status_count = 0U;
+    McPacketInfo packet = {0};
+    for (size_t index = 0U; mc_packet_at(776, index, &packet); ++index) {
+        if (packet.state == MC_STATE_STATUS) ++status_count;
+    }
+    assert(status_count == sizeof(expected) / sizeof(expected[0]));
+}
+
 static void nbt_writer_validates_complete_values(void)
 {
     static const unsigned char compound[] = {10U, 0U};
@@ -1114,6 +1141,7 @@ int main(int argc, char **argv)
         expect_command(boundary_protocols[index]);
     }
     invalid_commands_fail_sticky();
+    status_packet_catalog_is_public();
     nbt_writer_validates_complete_values();
     length_prefixed_buffers_round_trip();
     expect_player_abilities(4);

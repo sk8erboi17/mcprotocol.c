@@ -2,6 +2,10 @@
 #include "mc_protocol_776.h"
 
 const McPacketInfo mc776_generated_packet_ids[] = {
+    {MC_STATE_STATUS, MC_PACKET_SERVERBOUND, 0, "ping_start"},
+    {MC_STATE_STATUS, MC_PACKET_SERVERBOUND, 1, "ping"},
+    {MC_STATE_STATUS, MC_PACKET_CLIENTBOUND, 0, "server_info"},
+    {MC_STATE_STATUS, MC_PACKET_CLIENTBOUND, 1, "ping"},
     {MC_STATE_LOGIN, MC_PACKET_SERVERBOUND, 0, "login_start"},
     {MC_STATE_LOGIN, MC_PACKET_SERVERBOUND, 1, "encryption_begin"},
     {MC_STATE_LOGIN, MC_PACKET_SERVERBOUND, 2, "login_plugin_response"},

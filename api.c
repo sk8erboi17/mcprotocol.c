@@ -163,9 +163,11 @@ _Static_assert(sizeof(protocol_names) / sizeof(protocol_names[0])
 
 /* Each name array is indexed directly by its wire packet ID. Empty states use
  * a zero-length map rather than a sentinel, so enumeration and reverse lookup
- * share one representation. When a catalog is regenerated, keep its protocol
- * entry and all six state/direction maps together: mixing releases produces
- * names that look valid while resolving to the wrong packet on the wire. */
+ * share one representation. Status has one invariant pair of maps shared by
+ * every supported release. When a catalog is regenerated, keep its protocol
+ * entry and all six release-specific state/direction maps together: mixing
+ * releases produces names that look valid while resolving to the wrong packet
+ * on the wire. */
 typedef struct {
     const char *const *names;
     size_t count;
@@ -180,6 +182,24 @@ typedef struct {
     McPacketMap play_serverbound;
     McPacketMap play_clientbound;
 } McPacketCatalog;
+
+static const char *const packet_names_status_serverbound[] = {
+    "ping_start", "ping",
+};
+
+static const char *const packet_names_status_clientbound[] = {
+    "server_info", "ping",
+};
+
+static const McPacketMap packet_map_status_serverbound = {
+    packet_names_status_serverbound,
+    sizeof(packet_names_status_serverbound) / sizeof(packet_names_status_serverbound[0]),
+};
+
+static const McPacketMap packet_map_status_clientbound = {
+    packet_names_status_clientbound,
+    sizeof(packet_names_status_clientbound) / sizeof(packet_names_status_clientbound[0]),
+};
 
 static const char *const packet_names_0_login_serverbound[] = {
     "login_start", "encryption_begin",
@@ -2198,6 +2218,9 @@ static const McPacketMap *packet_map(const McPacketCatalog *catalog,
                            : &catalog->configuration_clientbound;
     case MC_STATE_PLAY:
         return serverbound ? &catalog->play_serverbound : &catalog->play_clientbound;
+    case MC_STATE_STATUS:
+        return serverbound ? &packet_map_status_serverbound
+                           : &packet_map_status_clientbound;
     default:
         return NULL;
     }
@@ -2339,7 +2362,11 @@ size_t mc_packet_count(int protocol)
     return catalog->login_serverbound.count + catalog->login_clientbound.count
         + catalog->configuration_serverbound.count
         + catalog->configuration_clientbound.count
-        + catalog->play_serverbound.count + catalog->play_clientbound.count;
+        + catalog->play_serverbound.count + catalog->play_clientbound.count
+        + sizeof(packet_names_status_serverbound)
+            / sizeof(packet_names_status_serverbound[0])
+        + sizeof(packet_names_status_clientbound)
+            / sizeof(packet_names_status_clientbound[0]);
 }
 
 bool mc_packet_at(int protocol, size_t index, McPacketInfo *packet)
@@ -2349,14 +2376,17 @@ bool mc_packet_at(int protocol, size_t index, McPacketInfo *packet)
     const McPacketMap *maps[] = {
         &catalog->login_serverbound, &catalog->login_clientbound,
         &catalog->configuration_serverbound, &catalog->configuration_clientbound,
-        &catalog->play_serverbound, &catalog->play_clientbound
+        &catalog->play_serverbound, &catalog->play_clientbound,
+        &packet_map_status_serverbound, &packet_map_status_clientbound
     };
     const McState states[] = {
         MC_STATE_LOGIN, MC_STATE_LOGIN,
         MC_STATE_CONFIGURATION, MC_STATE_CONFIGURATION,
-        MC_STATE_PLAY, MC_STATE_PLAY
+        MC_STATE_PLAY, MC_STATE_PLAY,
+        MC_STATE_STATUS, MC_STATE_STATUS
     };
     const McPacketDirection directions[] = {
+        MC_PACKET_SERVERBOUND, MC_PACKET_CLIENTBOUND,
         MC_PACKET_SERVERBOUND, MC_PACKET_CLIENTBOUND,
         MC_PACKET_SERVERBOUND, MC_PACKET_CLIENTBOUND,
         MC_PACKET_SERVERBOUND, MC_PACKET_CLIENTBOUND
