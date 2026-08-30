@@ -379,6 +379,10 @@ static void block_place_bodies_are_versioned(void)
         .cursor_y = 0.5F,
         .cursor_z = 0.5F,
     };
+    unsigned char insufficient[32];
+    mc_packet_init(&packet, insufficient, sizeof(insufficient));
+    assert(!mc_packet_block_place(&packet, 5, &tagged));
+    assert(packet.failed);
     unsigned char tagged_storage[256];
     mc_packet_init(&packet, tagged_storage, sizeof(tagged_storage));
     assert(mc_packet_block_place(&packet, 47, &tagged));

@@ -4810,15 +4810,39 @@ int mc_client_place_block(McClient *client, const McBlockPlace *place,
         set_error(error, error_size, "Client non in stato PLAY");
         return -1;
     }
-    unsigned char storage[32];
+    size_t capacity = 64U;
+    if (client->profile->protocol <= 47 && place->held_item_nbt.size != 0U) {
+        if (client->profile->protocol <= 5) {
+            const uLong bound = compressBound((uLong)place->held_item_nbt.size);
+            if (bound > (uLong)MC_MAX_PACKET - 64U) {
+                set_error(error, error_size, "NBT block_place troppo grande");
+                return -1;
+            }
+            capacity = (size_t)bound + 64U;
+        } else {
+            if (place->held_item_nbt.size > (size_t)MC_MAX_PACKET - 64U) {
+                set_error(error, error_size, "NBT block_place troppo grande");
+                return -1;
+            }
+            capacity = place->held_item_nbt.size + 64U;
+        }
+    }
+    unsigned char *storage = malloc(capacity);
+    if (storage == NULL) {
+        set_error(error, error_size, "Allocazione block_place fallita");
+        return -1;
+    }
     McPacket body;
-    mc_packet_init(&body, storage, sizeof(storage));
+    mc_packet_init(&body, storage, capacity);
     if (!mc_packet_block_place(&body, client->profile->protocol, place)) {
+        free(storage);
         set_error(error, error_size, "Azione block_place Minecraft non valida");
         return -1;
     }
-    return mc_client_send_named(client, "block_place",
+    const int result = mc_client_send_named(client, "block_place",
         body.data, body.length, error, error_size);
+    free(storage);
+    return result;
 }
 
 int mc_client_attack_entity(McClient *client, int32_t entity_id,
