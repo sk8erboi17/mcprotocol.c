@@ -19,8 +19,55 @@ sys.modules[SPEC.name] = COMPILER
 SPEC.loader.exec_module(COMPILER)
 
 
+PLAIN_SLOT = [
+    "container",
+    [
+        {"name": "itemCount", "type": "varint"},
+        {
+            "anon": True,
+            "type": [
+                "switch",
+                {
+                    "compareTo": "itemCount",
+                    "fields": {"0": "void"},
+                    "default": [
+                        "container",
+                        [
+                            {"name": "itemId", "type": "varint"},
+                            {"name": "addedComponentCount", "type": "varint"},
+                            {"name": "removedComponentCount", "type": "varint"},
+                            {
+                                "name": "components",
+                                "type": [
+                                    "array",
+                                    {"count": "addedComponentCount", "type": "SlotComponent"},
+                                ],
+                            },
+                            {
+                                "name": "removeComponents",
+                                "type": [
+                                    "array",
+                                    {
+                                        "count": "removedComponentCount",
+                                        "type": "SlotComponentType",
+                                    },
+                                ],
+                            },
+                        ],
+                    ],
+                },
+            ],
+        },
+    ],
+]
+
+
 DOCUMENT = {
-    "types": {},
+    "types": {
+        "Slot": PLAIN_SLOT,
+        "UntrustedSlot": PLAIN_SLOT,
+        "HashedSlot": ["container", []],
+    },
     "play": {
         "toClient": {
             "types": {
@@ -40,6 +87,10 @@ DOCUMENT = {
                                         "0x4": "scoreboard_display_objective",
                                         "0x5": "scoreboard_score",
                                         "0x6": "reset_score",
+                                        "0x7": "set_creative_slot",
+                                        "0x8": "set_cursor_item",
+                                        "0x9": "window_items",
+                                        "0xa": "window_click",
                                     },
                                 },
                             ],
@@ -57,6 +108,10 @@ DOCUMENT = {
                                         "scoreboard_display_objective": "packet_scoreboard_display_objective",
                                         "scoreboard_score": "packet_scoreboard_score",
                                         "reset_score": "packet_reset_score",
+                                        "set_creative_slot": "packet_set_creative_slot",
+                                        "set_cursor_item": "packet_set_cursor_item",
+                                        "window_items": "packet_window_items",
+                                        "window_click": "packet_window_click",
                                     },
                                 },
                             ],
@@ -233,6 +288,50 @@ DOCUMENT = {
                         {"name": "objective_name", "type": ["option", "string"]},
                     ],
                 ],
+                "packet_set_creative_slot": [
+                    "container",
+                    [
+                        {"name": "slot", "type": "i16"},
+                        {"name": "item", "type": "UntrustedSlot"},
+                    ],
+                ],
+                "packet_set_cursor_item": [
+                    "container",
+                    [{"name": "contents", "type": "Slot"}],
+                ],
+                "packet_window_items": [
+                    "container",
+                    [
+                        {"name": "windowId", "type": "varint"},
+                        {"name": "stateId", "type": "varint"},
+                        {
+                            "name": "items",
+                            "type": [
+                                "array",
+                                {"countType": "varint", "type": "Slot"},
+                            ],
+                        },
+                        {"name": "carriedItem", "type": "Slot"},
+                    ],
+                ],
+                "packet_window_click": [
+                    "container",
+                    [
+                        {"name": "windowId", "type": "varint"},
+                        {"name": "stateId", "type": "varint"},
+                        {"name": "slot", "type": "i16"},
+                        {"name": "mouseButton", "type": "i8"},
+                        {"name": "mode", "type": "varint"},
+                        {
+                            "name": "changedSlots",
+                            "type": [
+                                "array",
+                                {"countType": "varint", "type": "HashedSlot"},
+                            ],
+                        },
+                        {"name": "cursorItem", "type": ["option", "HashedSlot"]},
+                    ],
+                ],
             }
         }
     },
@@ -310,6 +409,31 @@ def main() -> None:
     assert score.projection == "scoreboard_score:modern"
     assert reset.projection == "scoreboard_reset"
 
+    inventory_packets = []
+    for name, packet_id, projection in (
+        ("set_creative_slot", 7, "plain_item_slot"),
+        ("set_cursor_item", 8, "plain_item_contents"),
+        ("window_items", 9, "plain_window_items"),
+        ("window_click", 10, "empty_window_click"),
+    ):
+        inventory_packets.append(
+            COMPILER.compile_manifest_packet(
+                compiler,
+                {
+                    "state": "play",
+                    "direction": "toClient",
+                    "name": name,
+                    "expected_id": packet_id,
+                    "projection": projection,
+                },
+            )
+        )
+    creative, cursor, window_items, window_click = inventory_packets
+    assert creative.projection == "inventory:plain_item_slot"
+    assert cursor.projection == "inventory:plain_item_contents"
+    assert window_items.projection == "inventory:plain_window_items"
+    assert window_click.projection == "inventory:empty_window_click"
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -318,7 +442,7 @@ def main() -> None:
         999,
         "0" * 64,
         (("movement_speed", 22, "synthetic registry contract"),),
-        (sample, attributes, *scoreboard_packets),
+        (sample, attributes, *scoreboard_packets, *inventory_packets),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
     source = COMPILER.render_manifest_source(profile, "0" * 40)
@@ -331,6 +455,11 @@ def main() -> None:
     assert "decoded.number_format_present" in source
     assert "decoded.display_name_present" in source
     assert "decoded.objective_name_present" in source
+    assert "int32_t item_ids[128]" in header
+    assert "mc_reader_plain_item(&reader, 999" in source
+    assert "mc_packet_plain_item(packet, 999" in source
+    assert "changed_slot_count != 0" in source
+    assert "mc_packet_varint(packet, 0) && mc_packet_bool(packet, false)" in source
 
     outputs = {
         "protocol_test.h": header,
@@ -349,7 +478,10 @@ def main() -> None:
         else:
             raise AssertionError("staleness check accepted an unexpected generated file")
 
-    print("PASS schema compiler manifest, overrides, scoreboard projections and staleness")
+    print(
+        "PASS schema compiler manifest, overrides, scoreboard/inventory "
+        "projections and staleness"
+    )
 
 
 if __name__ == "__main__":

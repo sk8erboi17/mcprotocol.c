@@ -201,7 +201,10 @@ python3 tools/schema_compiler.py \
 Add `--check` to reject missing, changed, or unexpected managed outputs. A
 manifest may use source-validated field overrides, integer constants, and the
 `single_attribute_no_modifiers`, `scoreboard_objective`, `scoreboard_score`,
-and `scoreboard_reset` projections for schema-checked conditional packets.
+`scoreboard_reset`, `plain_item_slot`, `plain_item_contents`,
+`plain_window_items`, and `empty_window_click` projections for schema-checked
+conditional packets. Plain-item projections deliberately reject componentful
+slots instead of exposing an unchecked opaque tail.
 
 ### Send a command or chat packet
 

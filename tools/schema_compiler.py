@@ -452,6 +452,124 @@ def option_payload(compiler: Compiler, schema: Any, types: dict[str, Any],
     return resolved[1]
 
 
+def validate_plain_item_schema(compiler: Compiler, schema: Any,
+                               types: dict[str, Any], description: str) -> None:
+    fields = manifest_container(compiler, schema, types, description)
+    if (
+        len(fields) != 2
+        or fields[0].get("name") != "itemCount"
+        or fields[1].get("anon") is not True
+        or compiler.resolve(fields[0].get("type"), types) != "varint"
+    ):
+        raise ValueError(f"{description} is not a modern plain-item slot")
+    item_switch = compiler.resolve(fields[1].get("type"), types)
+    if (
+        not isinstance(item_switch, list)
+        or len(item_switch) != 2
+        or item_switch[0] != "switch"
+        or not isinstance(item_switch[1], dict)
+        or item_switch[1].get("compareTo") != "itemCount"
+        or not isinstance(item_switch[1].get("fields"), dict)
+        or compiler.resolve(item_switch[1].get("fields", {}).get("0"), types)
+        != "void"
+    ):
+        raise ValueError(f"{description} item-count switch changed")
+    contents = manifest_container(
+        compiler, item_switch[1].get("default"), types, f"{description} contents")
+    names = [field.get("name") for field in contents]
+    if names != [
+        "itemId", "addedComponentCount", "removedComponentCount",
+        "components", "removeComponents",
+    ] or any(
+        compiler.resolve(contents[index].get("type"), types) != "varint"
+        for index in range(3)
+    ):
+        raise ValueError(f"{description} component-free prefix changed")
+    component_schema = compiler.resolve(contents[3].get("type"), types)
+    removal_schema = compiler.resolve(contents[4].get("type"), types)
+    if (
+        not isinstance(component_schema, list)
+        or len(component_schema) != 2
+        or component_schema[0] != "array"
+        or not isinstance(component_schema[1], dict)
+        or component_schema[1].get("count") != "addedComponentCount"
+        or not isinstance(removal_schema, list)
+        or len(removal_schema) != 2
+        or removal_schema[0] != "array"
+        or not isinstance(removal_schema[1], dict)
+        or removal_schema[1].get("count") != "removedComponentCount"
+    ):
+        raise ValueError(f"{description} component arrays changed")
+
+
+def inventory_projection(compiler: Compiler, packet_name: str,
+                         projection: str, raw_fields: list[dict[str, Any]],
+                         types: dict[str, Any]) -> tuple[tuple[ManifestField, ...], str]:
+    names = [field.get("name") for field in raw_fields]
+    varint_wire = required_manifest_wire(
+        compiler, "varint", types, "inventory varint")
+    if projection == "plain_item_slot":
+        if names != ["slot", "item"]:
+            raise ValueError(f"packet {packet_name} plain-item slot schema changed")
+        validate_plain_item_schema(
+            compiler, raw_fields[1]["type"], types, f"packet {packet_name} item")
+        return (
+            ManifestField("slot", "slot", required_manifest_wire(
+                compiler, raw_fields[0]["type"], types, "inventory slot")),
+            ManifestField("item.itemId", "item_id", varint_wire),
+            ManifestField("item.itemCount", "item_count", varint_wire),
+        ), "inventory:plain_item_slot"
+    if projection == "plain_item_contents":
+        if names != ["contents"]:
+            raise ValueError(f"packet {packet_name} plain contents schema changed")
+        validate_plain_item_schema(
+            compiler, raw_fields[0]["type"], types, f"packet {packet_name} contents")
+        return (
+            ManifestField("contents.itemId", "item_id", varint_wire),
+            ManifestField("contents.itemCount", "item_count", varint_wire),
+        ), "inventory:plain_item_contents"
+    if projection == "plain_window_items":
+        if names != ["windowId", "stateId", "items", "carriedItem"]:
+            raise ValueError(f"packet {packet_name} window-items schema changed")
+        count_schema, item_schema = manifest_array(
+            compiler, raw_fields[2]["type"], types, f"packet {packet_name} items")
+        if compiler.resolve(count_schema, types) != "varint":
+            raise ValueError(f"packet {packet_name} item count is not a VarInt")
+        validate_plain_item_schema(
+            compiler, item_schema, types, f"packet {packet_name} item")
+        validate_plain_item_schema(
+            compiler, raw_fields[3]["type"], types, f"packet {packet_name} carried item")
+        return (
+            ManifestField("windowId", "window_id", required_manifest_wire(
+                compiler, raw_fields[0]["type"], types, "window ID")),
+            ManifestField("stateId", "state_id", required_manifest_wire(
+                compiler, raw_fields[1]["type"], types, "window state ID")),
+        ), "inventory:plain_window_items"
+    if projection == "empty_window_click":
+        if names != [
+            "windowId", "stateId", "slot", "mouseButton", "mode",
+            "changedSlots", "cursorItem",
+        ]:
+            raise ValueError(f"packet {packet_name} click schema changed")
+        count_schema, _ = manifest_array(
+            compiler, raw_fields[5]["type"], types,
+            f"packet {packet_name} changed slots")
+        option_payload(
+            compiler, raw_fields[6]["type"], types,
+            f"packet {packet_name} cursor item")
+        if compiler.resolve(count_schema, types) != "varint":
+            raise ValueError(f"packet {packet_name} changed-slot count is not a VarInt")
+        return tuple(
+            ManifestField(str(raw_fields[index]["name"]),
+                          manifest_c_name(str(raw_fields[index]["name"])),
+                          required_manifest_wire(
+                              compiler, raw_fields[index]["type"], types,
+                              f"packet {packet_name} click field"))
+            for index in range(5)
+        ), "inventory:empty_window_click"
+    raise ValueError(f"unknown inventory projection {projection}")
+
+
 def scoreboard_projection(compiler: Compiler, packet_name: str,
                           projection: str, raw_fields: list[dict[str, Any]],
                           types: dict[str, Any]) -> tuple[tuple[ManifestField, ...], str]:
@@ -626,6 +744,21 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
                 fields,
                 variant,
             )
+        if projection in {
+            "plain_item_slot", "plain_item_contents", "plain_window_items",
+            "empty_window_click",
+        }:
+            fields, variant = inventory_projection(
+                compiler, name, projection, raw_fields, types)
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
         raise ValueError(f"unknown packet projection: {projection}")
 
     overrides = spec.get("field_type_overrides", {})
@@ -766,8 +899,19 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
         lines.append(f"typedef struct {type_name} {{")
-        for field in packet.fields:
-            lines.append(f"    {field.wire.c_type} {field.c_field};")
+        if packet.projection == "inventory:plain_window_items":
+            lines.extend([
+                f"    {packet.fields[0].wire.c_type} window_id;",
+                f"    {packet.fields[1].wire.c_type} state_id;",
+                "    size_t item_count;",
+                "    int32_t item_ids[128];",
+                "    int32_t item_counts[128];",
+                "    int32_t carried_item_id;",
+                "    int32_t carried_item_count;",
+            ])
+        else:
+            for field in packet.fields:
+                lines.append(f"    {field.wire.c_type} {field.c_field};")
         lines.extend([
             f"}} {type_name};",
             "",
@@ -1008,6 +1152,107 @@ def render_scoreboard_projection(profile: ManifestProfile,
     return lines
 
 
+def render_inventory_projection(profile: ManifestProfile,
+                                packet: ManifestPacket,
+                                type_name: str) -> list[str]:
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    variant = packet.projection
+    lines = [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    mc_reader_init(&reader, payload, payload_size);",
+    ]
+    if variant == "inventory:plain_item_slot":
+        lines.extend([
+            f"    if (!{manifest_reader(profile, packet.fields[0])} ||",
+            f"        !mc_reader_plain_item(&reader, {profile.protocol},",
+            "            &decoded.item_id, &decoded.item_count) ||",
+            "        mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    elif variant == "inventory:plain_item_contents":
+        lines.extend([
+            f"    if (!mc_reader_plain_item(&reader, {profile.protocol},",
+            "            &decoded.item_id, &decoded.item_count) ||",
+            "        mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    elif variant == "inventory:plain_window_items":
+        lines.extend([
+            "    int32_t item_count = -1;",
+            f"    if (!{manifest_reader(profile, packet.fields[0])} ||",
+            f"        !{manifest_reader(profile, packet.fields[1])} ||",
+            "        !mc_reader_varint(&reader, &item_count) || item_count < 0 ||",
+            "        (size_t)item_count > sizeof(decoded.item_ids) / sizeof(decoded.item_ids[0])) return false;",
+            "    decoded.item_count = (size_t)item_count;",
+            "    for (size_t index = 0U; index < decoded.item_count; ++index) {",
+            f"        if (!mc_reader_plain_item(&reader, {profile.protocol},",
+            "                &decoded.item_ids[index], &decoded.item_counts[index])) return false;",
+            "    }",
+            f"    if (!mc_reader_plain_item(&reader, {profile.protocol},",
+            "            &decoded.carried_item_id, &decoded.carried_item_count) ||",
+            "        mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    elif variant == "inventory:empty_window_click":
+        lines.extend([
+            "    int32_t changed_slot_count = -1;",
+            "    bool cursor_present = true;",
+            "    if (" + " ||\n        ".join(
+                "!" + manifest_reader(profile, field) for field in packet.fields
+            ) + " ||",
+            "        !mc_reader_varint(&reader, &changed_slot_count) ||",
+            "        changed_slot_count != 0 ||",
+            "        !mc_reader_bool(&reader, &cursor_present) || cursor_present ||",
+            "        mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    else:
+        raise ValueError(f"unknown inventory projection renderer {variant}")
+    lines.extend([
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL) return false;",
+    ])
+    if variant == "inventory:plain_item_slot":
+        lines.extend([
+            f"    return {manifest_writer(profile, packet.fields[0])} &&",
+            f"           mc_packet_plain_item(packet, {profile.protocol},",
+            "               value->item_id, value->item_count);",
+        ])
+    elif variant == "inventory:plain_item_contents":
+        lines.extend([
+            f"    return mc_packet_plain_item(packet, {profile.protocol},",
+            "        value->item_id, value->item_count);",
+        ])
+    elif variant == "inventory:plain_window_items":
+        lines.extend([
+            "    if (value->item_count > sizeof(value->item_ids) / sizeof(value->item_ids[0]) ||",
+            f"        !{manifest_writer(profile, packet.fields[0])} ||",
+            f"        !{manifest_writer(profile, packet.fields[1])} ||",
+            "        !mc_packet_varint(packet, (int32_t)value->item_count)) return false;",
+            "    for (size_t index = 0U; index < value->item_count; ++index) {",
+            f"        if (!mc_packet_plain_item(packet, {profile.protocol},",
+            "                value->item_ids[index], value->item_counts[index])) return false;",
+            "    }",
+            f"    return mc_packet_plain_item(packet, {profile.protocol},",
+            "        value->carried_item_id, value->carried_item_count);",
+        ])
+    else:
+        lines.extend([
+            "    if (" + " ||\n        ".join(
+                "!" + manifest_writer(profile, field) for field in packet.fields
+            ) + ") return false;",
+            "    return mc_packet_varint(packet, 0) && mc_packet_bool(packet, false);",
+        ])
+    lines.extend(["}", ""])
+    return lines
+
+
 def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
     lines = [
         "/* Generated by mcprotocol.c/tools/schema_compiler.py; do not edit. */",
@@ -1018,7 +1263,12 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
         if packet.projection is not None:
-            lines.extend(render_scoreboard_projection(profile, packet, type_name))
+            renderer = (
+                render_inventory_projection
+                if packet.projection.startswith("inventory:")
+                else render_scoreboard_projection
+            )
+            lines.extend(renderer(profile, packet, type_name))
             continue
         checks = [
             "!" + manifest_reader(profile, field) for field in packet.fields
