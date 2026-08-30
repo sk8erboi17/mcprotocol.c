@@ -591,6 +591,115 @@ def inventory_projection(compiler: Compiler, packet_name: str,
     raise ValueError(f"unknown inventory projection {projection}")
 
 
+def validate_nbt_array(compiler: Compiler, schema: Any,
+                       types: dict[str, Any], description: str) -> None:
+    count_schema, item_schema = manifest_array(compiler, schema, types, description)
+    if compiler.resolve(count_schema, types) != "varint" or item_schema != "nbt":
+        raise ValueError(f"{description} is not a VarInt-counted named-NBT array")
+
+
+def validate_biome_switch(compiler: Compiler, schema: Any,
+                          types: dict[str, Any]) -> bool:
+    resolved = compiler.resolve(schema, types)
+    if (
+        not isinstance(resolved, list)
+        or len(resolved) != 2
+        or resolved[0] != "switch"
+        or not isinstance(resolved[1], dict)
+        or resolved[1].get("compareTo") != "groundUp"
+        or not isinstance(resolved[1].get("fields"), dict)
+    ):
+        raise ValueError("chunk biomes are not selected by groundUp")
+    fields = resolved[1]["fields"]
+    if compiler.resolve(fields.get("false"), types) != "void":
+        raise ValueError("chunk biomes false branch changed")
+    true_schema = compiler.resolve(fields.get("true"), types)
+    if (
+        not isinstance(true_schema, list)
+        or len(true_schema) != 2
+        or true_schema[0] != "array"
+        or not isinstance(true_schema[1], dict)
+        or compiler.resolve(true_schema[1].get("type"), types) not in {"i32", "varint"}
+    ):
+        raise ValueError("chunk biome array changed")
+    if "countType" in true_schema[1]:
+        if (compiler.resolve(true_schema[1].get("countType"), types) != "varint" or
+                compiler.resolve(true_schema[1].get("type"), types) != "varint"):
+            raise ValueError("chunk counted biomes are not VarInts")
+        return True
+    if (true_schema[1].get("count") != 1024 or
+            compiler.resolve(true_schema[1].get("type"), types) != "i32"):
+        raise ValueError("chunk fixed biome array changed")
+    return False
+
+
+def chunk_envelope_projection(compiler: Compiler, packet_name: str,
+                              raw_fields: list[dict[str, Any]],
+                              types: dict[str, Any]) -> tuple[tuple[ManifestField, ...], str]:
+    names = [field.get("name") for field in raw_fields]
+    variants = {
+        ("x", "z", "groundUp", "bitMap", "chunkData", "blockEntities"):
+            "chunk:1_13",
+        ("x", "z", "groundUp", "bitMap", "heightmaps", "chunkData", "blockEntities"):
+            "chunk:1_14",
+        ("x", "z", "groundUp", "bitMap", "heightmaps", "biomes", "chunkData", "blockEntities"):
+            "chunk:1_15_or_1_16_2",
+        ("x", "z", "groundUp", "ignoreOldData", "bitMap", "heightmaps", "biomes", "chunkData", "blockEntities"):
+            "chunk:1_16",
+        ("x", "z", "bitMap", "heightmaps", "biomes", "chunkData", "blockEntities"):
+            "chunk:1_17",
+    }
+    variant = variants.get(tuple(names))
+    if variant is None:
+        raise ValueError(f"packet {packet_name} chunk envelope changed")
+    if (required_manifest_wire(
+            compiler, raw_fields[0]["type"], types, "chunk x").suffix != "i32" or
+            required_manifest_wire(
+                compiler, raw_fields[1]["type"], types, "chunk z").suffix != "i32"):
+        raise ValueError("chunk coordinates are not signed 32-bit integers")
+    offset = 2
+    if variant != "chunk:1_17":
+        if compiler.resolve(raw_fields[offset]["type"], types) != "bool":
+            raise ValueError("chunk groundUp is not boolean")
+        offset += 1
+    if variant == "chunk:1_16":
+        if compiler.resolve(raw_fields[offset]["type"], types) != "bool":
+            raise ValueError("chunk ignoreOldData is not boolean")
+        offset += 1
+    mask_schema = compiler.resolve(raw_fields[offset]["type"], types)
+    if variant == "chunk:1_17":
+        mask_count, mask_item = manifest_array(
+            compiler, mask_schema, types, "chunk section mask")
+        if (compiler.resolve(mask_count, types) != "varint" or
+                compiler.resolve(mask_item, types) != "i64"):
+            raise ValueError("chunk section mask is not a VarInt-counted long array")
+    elif mask_schema != "varint":
+        raise ValueError("chunk section mask is not a VarInt")
+    offset += 1
+    if variant != "chunk:1_13":
+        if raw_fields[offset]["type"] != "nbt":
+            raise ValueError("chunk heightmaps are not named NBT")
+        offset += 1
+    if variant in {"chunk:1_15_or_1_16_2", "chunk:1_16", "chunk:1_17"}:
+        if variant == "chunk:1_17":
+            count_schema, biome_schema = manifest_array(
+                compiler, raw_fields[offset]["type"], types, "chunk biomes")
+            if (compiler.resolve(count_schema, types) != "varint" or
+                    compiler.resolve(biome_schema, types) != "varint"):
+                raise ValueError("1.17 biomes are not a VarInt-counted VarInt array")
+        else:
+            counted = validate_biome_switch(
+                compiler, raw_fields[offset]["type"], types)
+            variant += ":counted" if counted else ":fixed"
+        offset += 1
+    if compiler.buffer_suffix(raw_fields[offset]["type"], types) != "buffer_varint":
+        raise ValueError("chunk data is not a VarInt-length buffer")
+    offset += 1
+    validate_nbt_array(
+        compiler, raw_fields[offset]["type"], types, "chunk block entities")
+    return (), variant
+
+
 def scoreboard_projection(compiler: Compiler, packet_name: str,
                           projection: str, raw_fields: list[dict[str, Any]],
                           types: dict[str, Any]) -> tuple[tuple[ManifestField, ...], str]:
@@ -780,6 +889,18 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
                 fields,
                 variant,
             )
+        if projection == "chunk_envelope":
+            fields, variant = chunk_envelope_projection(
+                compiler, name, raw_fields, types)
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
         raise ValueError(f"unknown packet projection: {projection}")
 
     overrides = spec.get("field_type_overrides", {})
@@ -920,7 +1041,20 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
         lines.append(f"typedef struct {type_name} {{")
-        if packet.projection == "inventory:plain_window_items":
+        if packet.projection is not None and packet.projection.startswith("chunk:"):
+            lines.extend([
+                "    int32_t x;",
+                "    int32_t z;",
+                "    bool ground_up;",
+                "    bool ignore_old_data;",
+                "    size_t section_mask_word_count;",
+                "    uint64_t section_mask;",
+                "    McBytes heightmaps;",
+                "    size_t biome_count;",
+                "    int32_t biomes[1024];",
+                "    McBytes chunk_data;",
+            ])
+        elif packet.projection == "inventory:plain_window_items":
             lines.extend([
                 f"    {packet.fields[0].wire.c_type} window_id;",
                 f"    {packet.fields[1].wire.c_type} state_id;",
@@ -1276,6 +1410,174 @@ def render_inventory_projection(profile: ManifestProfile,
     return lines
 
 
+def render_chunk_projection(profile: ManifestProfile,
+                            packet: ManifestPacket,
+                            type_name: str) -> list[str]:
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    variant = packet.projection
+    is_1_13 = variant == "chunk:1_13"
+    is_1_17 = variant == "chunk:1_17"
+    has_ignore_old_data = variant == "chunk:1_16:fixed"
+    has_heightmaps = not is_1_13
+    fixed_biomes = variant in {
+        "chunk:1_15_or_1_16_2:fixed", "chunk:1_16:fixed"
+    }
+    counted_biomes = variant == "chunk:1_15_or_1_16_2:counted"
+    has_biomes = fixed_biomes or counted_biomes or is_1_17
+    if variant not in {
+        "chunk:1_13",
+        "chunk:1_14",
+        "chunk:1_15_or_1_16_2:fixed",
+        "chunk:1_15_or_1_16_2:counted",
+        "chunk:1_16:fixed",
+        "chunk:1_17",
+    }:
+        raise ValueError(f"unknown chunk projection renderer {variant}")
+
+    lines = [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    mc_reader_init(&reader, payload, payload_size);",
+        "    if (!mc_reader_i32(&reader, &decoded.x) ||",
+        "        !mc_reader_i32(&reader, &decoded.z)) return false;",
+    ]
+    if is_1_17:
+        lines.extend([
+            "    int32_t mask_word_count = -1;",
+            "    int64_t mask_word = 0;",
+            "    decoded.ground_up = true;",
+            "    if (!mc_reader_varint(&reader, &mask_word_count) ||",
+            "        mask_word_count < 0 || mask_word_count > 1) return false;",
+            "    decoded.section_mask_word_count = (size_t)mask_word_count;",
+            "    if (mask_word_count == 1 && !mc_reader_i64(&reader, &mask_word)) return false;",
+            "    decoded.section_mask = (uint64_t)mask_word;",
+        ])
+    else:
+        lines.extend([
+            "    int32_t section_mask = -1;",
+            "    if (!mc_reader_bool(&reader, &decoded.ground_up)) return false;",
+        ])
+        if has_ignore_old_data:
+            lines.append(
+                "    if (!mc_reader_bool(&reader, &decoded.ignore_old_data)) return false;")
+        lines.extend([
+            "    if (!mc_reader_varint(&reader, &section_mask) ||",
+            "        section_mask < 0 || section_mask > (int32_t)UINT16_MAX) return false;",
+            "    decoded.section_mask_word_count = 1U;",
+            "    decoded.section_mask = (uint64_t)(uint32_t)section_mask;",
+        ])
+    if has_heightmaps:
+        lines.append(
+            "    if (!mc_reader_nbt(&reader, true, &decoded.heightmaps)) return false;")
+    if fixed_biomes:
+        lines.extend([
+            "    if (decoded.ground_up) {",
+            "        decoded.biome_count = 1024U;",
+            "        for (size_t index = 0U; index < decoded.biome_count; ++index) {",
+            "            if (!mc_reader_i32(&reader, &decoded.biomes[index])) return false;",
+            "        }",
+            "    }",
+        ])
+    elif counted_biomes or is_1_17:
+        if counted_biomes:
+            lines.append("    if (decoded.ground_up) {")
+            indent = "    "
+        else:
+            indent = ""
+        lines.extend([
+            f"{indent}    int32_t biome_count = -1;",
+            f"{indent}    if (!mc_reader_varint(&reader, &biome_count) ||",
+            f"{indent}        biome_count < 0 || biome_count > 1024) return false;",
+            f"{indent}    decoded.biome_count = (size_t)biome_count;",
+            f"{indent}    for (size_t index = 0U; index < decoded.biome_count; ++index) {{",
+            f"{indent}        if (!mc_reader_varint(&reader, &decoded.biomes[index])) return false;",
+            f"{indent}    }}",
+        ])
+        if counted_biomes:
+            lines.append("    }")
+    lines.extend([
+        "    int32_t block_entity_count = -1;",
+        "    if (!mc_reader_buffer_varint(&reader, &decoded.chunk_data) ||",
+        "        !mc_reader_varint(&reader, &block_entity_count) ||",
+        "        block_entity_count != 0 || mc_reader_remaining(&reader) != 0U) return false;",
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL) return false;",
+        "    if (!mc_packet_i32(packet, value->x) ||",
+        "        !mc_packet_i32(packet, value->z)) return false;",
+    ])
+    if is_1_17:
+        lines.extend([
+            "    if (!value->ground_up || value->ignore_old_data ||",
+            "        value->section_mask_word_count > 1U ||",
+            "        (value->section_mask_word_count == 0U && value->section_mask != 0U) ||",
+            "        !mc_packet_varint(packet, (int32_t)value->section_mask_word_count)) return false;",
+            "    if (value->section_mask_word_count == 1U &&",
+            "        !mc_packet_i64(packet, (int64_t)value->section_mask)) return false;",
+        ])
+    else:
+        lines.extend([
+            "    if (value->section_mask_word_count != 1U ||",
+            "        value->section_mask > UINT16_MAX ||",
+            "        !mc_packet_bool(packet, value->ground_up)) return false;",
+        ])
+        if has_ignore_old_data:
+            lines.append(
+                "    if (!mc_packet_bool(packet, value->ignore_old_data)) return false;")
+        else:
+            lines.append("    if (value->ignore_old_data) return false;")
+        lines.append(
+            "    if (!mc_packet_varint(packet, (int32_t)value->section_mask)) return false;")
+    if has_heightmaps:
+        lines.append(
+            "    if (!mc_packet_nbt(packet, true, &value->heightmaps)) return false;")
+    else:
+        lines.append("    if (value->heightmaps.size != 0U) return false;")
+    if fixed_biomes:
+        lines.extend([
+            "    if (value->biome_count != (value->ground_up ? 1024U : 0U)) return false;",
+            "    for (size_t index = 0U; index < value->biome_count; ++index) {",
+            "        if (!mc_packet_i32(packet, value->biomes[index])) return false;",
+            "    }",
+        ])
+    elif counted_biomes:
+        lines.extend([
+            "    if (value->biome_count > 1024U ||",
+            "        (!value->ground_up && value->biome_count != 0U)) return false;",
+            "    if (value->ground_up) {",
+            "        if (!mc_packet_varint(packet, (int32_t)value->biome_count)) return false;",
+            "        for (size_t index = 0U; index < value->biome_count; ++index) {",
+            "            if (!mc_packet_varint(packet, value->biomes[index])) return false;",
+            "        }",
+            "    }",
+        ])
+    elif is_1_17:
+        lines.extend([
+            "    if (value->biome_count > 1024U ||",
+            "        !mc_packet_varint(packet, (int32_t)value->biome_count)) return false;",
+            "    for (size_t index = 0U; index < value->biome_count; ++index) {",
+            "        if (!mc_packet_varint(packet, value->biomes[index])) return false;",
+            "    }",
+        ])
+    elif not has_biomes:
+        lines.append("    if (value->biome_count != 0U) return false;")
+    lines.extend([
+        "    return mc_packet_buffer_varint(packet, &value->chunk_data) &&",
+        "           mc_packet_varint(packet, 0);",
+        "}",
+        "",
+    ])
+    return lines
+
+
 def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
     lines = [
         "/* Generated by mcprotocol.c/tools/schema_compiler.py; do not edit. */",
@@ -1286,11 +1588,14 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
         if packet.projection is not None:
-            renderer = (
-                render_inventory_projection
-                if packet.projection.startswith("inventory:")
-                else render_scoreboard_projection
-            )
+            if packet.projection.startswith("inventory:"):
+                renderer = render_inventory_projection
+            elif packet.projection.startswith("scoreboard_"):
+                renderer = render_scoreboard_projection
+            elif packet.projection.startswith("chunk:"):
+                renderer = render_chunk_projection
+            else:
+                raise ValueError(f"unknown packet projection renderer {packet.projection}")
             lines.extend(renderer(profile, packet, type_name))
             continue
         checks = [

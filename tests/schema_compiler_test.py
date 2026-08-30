@@ -91,6 +91,7 @@ DOCUMENT = {
                                         "0x8": "set_cursor_item",
                                         "0x9": "window_items",
                                         "0xa": "window_click",
+                                        "0xb": "map_chunk",
                                     },
                                 },
                             ],
@@ -112,6 +113,7 @@ DOCUMENT = {
                                         "set_cursor_item": "packet_set_cursor_item",
                                         "window_items": "packet_window_items",
                                         "window_click": "packet_window_click",
+                                        "map_chunk": "packet_map_chunk",
                                     },
                                 },
                             ],
@@ -340,6 +342,39 @@ DOCUMENT = {
                         {"name": "cursorItem", "type": ["option", "HashedSlot"]},
                     ],
                 ],
+                "packet_map_chunk": [
+                    "container",
+                    [
+                        {"name": "x", "type": "i32"},
+                        {"name": "z", "type": "i32"},
+                        {
+                            "name": "bitMap",
+                            "type": [
+                                "array",
+                                {"countType": "varint", "type": "i64"},
+                            ],
+                        },
+                        {"name": "heightmaps", "type": "nbt"},
+                        {
+                            "name": "biomes",
+                            "type": [
+                                "array",
+                                {"countType": "varint", "type": "varint"},
+                            ],
+                        },
+                        {
+                            "name": "chunkData",
+                            "type": ["buffer", {"countType": "varint"}],
+                        },
+                        {
+                            "name": "blockEntities",
+                            "type": [
+                                "array",
+                                {"countType": "varint", "type": "nbt"},
+                            ],
+                        },
+                    ],
+                ],
             }
         }
     },
@@ -444,6 +479,18 @@ def main() -> None:
     assert window_items.projection == "inventory:plain_window_items"
     assert window_click.projection == "inventory:empty_window_click"
 
+    chunk = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "map_chunk",
+            "expected_id": 11,
+            "projection": "chunk_envelope",
+        },
+    )
+    assert chunk.projection == "chunk:1_17"
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -452,7 +499,7 @@ def main() -> None:
         999,
         "0" * 64,
         (("movement_speed", 22, "synthetic registry contract"),),
-        (sample, attributes, *scoreboard_packets, *inventory_packets),
+        (sample, attributes, *scoreboard_packets, *inventory_packets, chunk),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
     source = COMPILER.render_manifest_source(profile, "0" * 40)
@@ -472,6 +519,11 @@ def main() -> None:
     assert "mc_packet_plain_item(packet, 999" in source
     assert "changed_slot_count != 0" in source
     assert "mc_packet_varint(packet, 0) && mc_packet_bool(packet, false)" in source
+    assert "uint64_t section_mask" in header
+    assert "int32_t biomes[1024]" in header
+    assert "mc_reader_nbt(&reader, true, &decoded.heightmaps)" in source
+    assert "mask_word_count > 1" in source
+    assert "mc_packet_buffer_varint(packet, &value->chunk_data)" in source
 
     outputs = {
         "protocol_test.h": header,
@@ -491,7 +543,7 @@ def main() -> None:
             raise AssertionError("staleness check accepted an unexpected generated file")
 
     print(
-        "PASS schema compiler manifest, overrides, scoreboard/inventory "
+        "PASS schema compiler manifest, overrides, scoreboard/inventory/chunk "
         "projections and staleness"
     )
 
