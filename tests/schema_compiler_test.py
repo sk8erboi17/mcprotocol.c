@@ -727,6 +727,57 @@ def main() -> None:
         else:
             raise AssertionError("minecart metadata accepted an incomplete source contract")
 
+    primed_tnt_metadata = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "entity_metadata",
+            "expected_id": 15,
+            "projection": "source_validated_primed_tnt_metadata",
+            "metadata_layout": "fuse_and_block_state",
+            "source_validation": (
+                "Vanilla PrimedTnt accessors and EntityDataSerializers wire IDs"
+            ),
+        },
+    )
+    assert primed_tnt_metadata.projection == (
+        "primed_tnt_metadata:fuse_and_block_state:8"
+    )
+    legacy_primed_tnt_metadata = COMPILER.compile_manifest_packet(
+        COMPILER.Compiler(DOCUMENT, 340, {}),
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "entity_metadata",
+            "expected_id": 15,
+            "projection": "source_validated_primed_tnt_metadata",
+            "metadata_layout": "fuse",
+            "source_validation": "Vanilla 1.12.2 PrimedTnt accessor layout",
+        },
+    )
+    assert legacy_primed_tnt_metadata.projection == "primed_tnt_metadata:fuse:6"
+    for incomplete in (
+        {"metadata_layout": "fuse_and_block_state"},
+        {"source_validation": "source checked"},
+    ):
+        try:
+            COMPILER.compile_manifest_packet(
+                compiler,
+                {
+                    "state": "play",
+                    "direction": "toClient",
+                    "name": "entity_metadata",
+                    "expected_id": 15,
+                    "projection": "source_validated_primed_tnt_metadata",
+                    **incomplete,
+                },
+            )
+        except ValueError as error:
+            assert "requires" in str(error)
+        else:
+            raise AssertionError("primed TNT metadata accepted an incomplete source contract")
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -749,6 +800,22 @@ def main() -> None:
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
     source = COMPILER.render_manifest_source(profile, "0" * 40)
+    primed_tnt_profile = COMPILER.ManifestProfile(
+        "primed_tnt_test",
+        "primed_tnt_test",
+        999,
+        "synthetic",
+        999,
+        "0" * 64,
+        (),
+        (primed_tnt_metadata,),
+    )
+    primed_tnt_header = COMPILER.render_manifest_header(
+        primed_tnt_profile, "0" * 40
+    )
+    primed_tnt_source = COMPILER.render_manifest_source(
+        primed_tnt_profile, "0" * 40
+    )
     assert "PERRY_MC_TEST_MOVEMENT_SPEED INT32_C(22)" in header
     assert "mc_reader_varlong(&reader, &decoded.duration)" in source
     assert "mc_reader_buffer_i32(&reader, &decoded.legacy_blob)" in source
@@ -761,6 +828,11 @@ def main() -> None:
     assert "decoded.display_name_present" in source
     assert "decoded.objective_name_present" in source
     assert "int32_t item_ids[128]" in header
+    assert "FIELD_FUSE (UINT32_C(1) << 0U)" in primed_tnt_header
+    assert "FIELD_BLOCK_STATE (UINT32_C(1) << 1U)" in primed_tnt_header
+    assert "index == UINT8_C(8)" in primed_tnt_source
+    assert "index == UINT8_C(9)" in primed_tnt_source
+    assert "!mc_packet_varint(packet, 14)" in primed_tnt_source
     assert "mc_reader_plain_item(&reader, 999" in source
     assert "mc_packet_plain_item(packet, 999" in source
     assert "changed_slot_count != 0" in source

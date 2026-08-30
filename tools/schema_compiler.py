@@ -537,6 +537,47 @@ def manifest_minecart_metadata_projection(
     )
 
 
+def manifest_primed_tnt_metadata_projection(
+    compiler: Compiler,
+    packet_name: str,
+    raw_fields: list[dict[str, Any]],
+    types: dict[str, Any],
+    layout: Any,
+) -> tuple[tuple[ManifestField, ...], str]:
+    if (
+        len(raw_fields) != 2
+        or raw_fields[0].get("name") != "entityId"
+        or raw_fields[1].get("name") != "metadata"
+        or raw_fields[1].get("type") != "entityMetadata"
+    ):
+        raise ValueError(f"packet {packet_name} primed TNT metadata envelope changed")
+    entity_wire = required_manifest_wire(
+        compiler, raw_fields[0].get("type"), types, "primed TNT metadata entity ID"
+    )
+    if entity_wire.suffix != "varint":
+        raise ValueError(f"packet {packet_name} primed TNT metadata entity ID is not VarInt")
+    if compiler.protocol < 107:
+        raise ValueError("source_validated_primed_tnt_metadata requires protocol 107 or later")
+    expected_layout = (
+        "fuse_and_block_state" if compiler.protocol >= 765 else "fuse"
+    )
+    if layout != expected_layout:
+        raise ValueError(
+            "source_validated_primed_tnt_metadata requires metadata_layout "
+            f"{expected_layout} for protocol {compiler.protocol}"
+        )
+    fuse_index = (
+        5 if compiler.protocol <= 110
+        else 6 if compiler.protocol <= 404
+        else 7 if compiler.protocol <= 754
+        else 8
+    )
+    return (
+        (ManifestField("entityId", "entity_id", entity_wire),),
+        f"primed_tnt_metadata:{expected_layout}:{fuse_index}",
+    )
+
+
 def required_manifest_wire(compiler: Compiler, schema: Any,
                            types: dict[str, Any], description: str) -> ManifestWire:
     wire = manifest_wire(compiler, schema, types)
@@ -1097,6 +1138,28 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
                 fields,
                 variant,
             )
+        if projection == "source_validated_primed_tnt_metadata":
+            source_validation = spec.get("source_validation")
+            if not isinstance(source_validation, str) or not source_validation.strip():
+                raise ValueError(
+                    "source_validated_primed_tnt_metadata requires source_validation"
+                )
+            fields, variant = manifest_primed_tnt_metadata_projection(
+                compiler,
+                name,
+                raw_fields,
+                types,
+                spec.get("metadata_layout"),
+            )
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
         if projection in {
             "scoreboard_objective", "scoreboard_score", "scoreboard_reset"
         }:
@@ -1293,6 +1356,22 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
                 f"#define {mask_prefix}_ALL ((UINT32_C(1) << 5U) - UINT32_C(1))",
                 "",
             ])
+        if (
+            packet.projection is not None
+            and packet.projection.startswith("primed_tnt_metadata:")
+        ):
+            mask_prefix = manifest_macro(
+                "PERRY_MC", profile.c_profile, packet.c_packet, "FIELD"
+            )
+            primed_tnt_field_count = (
+                2 if ":fuse_and_block_state:" in packet.projection else 1
+            )
+            lines.extend([
+                f"#define {mask_prefix}_FUSE (UINT32_C(1) << 0U)",
+                f"#define {mask_prefix}_BLOCK_STATE (UINT32_C(1) << 1U)",
+                f"#define {mask_prefix}_ALL ((UINT32_C(1) << {primed_tnt_field_count}U) - UINT32_C(1))",
+                "",
+            ])
         lines.append(f"typedef struct {type_name} {{")
         if packet.projection is not None and packet.projection.startswith("chunk:"):
             lines.extend([
@@ -1340,6 +1419,16 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
                 "    int32_t display_offset;",
                 "    uint32_t fields;",
                 "    bool has_custom_display_block;",
+            ])
+        elif (
+            packet.projection is not None
+            and packet.projection.startswith("primed_tnt_metadata:")
+        ):
+            lines.extend([
+                "    int32_t entity_id;",
+                "    int32_t fuse;",
+                "    int32_t block_state;",
+                "    uint32_t fields;",
             ])
         elif packet.projection == "inventory:plain_window_items":
             lines.extend([
@@ -1595,6 +1684,96 @@ def render_minecart_metadata_projection(
             f"    if ((value->fields & {mask}_CUSTOM_DISPLAY_BLOCK) != 0U &&",
             "        (!mc_packet_u8(packet, UINT8_C(13)) || !mc_packet_varint(packet, 8) ||",
             "         !mc_packet_bool(packet, value->has_custom_display_block))) return false;",
+        ])
+    lines.extend([
+        "    return mc_packet_u8(packet, UINT8_C(0xff)) && !packet->failed;",
+        "}",
+        "",
+    ])
+    return lines
+
+
+def render_primed_tnt_metadata_projection(
+    profile: ManifestProfile,
+    packet: ManifestPacket,
+    type_name: str,
+) -> list[str]:
+    parts = packet.projection.split(":") if packet.projection is not None else []
+    if (
+        len(parts) != 3
+        or parts[0] != "primed_tnt_metadata"
+        or parts[1] not in {"fuse", "fuse_and_block_state"}
+        or parts[2] not in {"5", "6", "7", "8"}
+    ):
+        raise ValueError(f"unknown primed TNT metadata projection {packet.projection}")
+    with_block_state = parts[1] == "fuse_and_block_state"
+    fuse_index = int(parts[2])
+    block_state_index = fuse_index + 1
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    mask = manifest_macro("PERRY_MC", profile.c_profile, packet.c_packet, "FIELD")
+    lines = [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    uint32_t seen = 0U;",
+        "    bool terminated = false;",
+        "    mc_reader_init(&reader, payload, payload_size);",
+        "    if (!mc_reader_varint(&reader, &decoded.entity_id) || decoded.entity_id <= 0)",
+        "        return false;",
+        "    while (mc_reader_remaining(&reader) != 0U) {",
+        "        uint8_t index = 0U;",
+        "        int32_t serializer = -1;",
+        "        if (!mc_reader_u8(&reader, &index)) return false;",
+        "        if (index == UINT8_C(0xff)) {",
+        "            terminated = true;",
+        "            break;",
+        "        }",
+        "        if (!mc_reader_varint(&reader, &serializer)) return false;",
+        f"        if (index == UINT8_C({fuse_index})) {{",
+        f"            if (serializer != 1 || (seen & {mask}_FUSE) != 0U ||",
+        "                !mc_reader_varint(&reader, &decoded.fuse)) return false;",
+        f"            seen |= {mask}_FUSE;",
+        "            continue;",
+        "        }",
+    ]
+    if with_block_state:
+        lines.extend([
+            f"        if (index == UINT8_C({block_state_index})) {{",
+            f"            if (serializer != 14 || (seen & {mask}_BLOCK_STATE) != 0U ||",
+            "                !mc_reader_varint(&reader, &decoded.block_state) ||",
+            "                decoded.block_state < 0) return false;",
+            f"            seen |= {mask}_BLOCK_STATE;",
+            "            continue;",
+            "        }",
+        ])
+    lines.extend([
+        "        return false;",
+        "    }",
+        "    if (!terminated || mc_reader_remaining(&reader) != 0U || seen == 0U)",
+        "        return false;",
+        "    decoded.fields = seen;",
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL || value->entity_id <= 0 ||",
+        f"        value->fields == 0U || (value->fields & ~{mask}_ALL) != 0U ||",
+        *(["        value->block_state < 0 ||"] if with_block_state else []),
+        "        !mc_packet_varint(packet, value->entity_id)) return false;",
+        f"    if ((value->fields & {mask}_FUSE) != 0U &&",
+        f"        (!mc_packet_u8(packet, UINT8_C({fuse_index})) || !mc_packet_varint(packet, 1) ||",
+        "         !mc_packet_varint(packet, value->fuse))) return false;",
+    ])
+    if with_block_state:
+        lines.extend([
+            f"    if ((value->fields & {mask}_BLOCK_STATE) != 0U &&",
+            f"        (!mc_packet_u8(packet, UINT8_C({block_state_index})) || !mc_packet_varint(packet, 14) ||",
+            "         !mc_packet_varint(packet, value->block_state))) return false;",
         ])
     lines.extend([
         "    return mc_packet_u8(packet, UINT8_C(0xff)) && !packet->failed;",
@@ -2237,6 +2416,8 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
                 renderer = render_minecart_steps_projection
             elif packet.projection.startswith("minecart_metadata:"):
                 renderer = render_minecart_metadata_projection
+            elif packet.projection.startswith("primed_tnt_metadata:"):
+                renderer = render_primed_tnt_metadata_projection
             elif packet.projection.startswith("inventory:"):
                 renderer = render_inventory_projection
             elif packet.projection.startswith("scoreboard_"):
