@@ -243,6 +243,9 @@ bool mc_packet_string_n(McPacket *packet, const char *value, size_t size);
 bool mc_packet_string(McPacket *packet, const char *value);
 bool mc_packet_position(McPacket *packet, int protocol, McPosition value);
 bool mc_packet_uuid(McPacket *packet, const McUuid *value);
+/* Validates and appends one complete encoded NBT value. named_root selects
+ * the legacy named-root network form; modern components use false. */
+bool mc_packet_nbt(McPacket *packet, bool named_root, const McBytes *encoded);
 /* Encodes a metadata-free Slot/ItemStack value. count=0 writes the empty-item
  * sentinel for the selected release; non-empty stacks require item_id > 0. */
 bool mc_packet_plain_item(McPacket *packet, int protocol,

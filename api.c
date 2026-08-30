@@ -2424,6 +2424,23 @@ bool mc_packet_bytes(McPacket *packet, const void *data, size_t size)
     return true;
 }
 
+bool mc_packet_nbt(McPacket *packet, bool named_root, const McBytes *encoded)
+{
+    if (packet == NULL || packet->failed || encoded == NULL
+        || (encoded->size != 0U && encoded->data == NULL)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    McReader reader;
+    mc_reader_init(&reader, encoded->data, encoded->size);
+    if (!mc_reader_nbt(&reader, named_root, NULL)
+        || mc_reader_remaining(&reader) != 0U) {
+        packet->failed = true;
+        return false;
+    }
+    return mc_packet_bytes(packet, encoded->data, encoded->size);
+}
+
 bool mc_packet_bool(McPacket *packet, bool value)
 {
     return mc_packet_u8(packet, value ? 1U : 0U);

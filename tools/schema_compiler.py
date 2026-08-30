@@ -35,6 +35,7 @@ PRIMITIVES = {
     "string": ("McBytes", "string"),
     "UUID": ("McUuid", "uuid"),
     "uuid": ("McUuid", "uuid"),
+    "anonymousNbt": ("McBytes", "nbt"),
 }
 
 STATE_ORDER = ("handshaking", "status", "login", "configuration", "play")
@@ -75,7 +76,7 @@ class Compiler:
         seen: set[str] = set()
         while True:
             if isinstance(schema, str):
-                if schema in PRIMITIVES or schema == "position":
+                if schema in PRIMITIVES or schema in {"position", "void"}:
                     return schema
                 if schema in seen:
                     raise ValueError(f"recursive schema alias: {schema}")
@@ -151,9 +152,13 @@ class Compiler:
             if encode:
                 if suffix == "string":
                     return [f"    if (!mc_packet_string_n(packet, (const char *)value->{expression}.data, value->{expression}.size)) return false;"]
+                if suffix == "nbt":
+                    return [f"    if (!mc_packet_nbt(packet, false, &value->{expression})) return false;"]
                 if suffix == "uuid":
                     return [f"    if (!mc_packet_uuid(packet, &value->{expression})) return false;"]
                 return [f"    if (!mc_packet_{suffix}(packet, value->{expression})) return false;"]
+            if suffix == "nbt":
+                return [f"    if (!mc_reader_nbt(reader, false, &value->{expression})) return false;"]
             return [f"    if (!mc_reader_{suffix}(reader, &value->{expression})) return false;"]
         if not isinstance(schema, list) or not schema or schema[0] != "container":
             kind = schema[0] if isinstance(schema, list) and schema else repr(schema)
@@ -297,6 +302,7 @@ class ManifestPacket:
     state: str
     direction: str
     fields: tuple[ManifestField, ...]
+    projection: str | None = None
 
 
 @dataclass(frozen=True)
@@ -406,6 +412,174 @@ def manifest_attribute_projection(compiler: Compiler, packet_name: str,
     return tuple(fields)
 
 
+def required_manifest_wire(compiler: Compiler, schema: Any,
+                           types: dict[str, Any], description: str) -> ManifestWire:
+    wire = manifest_wire(compiler, schema, types)
+    if wire is None:
+        raise ValueError(f"{description} uses unsupported schema {schema!r}")
+    return wire
+
+
+def switch_payload(compiler: Compiler, schema: Any, types: dict[str, Any],
+                   description: str) -> Any:
+    resolved = compiler.resolve(schema, types)
+    if (
+        not isinstance(resolved, list)
+        or len(resolved) != 2
+        or resolved[0] != "switch"
+        or not isinstance(resolved[1], dict)
+        or not isinstance(resolved[1].get("fields"), dict)
+    ):
+        raise ValueError(f"{description} is not a switch")
+    payloads = []
+    for candidate in resolved[1]["fields"].values():
+        candidate = compiler.resolve(candidate, types)
+        if candidate != "void" and candidate not in payloads:
+            payloads.append(candidate)
+    default = compiler.resolve(resolved[1].get("default", "void"), types)
+    if default != "void" and default not in payloads:
+        payloads.append(default)
+    if len(payloads) != 1:
+        raise ValueError(f"{description} does not have one non-void payload")
+    return payloads[0]
+
+
+def option_payload(compiler: Compiler, schema: Any, types: dict[str, Any],
+                   description: str) -> Any:
+    resolved = compiler.resolve(schema, types)
+    if not isinstance(resolved, list) or len(resolved) != 2 or resolved[0] != "option":
+        raise ValueError(f"{description} is not an option")
+    return resolved[1]
+
+
+def scoreboard_projection(compiler: Compiler, packet_name: str,
+                          projection: str, raw_fields: list[dict[str, Any]],
+                          types: dict[str, Any]) -> tuple[tuple[ManifestField, ...], str]:
+    names = [field.get("name") for field in raw_fields]
+    bool_wire = required_manifest_wire(compiler, "bool", types, "scoreboard bool")
+    if projection == "scoreboard_objective":
+        if names == ["name", "displayText", "action"]:
+            fields = (
+                ManifestField("name", "name", required_manifest_wire(
+                    compiler, raw_fields[0]["type"], types, "objective name")),
+                ManifestField("displayText", "display_text", required_manifest_wire(
+                    compiler, raw_fields[1]["type"], types, "objective display text")),
+                ManifestField("action", "action", required_manifest_wire(
+                    compiler, raw_fields[2]["type"], types, "objective action")),
+            )
+            return fields, "scoreboard_objective:1_7"
+        if names not in (
+            ["name", "action", "displayText", "type"],
+            ["name", "action", "displayText", "type", "number_format", "styling"],
+        ):
+            raise ValueError("scoreboard objective schema changed")
+        name_wire = required_manifest_wire(
+            compiler, raw_fields[0]["type"], types, "objective name")
+        action_wire = required_manifest_wire(
+            compiler, raw_fields[1]["type"], types, "objective action")
+        display_schema = switch_payload(
+            compiler, raw_fields[2]["type"], types, "objective display text")
+        render_schema = switch_payload(
+            compiler, raw_fields[3]["type"], types, "objective render type")
+        display_wire = required_manifest_wire(
+            compiler, display_schema, types, "objective display text")
+        render_wire = required_manifest_wire(
+            compiler, render_schema, types, "objective render type")
+        fields = [
+            ManifestField("name", "name", name_wire),
+            ManifestField("action", "action", action_wire),
+            ManifestField("displayText", "display_text", display_wire),
+            ManifestField("type", "render_type", render_wire),
+        ]
+        if len(raw_fields) == 4:
+            variant = "string_type" if render_wire.suffix == "string" else "numeric_type"
+            return tuple(fields), f"scoreboard_objective:{variant}"
+        number_option = switch_payload(
+            compiler, raw_fields[4]["type"], types, "objective number format")
+        number_schema = option_payload(
+            compiler, number_option, types, "objective number format")
+        number_wire = required_manifest_wire(
+            compiler, number_schema, types, "objective number format")
+        style_outer = switch_payload(
+            compiler, raw_fields[5]["type"], types, "objective styling")
+        style_schema = switch_payload(
+            compiler, style_outer, types, "objective styling format")
+        style_wire = required_manifest_wire(
+            compiler, style_schema, types, "objective styling")
+        fields.extend([
+            ManifestField("number_format.present", "number_format_present", bool_wire),
+            ManifestField("number_format", "number_format", number_wire),
+            ManifestField("styling", "styling", style_wire),
+        ])
+        return tuple(fields), "scoreboard_objective:modern"
+
+    if projection == "scoreboard_score":
+        if names == ["itemName", "action", "scoreName", "value"]:
+            score_schema = switch_payload(
+                compiler, raw_fields[2]["type"], types, "1.7 score objective") \
+                if compiler.resolve(raw_fields[2]["type"], types)[0] == "switch" \
+                else raw_fields[2]["type"]
+            value_schema = switch_payload(
+                compiler, raw_fields[3]["type"], types, "score value")
+            fields = (
+                ManifestField("itemName", "item_name", required_manifest_wire(
+                    compiler, raw_fields[0]["type"], types, "score owner")),
+                ManifestField("action", "action", required_manifest_wire(
+                    compiler, raw_fields[1]["type"], types, "score action")),
+                ManifestField("scoreName", "score_name", required_manifest_wire(
+                    compiler, score_schema, types, "score objective")),
+                ManifestField("value", "value", required_manifest_wire(
+                    compiler, value_schema, types, "score value")),
+            )
+            action_suffix = fields[1].wire.suffix
+            return fields, (
+                "scoreboard_score:1_7" if action_suffix == "i8"
+                else "scoreboard_score:legacy"
+            )
+        if names != [
+            "itemName", "scoreName", "value", "display_name", "number_format", "styling"
+        ]:
+            raise ValueError("modern scoreboard score schema changed")
+        display_schema = option_payload(
+            compiler, raw_fields[3]["type"], types, "score display name")
+        number_schema = option_payload(
+            compiler, raw_fields[4]["type"], types, "score number format")
+        style_schema = switch_payload(
+            compiler, raw_fields[5]["type"], types, "score styling")
+        fields = (
+            ManifestField("itemName", "item_name", required_manifest_wire(
+                compiler, raw_fields[0]["type"], types, "score owner")),
+            ManifestField("scoreName", "score_name", required_manifest_wire(
+                compiler, raw_fields[1]["type"], types, "score objective")),
+            ManifestField("value", "value", required_manifest_wire(
+                compiler, raw_fields[2]["type"], types, "score value")),
+            ManifestField("display_name.present", "display_name_present", bool_wire),
+            ManifestField("display_name", "display_name", required_manifest_wire(
+                compiler, display_schema, types, "score display name")),
+            ManifestField("number_format.present", "number_format_present", bool_wire),
+            ManifestField("number_format", "number_format", required_manifest_wire(
+                compiler, number_schema, types, "score number format")),
+            ManifestField("styling", "styling", required_manifest_wire(
+                compiler, style_schema, types, "score styling")),
+        )
+        return fields, "scoreboard_score:modern"
+
+    if projection == "scoreboard_reset":
+        if names != ["entity_name", "objective_name"]:
+            raise ValueError("scoreboard reset schema changed")
+        objective_schema = option_payload(
+            compiler, raw_fields[1]["type"], types, "reset objective")
+        fields = (
+            ManifestField("entity_name", "entity_name", required_manifest_wire(
+                compiler, raw_fields[0]["type"], types, "reset owner")),
+            ManifestField("objective_name.present", "objective_name_present", bool_wire),
+            ManifestField("objective_name", "objective_name", required_manifest_wire(
+                compiler, objective_schema, types, "reset objective")),
+        )
+        return fields, "scoreboard_reset"
+    raise ValueError(f"unknown scoreboard projection {projection}")
+
+
 def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> ManifestPacket:
     name = spec.get("name")
     state = spec.get("state")
@@ -432,13 +606,27 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
         compiler, schemas[name], types, f"packet {name}")
     projection = spec.get("projection")
     if projection is not None:
-        if projection != "single_attribute_no_modifiers":
-            raise ValueError(f"unknown packet projection: {projection}")
         if spec.get("field_type_overrides"):
             raise ValueError("projected packet cannot also override field types")
-        fields = manifest_attribute_projection(compiler, name, raw_fields, types)
-        return ManifestPacket(
-            name, manifest_c_name(name), packet_id, state, str(raw_direction), fields)
+        if projection == "single_attribute_no_modifiers":
+            fields = manifest_attribute_projection(compiler, name, raw_fields, types)
+            return ManifestPacket(
+                name, manifest_c_name(name), packet_id, state, str(raw_direction), fields)
+        if projection in {
+            "scoreboard_objective", "scoreboard_score", "scoreboard_reset"
+        }:
+            fields, variant = scoreboard_projection(
+                compiler, name, projection, raw_fields, types)
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
+        raise ValueError(f"unknown packet projection: {projection}")
 
     overrides = spec.get("field_type_overrides", {})
     if not isinstance(overrides, dict):
@@ -594,6 +782,8 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
 
 
 def manifest_reader(profile: ManifestProfile, field: ManifestField) -> str:
+    if field.wire.suffix == "nbt":
+        return f"mc_reader_nbt(&reader, false, &decoded.{field.c_field})"
     if field.wire.protocol_argument:
         return (
             f"mc_reader_{field.wire.suffix}(&reader, {profile.protocol}, "
@@ -608,6 +798,8 @@ def manifest_writer(profile: ManifestProfile, field: ManifestField) -> str:
             f"mc_packet_string_n(packet, (const char *)value->{field.c_field}.data, "
             f"value->{field.c_field}.size)"
         )
+    if field.wire.suffix == "nbt":
+        return f"mc_packet_nbt(packet, false, &value->{field.c_field})"
     address = "&" if field.wire.suffix == "uuid" else ""
     if field.wire.protocol_argument:
         return (
@@ -615,6 +807,205 @@ def manifest_writer(profile: ManifestProfile, field: ManifestField) -> str:
             f"{address}value->{field.c_field})"
         )
     return f"mc_packet_{field.wire.suffix}(packet, {address}value->{field.c_field})"
+
+
+def render_scoreboard_projection(profile: ManifestProfile,
+                                 packet: ManifestPacket,
+                                 type_name: str) -> list[str]:
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    variant = packet.projection
+    lines = [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    mc_reader_init(&reader, payload, payload_size);",
+    ]
+    if variant == "scoreboard_objective:1_7":
+        lines.extend([
+            "    if (!mc_reader_string(&reader, &decoded.name) ||",
+            "        !mc_reader_string(&reader, &decoded.display_text) ||",
+            "        !mc_reader_i8(&reader, &decoded.action) ||",
+            "        (decoded.action != 0 && decoded.action != 1 && decoded.action != 2) ||",
+            "        mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    elif variant in {
+        "scoreboard_objective:string_type", "scoreboard_objective:numeric_type"
+    }:
+        render_reader = (
+            "mc_reader_string(&reader, &decoded.render_type)"
+            if variant.endswith("string_type")
+            else "mc_reader_varint(&reader, &decoded.render_type)"
+        )
+        lines.extend([
+            "    if (!mc_reader_string(&reader, &decoded.name) ||",
+            "        !mc_reader_i8(&reader, &decoded.action) ||",
+            "        (decoded.action != 0 && decoded.action != 1 && decoded.action != 2)) return false;",
+            "    if ((decoded.action == 0 || decoded.action == 2) &&",
+            f"        (!mc_reader_string(&reader, &decoded.display_text) || !{render_reader})) return false;",
+            "    if (mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    elif variant == "scoreboard_objective:modern":
+        lines.extend([
+            "    if (!mc_reader_string(&reader, &decoded.name) ||",
+            "        !mc_reader_i8(&reader, &decoded.action) ||",
+            "        (decoded.action != 0 && decoded.action != 1 && decoded.action != 2)) return false;",
+            "    if (decoded.action == 0 || decoded.action == 2) {",
+            "        if (!mc_reader_nbt(&reader, false, &decoded.display_text) ||",
+            "            !mc_reader_varint(&reader, &decoded.render_type) ||",
+            "            !mc_reader_bool(&reader, &decoded.number_format_present)) return false;",
+            "        if (decoded.number_format_present &&",
+            "            !mc_reader_varint(&reader, &decoded.number_format)) return false;",
+            "        if (decoded.number_format_present &&",
+            "            (decoded.number_format == 1 || decoded.number_format == 2) &&",
+            "            !mc_reader_nbt(&reader, false, &decoded.styling)) return false;",
+            "    }",
+            "    if (mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    elif variant in {"scoreboard_score:1_7", "scoreboard_score:legacy"}:
+        action_reader = "mc_reader_i8" if variant.endswith("1_7") else "mc_reader_varint"
+        lines.extend([
+            "    if (!mc_reader_string(&reader, &decoded.item_name) ||",
+            f"        !{action_reader}(&reader, &decoded.action) ||",
+            "        (decoded.action != 0 && decoded.action != 1)) return false;",
+        ])
+        if variant.endswith("1_7"):
+            lines.extend([
+                "    if (decoded.action == 0 &&",
+                "        (!mc_reader_string(&reader, &decoded.score_name) ||",
+                "         !mc_reader_i32(&reader, &decoded.value))) return false;",
+            ])
+        else:
+            lines.extend([
+                "    if (!mc_reader_string(&reader, &decoded.score_name)) return false;",
+                "    if (decoded.action == 0 &&",
+                "        !mc_reader_varint(&reader, &decoded.value)) return false;",
+            ])
+        lines.append("    if (mc_reader_remaining(&reader) != 0U) return false;")
+    elif variant == "scoreboard_score:modern":
+        lines.extend([
+            "    if (!mc_reader_string(&reader, &decoded.item_name) ||",
+            "        !mc_reader_string(&reader, &decoded.score_name) ||",
+            "        !mc_reader_varint(&reader, &decoded.value) ||",
+            "        !mc_reader_bool(&reader, &decoded.display_name_present)) return false;",
+            "    if (decoded.display_name_present &&",
+            "        !mc_reader_nbt(&reader, false, &decoded.display_name)) return false;",
+            "    if (!mc_reader_bool(&reader, &decoded.number_format_present)) return false;",
+            "    if (decoded.number_format_present &&",
+            "        !mc_reader_varint(&reader, &decoded.number_format)) return false;",
+            "    if (decoded.number_format_present &&",
+            "        (decoded.number_format == 1 || decoded.number_format == 2) &&",
+            "        !mc_reader_nbt(&reader, false, &decoded.styling)) return false;",
+            "    if (mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    elif variant == "scoreboard_reset":
+        lines.extend([
+            "    if (!mc_reader_string(&reader, &decoded.entity_name) ||",
+            "        !mc_reader_bool(&reader, &decoded.objective_name_present)) return false;",
+            "    if (decoded.objective_name_present &&",
+            "        !mc_reader_string(&reader, &decoded.objective_name)) return false;",
+            "    if (mc_reader_remaining(&reader) != 0U) return false;",
+        ])
+    else:
+        raise ValueError(f"unknown rendered projection {variant}")
+    lines.extend([
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL) return false;",
+    ])
+    if variant == "scoreboard_objective:1_7":
+        lines.extend([
+            "    if (value->action != 0 && value->action != 1 && value->action != 2) return false;",
+            "    return mc_packet_string_n(packet, (const char *)value->name.data, value->name.size) &&",
+            "           mc_packet_string_n(packet, (const char *)value->display_text.data, value->display_text.size) &&",
+            "           mc_packet_i8(packet, value->action);",
+        ])
+    elif variant in {
+        "scoreboard_objective:string_type", "scoreboard_objective:numeric_type"
+    }:
+        render_writer = (
+            "mc_packet_string_n(packet, (const char *)value->render_type.data, value->render_type.size)"
+            if variant.endswith("string_type")
+            else "mc_packet_varint(packet, value->render_type)"
+        )
+        lines.extend([
+            "    if (value->action != 0 && value->action != 1 && value->action != 2) return false;",
+            "    if (!mc_packet_string_n(packet, (const char *)value->name.data, value->name.size) ||",
+            "        !mc_packet_i8(packet, value->action)) return false;",
+            "    if (value->action == 0 || value->action == 2) {",
+            "        if (!mc_packet_string_n(packet, (const char *)value->display_text.data, value->display_text.size) ||",
+            f"            !{render_writer}) return false;",
+            "    }",
+            "    return !packet->failed;",
+        ])
+    elif variant == "scoreboard_objective:modern":
+        lines.extend([
+            "    if (value->action != 0 && value->action != 1 && value->action != 2) return false;",
+            "    if (!mc_packet_string_n(packet, (const char *)value->name.data, value->name.size) ||",
+            "        !mc_packet_i8(packet, value->action)) return false;",
+            "    if (value->action == 0 || value->action == 2) {",
+            "        if (!mc_packet_nbt(packet, false, &value->display_text) ||",
+            "            !mc_packet_varint(packet, value->render_type) ||",
+            "            !mc_packet_bool(packet, value->number_format_present)) return false;",
+            "        if (value->number_format_present &&",
+            "            !mc_packet_varint(packet, value->number_format)) return false;",
+            "        if (value->number_format_present &&",
+            "            (value->number_format == 1 || value->number_format == 2) &&",
+            "            !mc_packet_nbt(packet, false, &value->styling)) return false;",
+            "    }",
+            "    return !packet->failed;",
+        ])
+    elif variant in {"scoreboard_score:1_7", "scoreboard_score:legacy"}:
+        action_writer = "mc_packet_i8" if variant.endswith("1_7") else "mc_packet_varint"
+        lines.extend([
+            "    if (value->action != 0 && value->action != 1) return false;",
+            "    if (!mc_packet_string_n(packet, (const char *)value->item_name.data, value->item_name.size) ||",
+            f"        !{action_writer}(packet, value->action)) return false;",
+        ])
+        if variant.endswith("1_7"):
+            lines.extend([
+                "    if (value->action == 0 &&",
+                "        (!mc_packet_string_n(packet, (const char *)value->score_name.data, value->score_name.size) ||",
+                "         !mc_packet_i32(packet, value->value))) return false;",
+            ])
+        else:
+            lines.extend([
+                "    if (!mc_packet_string_n(packet, (const char *)value->score_name.data, value->score_name.size)) return false;",
+                "    if (value->action == 0 && !mc_packet_varint(packet, value->value)) return false;",
+            ])
+        lines.append("    return !packet->failed;")
+    elif variant == "scoreboard_score:modern":
+        lines.extend([
+            "    if (!mc_packet_string_n(packet, (const char *)value->item_name.data, value->item_name.size) ||",
+            "        !mc_packet_string_n(packet, (const char *)value->score_name.data, value->score_name.size) ||",
+            "        !mc_packet_varint(packet, value->value) ||",
+            "        !mc_packet_bool(packet, value->display_name_present)) return false;",
+            "    if (value->display_name_present &&",
+            "        !mc_packet_nbt(packet, false, &value->display_name)) return false;",
+            "    if (!mc_packet_bool(packet, value->number_format_present)) return false;",
+            "    if (value->number_format_present &&",
+            "        !mc_packet_varint(packet, value->number_format)) return false;",
+            "    if (value->number_format_present &&",
+            "        (value->number_format == 1 || value->number_format == 2) &&",
+            "        !mc_packet_nbt(packet, false, &value->styling)) return false;",
+            "    return !packet->failed;",
+        ])
+    else:
+        lines.extend([
+            "    if (!mc_packet_string_n(packet, (const char *)value->entity_name.data, value->entity_name.size) ||",
+            "        !mc_packet_bool(packet, value->objective_name_present)) return false;",
+            "    if (value->objective_name_present &&",
+            "        !mc_packet_string_n(packet, (const char *)value->objective_name.data, value->objective_name.size)) return false;",
+            "    return !packet->failed;",
+        ])
+    lines.extend(["}", ""])
+    return lines
 
 
 def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
@@ -626,6 +1017,9 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
     ]
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
+        if packet.projection is not None:
+            lines.extend(render_scoreboard_projection(profile, packet, type_name))
+            continue
         checks = [
             "!" + manifest_reader(profile, field) for field in packet.fields
         ]

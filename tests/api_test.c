@@ -15,6 +15,37 @@ static void expect_string(McReader *reader, const char *expected)
     assert(memcmp(value.data, expected, value.size) == 0);
 }
 
+static void nbt_writer_validates_complete_values(void)
+{
+    static const unsigned char compound[] = {10U, 0U};
+    static const unsigned char named_compound[] = {10U, 0U, 0U, 0U};
+    static const unsigned char truncated[] = {10U};
+    unsigned char storage[8];
+    McPacket packet;
+    const McBytes valid = {compound, sizeof(compound)};
+    const McBytes invalid = {truncated, sizeof(truncated)};
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_nbt(&packet, false, &valid));
+    assert(packet.length == sizeof(compound));
+    assert(memcmp(packet.data, compound, sizeof(compound)) == 0);
+
+    const McBytes named = {named_compound, sizeof(named_compound)};
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_nbt(&packet, true, &named));
+    assert(packet.length == sizeof(named_compound));
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_nbt(&packet, false, &named));
+    assert(packet.failed);
+    assert(packet.length == 0U);
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_nbt(&packet, false, &invalid));
+    assert(packet.failed);
+    assert(packet.length == 0U);
+}
+
 static void expect_command(int protocol)
 {
     unsigned char storage[384];
@@ -193,10 +224,11 @@ int main(int argc, char **argv)
         expect_command(boundary_protocols[index]);
     }
     invalid_commands_fail_sticky();
+    nbt_writer_validates_complete_values();
     expect_player_abilities(4);
     expect_player_abilities(578);
     expect_player_abilities(735);
     expect_player_abilities(776);
-    puts("PASS command codec boundaries and player abilities body");
+    puts("PASS command, abilities and validated NBT writer codecs");
     return 0;
 }
