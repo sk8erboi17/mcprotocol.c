@@ -290,6 +290,94 @@ static void block_dig_bodies_are_versioned(void)
     assert(!mc_packet_block_dig(NULL, 776, &cases[4].dig));
 }
 
+static void block_place_bodies_are_versioned(void)
+{
+    static const unsigned char body_5[] = {
+        0xffU,0xffU,0xffU,0xf7U,0x3fU,0x00U,0x00U,0x00U,0x0bU,0x01U,
+        0x00U,0x01U,0x40U,0x00U,0x00U,0xffU,0xffU,0x08U,0x10U,0x08U};
+    static const unsigned char body_47[] = {
+        0xffU,0xffU,0xfdU,0xc0U,0xfcU,0x00U,0x00U,0x0bU,0x01U,0x00U,
+        0x01U,0x40U,0x00U,0x00U,0x00U,0x08U,0x10U,0x08U};
+    static const unsigned char body_107[] = {
+        0xffU,0xffU,0xfdU,0xc0U,0xfcU,0x00U,0x00U,0x0bU,0x01U,0x00U,
+        0x08U,0x10U,0x08U};
+    static const unsigned char body_315[] = {
+        0xffU,0xffU,0xfdU,0xc0U,0xfcU,0x00U,0x00U,0x0bU,0x01U,0x00U,
+        0x3fU,0x00U,0x00U,0x00U,0x3fU,0x80U,0x00U,0x00U,0x3fU,0x00U,
+        0x00U,0x00U};
+    static const unsigned char body_477[] = {
+        0x00U,0xffU,0xffU,0xfdU,0xc0U,0x00U,0x00U,0xb0U,0x3fU,0x01U,
+        0x3fU,0x00U,0x00U,0x00U,0x3fU,0x80U,0x00U,0x00U,0x3fU,0x00U,
+        0x00U,0x00U,0x00U};
+    static const unsigned char body_758[] = {
+        0x00U,0xffU,0xffU,0xfdU,0xc0U,0x00U,0x00U,0xbfU,0xc3U,0x01U,
+        0x3fU,0x00U,0x00U,0x00U,0x3fU,0x80U,0x00U,0x00U,0x3fU,0x00U,
+        0x00U,0x00U,0x00U};
+    static const unsigned char body_759[] = {
+        0x00U,0xffU,0xffU,0xfdU,0xc0U,0x00U,0x00U,0xbfU,0xc3U,0x01U,
+        0x3fU,0x00U,0x00U,0x00U,0x3fU,0x80U,0x00U,0x00U,0x3fU,0x00U,
+        0x00U,0x00U,0x00U,0x01U};
+    static const unsigned char body_768[] = {
+        0x00U,0xffU,0xffU,0xfdU,0xc0U,0x00U,0x00U,0xbfU,0xc3U,0x01U,
+        0x3fU,0x00U,0x00U,0x00U,0x3fU,0x80U,0x00U,0x00U,0x3fU,0x00U,
+        0x00U,0x00U,0x00U,0x00U,0x01U};
+    static const struct {
+        int protocol;
+        const unsigned char *bytes;
+        size_t size;
+    } cases[] = {
+        {5, body_5, sizeof(body_5)},
+        {47, body_47, sizeof(body_47)},
+        {107, body_107, sizeof(body_107)},
+        {315, body_315, sizeof(body_315)},
+        {477, body_477, sizeof(body_477)},
+        {758, body_758, sizeof(body_758)},
+        {759, body_759, sizeof(body_759)},
+        {768, body_768, sizeof(body_768)},
+        {775, body_768, sizeof(body_768)},
+        {776, body_768, sizeof(body_768)},
+    };
+    unsigned char storage[32];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        const int protocol = cases[index].protocol;
+        const McBlockPlace place = {
+            .location = {-9, protocol <= 756 ? 63 : -61, 11},
+            .direction = 1,
+            .hand = 0,
+            .held_item_id = 1,
+            .held_item_count = 64,
+            .cursor_x = 0.5F,
+            .cursor_y = 1.0F,
+            .cursor_z = 0.5F,
+            .inside_block = false,
+            .world_border_hit = false,
+            .sequence = 1,
+        };
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_block_place(&packet, protocol, &place));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+
+    McBlockPlace invalid = {
+        .location = {0, 0, 0}, .direction = 6, .cursor_x = 0.5F,
+        .cursor_y = 1.0F, .cursor_z = 0.5F,
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_block_place(&packet, 776, &invalid));
+    assert(packet.failed);
+    invalid.direction = 1;
+    invalid.cursor_x = 0.3F;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_block_place(&packet, 47, &invalid));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_block_place(&packet, 6, &invalid));
+    assert(packet.failed);
+    assert(!mc_packet_block_place(NULL, 776, &invalid));
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -352,6 +440,7 @@ int main(int argc, char **argv)
     expect_player_abilities(776);
     attack_and_respawn_bodies_are_versioned();
     block_dig_bodies_are_versioned();
-    puts("PASS command, abilities, block dig, combat, respawn, NBT and buffer codecs");
+    block_place_bodies_are_versioned();
+    puts("PASS command, abilities, block actions, combat, respawn, NBT and buffer codecs");
     return 0;
 }

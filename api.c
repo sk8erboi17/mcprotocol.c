@@ -2932,6 +2932,77 @@ bool mc_packet_block_dig(McPacket *packet, int protocol,
         && (protocol < 759 || mc_packet_varint(packet, value->sequence));
 }
 
+static bool packet_block_place_cursor(McPacket *packet, int protocol,
+    float x, float y, float z)
+{
+    if (!isfinite(x) || !isfinite(y) || !isfinite(z)
+        || x < 0.0F || x > 1.0F || y < 0.0F || y > 1.0F
+        || z < 0.0F || z > 1.0F) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol <= 210) {
+        const float scaled_x = x * 16.0F;
+        const float scaled_y = y * 16.0F;
+        const float scaled_z = z * 16.0F;
+        if (floorf(scaled_x) != scaled_x || floorf(scaled_y) != scaled_y
+            || floorf(scaled_z) != scaled_z) {
+            packet->failed = true;
+            return false;
+        }
+        return mc_packet_i8(packet, (int8_t)scaled_x)
+            && mc_packet_i8(packet, (int8_t)scaled_y)
+            && mc_packet_i8(packet, (int8_t)scaled_z);
+    }
+    return mc_packet_float(packet, x) && mc_packet_float(packet, y)
+        && mc_packet_float(packet, z);
+}
+
+bool mc_packet_block_place(McPacket *packet, int protocol,
+    const McBlockPlace *value)
+{
+    if (packet == NULL || value == NULL || !mc_protocol_supported(protocol)
+        || value->direction < 0 || value->direction > 5
+        || value->hand < 0 || value->hand > 1 || value->sequence < 0) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (protocol <= 5) {
+        if (value->location.y < 0 || value->location.y > (int32_t)UINT8_MAX
+            || !mc_packet_i32(packet, value->location.x)
+            || !mc_packet_u8(packet, (uint8_t)value->location.y)
+            || !mc_packet_i32(packet, value->location.z)) {
+            packet->failed = true;
+            return false;
+        }
+    } else if (protocol <= 404
+        && !mc_packet_position(packet, protocol, value->location)) {
+        return false;
+    }
+    if (protocol <= 47) {
+        return mc_packet_i8(packet, (int8_t)value->direction)
+            && mc_packet_plain_item(packet, protocol,
+                value->held_item_id, value->held_item_count)
+            && packet_block_place_cursor(packet, protocol,
+                value->cursor_x, value->cursor_y, value->cursor_z);
+    }
+    if (protocol <= 404) {
+        return mc_packet_varint(packet, value->direction)
+            && mc_packet_varint(packet, value->hand)
+            && packet_block_place_cursor(packet, protocol,
+                value->cursor_x, value->cursor_y, value->cursor_z);
+    }
+    return mc_packet_varint(packet, value->hand)
+        && mc_packet_position(packet, protocol, value->location)
+        && mc_packet_varint(packet, value->direction)
+        && packet_block_place_cursor(packet, protocol,
+            value->cursor_x, value->cursor_y, value->cursor_z)
+        && mc_packet_bool(packet, value->inside_block)
+        && (protocol < 768
+            || mc_packet_bool(packet, value->world_border_hit))
+        && (protocol < 759 || mc_packet_varint(packet, value->sequence));
+}
+
 bool mc_packet_attack_entity(McPacket *packet, int protocol, int32_t entity_id)
 {
     if (packet == NULL || !mc_protocol_supported(protocol) || entity_id <= 0) {
@@ -4569,6 +4640,26 @@ int mc_client_dig_block(McClient *client, const McBlockDig *dig,
         return -1;
     }
     return mc_client_send_named(client, "block_dig",
+        body.data, body.length, error, error_size);
+}
+
+int mc_client_place_block(McClient *client, const McBlockPlace *place,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[32];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_block_place(&body, client->profile->protocol, place)) {
+        set_error(error, error_size, "Azione block_place Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "block_place",
         body.data, body.length, error, error_size);
 }
 

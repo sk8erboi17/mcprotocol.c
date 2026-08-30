@@ -228,6 +228,20 @@ typedef struct {
 } McBlockDig;
 
 typedef struct {
+    McPosition location;
+    int32_t direction;
+    int32_t hand;
+    int32_t held_item_id;
+    int32_t held_item_count;
+    float cursor_x;
+    float cursor_y;
+    float cursor_z;
+    bool inside_block;
+    bool world_border_hit;
+    int32_t sequence;
+} McBlockPlace;
+
+typedef struct {
     unsigned char bytes[16];
 } McUuid;
 
@@ -271,6 +285,10 @@ bool mc_packet_player_abilities(McPacket *packet, int protocol,
  * encoded from 1.19 onward and ignored by older releases. */
 bool mc_packet_block_dig(McPacket *packet, int protocol,
     const McBlockDig *value);
+/* Builds block_place/use_item_on bodies across the legacy embedded-stack,
+ * byte-cursor, hand-first, sequence and world-border-hit boundaries. */
+bool mc_packet_block_place(McPacket *packet, int protocol,
+    const McBlockPlace *value);
 /* Builds a primary attack against one entity. Legacy use_entity packets use
  * action 1 and add the sneaking flag from 1.16; 26.1+ has a dedicated body. */
 bool mc_packet_attack_entity(McPacket *packet, int protocol, int32_t entity_id);
@@ -386,6 +404,9 @@ int mc_client_send_player_abilities(McClient *client,
     const McPlayerAbilities *abilities, char *error, size_t error_size);
 /* Sends one release-aware block_dig action while the client is in PLAY. */
 int mc_client_dig_block(McClient *client, const McBlockDig *dig,
+    char *error, size_t error_size);
+/* Sends one release-aware block placement while the client is in PLAY. */
+int mc_client_place_block(McClient *client, const McBlockPlace *place,
     char *error, size_t error_size);
 /* Sends one primary entity attack while the client is in PLAY. */
 int mc_client_attack_entity(McClient *client, int32_t entity_id,
