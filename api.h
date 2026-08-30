@@ -315,6 +315,9 @@ bool mc_packet_empty_window_click(McPacket *packet, int protocol,
  * are deliberately empty, so clicked_item_count must be zero. */
 bool mc_packet_window_click(McPacket *packet, int protocol,
     const McWindowClick *value);
+/* Builds a release-aware close-window body. Container IDs use one unsigned
+ * byte through 1.21.1 and VarInt from 1.21.3 onward. */
+bool mc_packet_close_window(McPacket *packet, int protocol, int32_t window_id);
 /* Encodes a serverbound UntrustedSlot item with raw, length-prefixed added
  * component payloads and removed component type IDs (1.20.5+). */
 bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
@@ -457,6 +460,9 @@ int mc_client_dig_block(McClient *client, const McBlockDig *dig,
     char *error, size_t error_size);
 /* Sends one release-aware block placement while the client is in PLAY. */
 int mc_client_place_block(McClient *client, const McBlockPlace *place,
+    char *error, size_t error_size);
+/* Closes one inventory menu while the client is in PLAY. */
+int mc_client_close_window(McClient *client, int32_t window_id,
     char *error, size_t error_size);
 /* Sends one primary entity attack while the client is in PLAY. */
 int mc_client_attack_entity(McClient *client, int32_t entity_id,

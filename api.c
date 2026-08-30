@@ -2887,16 +2887,16 @@ bool mc_packet_window_click(McPacket *packet, int protocol,
         || (protocol >= 755 && value->clicked_item_count != 0)
         || (protocol <= 5
             && (value->window_id < INT8_MIN || value->window_id > INT8_MAX))
-        || (protocol >= 47 && protocol <= 765
+        || (protocol >= 47 && protocol <= 767
             && (value->window_id < 0
                 || value->window_id > (int32_t)UINT8_MAX))
-        || (protocol >= 766 && value->window_id < 0)) {
+        || (protocol >= 768 && value->window_id < 0)) {
         if (packet != NULL) packet->failed = true;
         return false;
     }
     if (protocol <= 5) {
         if (!mc_packet_i8(packet, (int8_t)value->window_id)) return false;
-    } else if (protocol <= 765) {
+    } else if (protocol <= 767) {
         if (!mc_packet_u8(packet, (uint8_t)value->window_id)) return false;
     } else if (!mc_packet_varint(packet, value->window_id)) {
         return false;
@@ -2923,6 +2923,18 @@ bool mc_packet_window_click(McPacket *packet, int protocol,
     return protocol < 770
         ? mc_packet_plain_item(packet, protocol, 0, 0)
         : mc_packet_bool(packet, false);
+}
+
+bool mc_packet_close_window(McPacket *packet, int protocol, int32_t window_id)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol) || window_id < 0
+        || (protocol <= 767 && window_id > (int32_t)UINT8_MAX)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    return protocol <= 767
+        ? mc_packet_u8(packet, (uint8_t)window_id)
+        : mc_packet_varint(packet, window_id);
 }
 
 bool mc_packet_empty_window_click(McPacket *packet, int protocol,
@@ -4867,6 +4879,27 @@ int mc_client_place_block(McClient *client, const McBlockPlace *place,
         body.data, body.length, error, error_size);
     free(storage);
     return result;
+}
+
+int mc_client_close_window(McClient *client, int32_t window_id,
+    char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || client->state != MC_STATE_PLAY) {
+        set_error(error, error_size, "Client non in stato PLAY");
+        return -1;
+    }
+    unsigned char storage[5];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_close_window(
+            &body, client->profile->protocol, window_id)) {
+        set_error(error, error_size, "Finestra Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "close_window",
+        body.data, body.length, error, error_size);
 }
 
 int mc_client_attack_entity(McClient *client, int32_t entity_id,

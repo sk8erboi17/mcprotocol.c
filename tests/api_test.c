@@ -575,6 +575,52 @@ static void legacy_window_clicks_include_predicted_stacks(void)
     assert(packet.failed);
 }
 
+static void close_windows_and_container_ids_are_versioned(void)
+{
+    unsigned char storage[16];
+    McPacket packet;
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_close_window(&packet, 767, 128));
+    assert(packet.length == 1U && packet.data[0] == 0x80U);
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_close_window(&packet, 768, 128));
+    assert(packet.length == 2U && packet.data[0] == 0x80U
+        && packet.data[1] == 0x01U);
+
+    const McEmptyWindowClick click = {
+        .window_id = 128,
+        .state_id = 17,
+        .slot = 36,
+        .mouse_button = 0,
+        .action_number = 1,
+        .mode = 0,
+    };
+    static const unsigned char click_1_21_1[] = {
+        0x80U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U,
+    };
+    static const unsigned char click_1_21_3[] = {
+        0x80U,0x01U,0x11U,0x00U,0x24U,0x00U,0x00U,0x00U,0x00U,
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_empty_window_click(&packet, 767, &click));
+    assert(packet.length == sizeof(click_1_21_1));
+    assert(memcmp(packet.data, click_1_21_1, packet.length) == 0);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_empty_window_click(&packet, 768, &click));
+    assert(packet.length == sizeof(click_1_21_3));
+    assert(memcmp(packet.data, click_1_21_3, packet.length) == 0);
+
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_close_window(&packet, 767, 256));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_close_window(&packet, 768, -1));
+    assert(packet.failed);
+    assert(!mc_packet_close_window(NULL, 768, 0));
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -641,6 +687,7 @@ int main(int argc, char **argv)
     untrusted_component_items_match_node();
     empty_window_clicks_are_versioned();
     legacy_window_clicks_include_predicted_stacks();
-    puts("PASS command, abilities, block actions, window clicks, component items, combat, respawn, NBT and buffer codecs");
+    close_windows_and_container_ids_are_versioned();
+    puts("PASS command, abilities, block actions, window clicks/close, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }
