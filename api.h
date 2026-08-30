@@ -215,6 +215,22 @@ typedef struct {
 } McPlayerPosition;
 
 typedef struct {
+    const char *locale;
+    int8_t view_distance;
+    int32_t chat_mode;
+    bool chat_colors;
+    uint8_t skin_parts;
+    uint8_t difficulty;
+    bool show_cape;
+    int32_t main_hand;
+    /* This is the raw wire boolean. Mojang renamed it from
+     * disableTextFiltering to enableTextFiltering at the 1.18 boundary. */
+    bool text_filtering;
+    bool server_listing;
+    int32_t particle_status;
+} McClientInformation;
+
+typedef struct {
     uint8_t flags;
     float flying_speed;
     float walking_speed;
@@ -331,6 +347,10 @@ bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
     int32_t item_id, int32_t count,
     const McItemComponentPatch *added, size_t added_count,
     const int32_t *removed, size_t removed_count);
+/* Builds the release-aware Client Information/Settings body. The packet is
+ * sent in PLAY through 1.20.1 and in CONFIGURATION from 1.20.2 onward. */
+bool mc_packet_client_information(McPacket *packet, int protocol,
+    const McClientInformation *value);
 /* Builds the body of the serverbound position_look packet, including the
  * stance field used only by 1.7. Packet ID/framing remain mc_client_send's job. */
 bool mc_packet_player_position(McPacket *packet, int protocol,
@@ -464,6 +484,11 @@ int mc_client_send_named(McClient *client, const char *packet_name,
  * modern unsigned command packet. The command may include one leading slash. */
 int mc_client_send_command(McClient *client, const char *command,
     char *error, size_t error_size);
+/* Sends Client Information in the client's current PLAY or CONFIGURATION
+ * state. mc_client_connect() already sends a conservative default while
+ * completing modern CONFIGURATION. */
+int mc_client_send_client_information(McClient *client,
+    const McClientInformation *information, char *error, size_t error_size);
 /* Sends one release-aware player position/look update while in PLAY. */
 int mc_client_send_player_position(McClient *client,
     const McPlayerPosition *position, char *error, size_t error_size);

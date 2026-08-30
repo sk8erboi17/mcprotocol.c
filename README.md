@@ -98,8 +98,10 @@ cc -std=c11 client.c -L. -lmcprotocol -lz -o client
 ```
 
 Keep-alive, teleport, player-loaded and chunk-batch acknowledgements are
-automatic by default. A raw application can disable all or selected replies
-before connecting:
+automatic by default. During modern CONFIGURATION, `mc_client_connect` also
+sends conservative Client Information defaults; older PLAY clients can send
+their desired values with `mc_client_send_client_information`. A raw
+application can disable all or selected replies before connecting:
 
 ```c
 mc_client_set_automatic_replies(client, 0U, error, sizeof(error));
@@ -163,6 +165,7 @@ Available symmetric field codecs are:
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `held_item_slot` | Validated hotbar index as a big-endian short | selected-slot changes in every release |
+| `client_information` | Release-aware locale, view, chat, skin and preference fields | PLAY settings through 1.20.1 and CONFIGURATION settings afterward |
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |

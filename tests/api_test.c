@@ -327,6 +327,84 @@ static void block_changes_are_versioned(void)
     assert(!mc_reader_block_change(NULL, 776, &position, &state_id));
 }
 
+static void client_information_bodies_match_node(void)
+{
+    /* Bodies exclude the packet ID. They were serialized by the historical
+     * node-minecraft-protocol client at each field-family boundary. */
+    static const unsigned char body_1_7[] = {
+        0x05U,0x65U,0x6eU,0x5fU,0x75U,0x73U,0x02U,0x00U,0x01U,0x00U,0x01U,
+    };
+    static const unsigned char body_1_8[] = {
+        0x05U,0x65U,0x6eU,0x5fU,0x75U,0x73U,0x02U,0x00U,0x01U,0x7fU,
+    };
+    static const unsigned char body_1_9[] = {
+        0x05U,0x65U,0x6eU,0x5fU,0x75U,0x73U,0x02U,0x00U,0x01U,0x7fU,0x01U,
+    };
+    static const unsigned char body_1_17[] = {
+        0x05U,0x65U,0x6eU,0x5fU,0x75U,0x73U,0x02U,0x00U,0x01U,0x7fU,0x01U,0x00U,
+    };
+    static const unsigned char body_1_18[] = {
+        0x05U,0x65U,0x6eU,0x5fU,0x75U,0x73U,0x02U,0x00U,0x01U,0x7fU,0x01U,0x00U,0x01U,
+    };
+    static const unsigned char body_1_21_3[] = {
+        0x05U,0x65U,0x6eU,0x5fU,0x75U,0x73U,0x02U,0x00U,0x01U,0x7fU,0x01U,0x00U,0x01U,0x00U,
+    };
+    static const struct {
+        int protocol;
+        const unsigned char *bytes;
+        size_t size;
+    } cases[] = {
+        {4, body_1_7, sizeof(body_1_7)},
+        {47, body_1_8, sizeof(body_1_8)},
+        {107, body_1_9, sizeof(body_1_9)},
+        {755, body_1_17, sizeof(body_1_17)},
+        {757, body_1_18, sizeof(body_1_18)},
+        {765, body_1_18, sizeof(body_1_18)},
+        {768, body_1_21_3, sizeof(body_1_21_3)},
+        {776, body_1_21_3, sizeof(body_1_21_3)},
+    };
+    McClientInformation information = {
+        .locale = "en_us",
+        .view_distance = 2,
+        .chat_mode = 0,
+        .chat_colors = true,
+        .skin_parts = 0x7fU,
+        .difficulty = 0U,
+        .show_cape = true,
+        .main_hand = 1,
+        .text_filtering = false,
+        .server_listing = true,
+        .particle_status = 0,
+    };
+    unsigned char storage[64];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_client_information(
+            &packet, cases[index].protocol, &information));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+
+    information.view_distance = 1;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_client_information(&packet, 776, &information));
+    assert(packet.failed);
+    information.view_distance = 2;
+    information.particle_status = 3;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_client_information(&packet, 768, &information));
+    information.particle_status = 0;
+    information.main_hand = 2;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_client_information(&packet, 107, &information));
+    information.main_hand = 1;
+    information.difficulty = 4U;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_client_information(&packet, 4, &information));
+    assert(!mc_packet_client_information(NULL, 776, &information));
+}
+
 static void player_positions_are_versioned(void)
 {
     unsigned char storage[64];
@@ -860,6 +938,7 @@ int main(int argc, char **argv)
     attack_and_respawn_bodies_are_versioned();
     block_dig_bodies_are_versioned();
     block_changes_are_versioned();
+    client_information_bodies_match_node();
     player_positions_are_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
@@ -868,6 +947,6 @@ int main(int argc, char **argv)
     legacy_window_clicks_include_predicted_stacks();
     close_windows_and_container_ids_are_versioned();
     creative_slots_match_node_release_boundaries();
-    puts("PASS command, movement, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
+    puts("PASS command, client information, movement, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }

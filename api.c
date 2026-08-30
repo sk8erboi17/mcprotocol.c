@@ -3015,6 +3015,49 @@ bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
     return true;
 }
 
+bool mc_packet_client_information(McPacket *packet, int protocol,
+    const McClientInformation *value)
+{
+    if (packet == NULL || !mc_protocol_supported(protocol) || value == NULL
+        || value->locale == NULL) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    size_t locale_size = strlen(value->locale);
+    if (locale_size == 0U || locale_size > 16U
+        || value->view_distance < 2 || value->view_distance > 32
+        || value->chat_mode < 0 || value->chat_mode > 2
+        || (protocol <= 5 && value->difficulty > 3U)
+        || (protocol >= 107 && (value->main_hand < 0 || value->main_hand > 1))
+        || (protocol >= 768
+            && (value->particle_status < 0 || value->particle_status > 2))) {
+        packet->failed = true;
+        return false;
+    }
+    if (!mc_packet_string_n(packet, value->locale, locale_size)
+        || !mc_packet_i8(packet, value->view_distance)
+        || !(protocol <= 47
+            ? mc_packet_i8(packet, (int8_t)value->chat_mode)
+            : mc_packet_varint(packet, value->chat_mode))
+        || !mc_packet_bool(packet, value->chat_colors)) {
+        return false;
+    }
+    if (protocol <= 5) {
+        return mc_packet_u8(packet, value->difficulty)
+            && mc_packet_bool(packet, value->show_cape);
+    }
+    if (!mc_packet_u8(packet, value->skin_parts)
+        || (protocol >= 107 && !mc_packet_varint(packet, value->main_hand))
+        || (protocol >= 755
+            && !mc_packet_bool(packet, value->text_filtering))
+        || (protocol >= 757
+            && !mc_packet_bool(packet, value->server_listing))) {
+        return false;
+    }
+    return protocol < 768
+        || mc_packet_varint(packet, value->particle_status);
+}
+
 bool mc_packet_player_position(McPacket *packet, int protocol,
     const McPlayerPosition *value)
 {
@@ -4855,6 +4898,47 @@ int mc_client_send_command(McClient *client, const char *command,
         body.data, body.length, error, error_size);
 }
 
+static McClientInformation default_client_information(void)
+{
+    const McClientInformation information = {
+        .locale = "en_us",
+        .view_distance = 2,
+        .chat_mode = 0,
+        .chat_colors = true,
+        .skin_parts = 0x7fU,
+        .difficulty = 0U,
+        .show_cape = true,
+        .main_hand = 1,
+        .text_filtering = false,
+        .server_listing = true,
+        .particle_status = 0,
+    };
+    return information;
+}
+
+int mc_client_send_client_information(McClient *client,
+    const McClientInformation *information, char *error, size_t error_size)
+{
+    if (client == NULL || client->profile == NULL
+        || atomic_load(&client->socket_fd) < 0
+        || (client->state != MC_STATE_PLAY
+            && client->state != MC_STATE_CONFIGURATION)) {
+        set_error(error, error_size,
+            "Client non in stato PLAY o CONFIGURATION");
+        return -1;
+    }
+    unsigned char storage[64];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    if (!mc_packet_client_information(
+            &body, client->profile->protocol, information)) {
+        set_error(error, error_size, "Client Information Minecraft non valida");
+        return -1;
+    }
+    return mc_client_send_named(client, "settings",
+        body.data, body.length, error, error_size);
+}
+
 int mc_client_send_player_position(McClient *client,
     const McPlayerPosition *position, char *error, size_t error_size)
 {
@@ -5193,16 +5277,11 @@ static int configuration(McClient *client, char *error, size_t error_size)
         if (client->profile->protocol == 776 && !information_sent) {
             unsigned char storage[128];
             McPacket settings;
+            McClientInformation information = default_client_information();
+            information.server_listing = false;
             mc_packet_init(&settings, storage, sizeof(storage));
-            mc_packet_string(&settings, "en_us");
-            mc_packet_u8(&settings, 2U);
-            mc_packet_varint(&settings, 0);
-            mc_packet_u8(&settings, 1U);
-            mc_packet_u8(&settings, 0x7fU);
-            mc_packet_varint(&settings, 1);
-            mc_packet_u8(&settings, 0U);
-            mc_packet_u8(&settings, 0U);
-            mc_packet_varint(&settings, 0);
+            mc_packet_client_information(
+                &settings, client->profile->protocol, &information);
             if (send_builder(client, 0x00, &settings, error, error_size) != 0) {
                 free(frame.data);
                 return -1;
@@ -5231,16 +5310,10 @@ static int configuration(McClient *client, char *error, size_t error_size)
         if (!information_sent) {
             unsigned char storage[128];
             McPacket settings;
+            const McClientInformation information = default_client_information();
             mc_packet_init(&settings, storage, sizeof(storage));
-            mc_packet_string(&settings, "en_us");
-            mc_packet_u8(&settings, 2U);
-            mc_packet_varint(&settings, 0);
-            mc_packet_u8(&settings, 1U);
-            mc_packet_u8(&settings, 0x7fU);
-            mc_packet_varint(&settings, 1);
-            mc_packet_u8(&settings, 0U);
-            mc_packet_u8(&settings, 1U);
-            if (client->profile->protocol >= 768) mc_packet_varint(&settings, 0);
+            mc_packet_client_information(
+                &settings, client->profile->protocol, &information);
             if (send_builder(client, 0x00, &settings, error, error_size) != 0) return -1;
         }
         if (client->profile->protocol >= 765 && client->profile->protocol <= 775) {
