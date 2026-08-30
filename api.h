@@ -309,6 +309,9 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
  * canonical player-inventory slot and the item is metadata-free. */
 bool mc_packet_set_creative_slot(McPacket *packet, int protocol,
     int16_t slot, int32_t item_id, int32_t count);
+/* Selects one hotbar slot. The body is a signed big-endian short in every
+ * supported release; Vanilla accepts only indices 0 through 8. */
+bool mc_packet_held_item_slot(McPacket *packet, int protocol, int16_t slot);
 /* Builds a release-aware inventory click with no changed-slot claims and an
  * empty carried/clicked item. state_id is used from 1.17.1 onward;
  * action_number is used through 1.16.5. */
@@ -461,6 +464,9 @@ int mc_client_send_named(McClient *client, const char *packet_name,
  * modern unsigned command packet. The command may include one leading slash. */
 int mc_client_send_command(McClient *client, const char *command,
     char *error, size_t error_size);
+/* Sends one release-aware player position/look update while in PLAY. */
+int mc_client_send_player_position(McClient *client,
+    const McPlayerPosition *position, char *error, size_t error_size);
 /* Sends the serverbound abilities state while the client is in PLAY. */
 int mc_client_send_player_abilities(McClient *client,
     const McPlayerAbilities *abilities, char *error, size_t error_size);
@@ -476,6 +482,12 @@ int mc_client_close_window(McClient *client, int32_t window_id,
 /* Writes one metadata-free stack into a creative player-inventory slot. */
 int mc_client_set_creative_slot(McClient *client, int16_t slot,
     int32_t item_id, int32_t count, char *error, size_t error_size);
+/* Selects one of the nine player hotbar slots while in PLAY. */
+int mc_client_select_hotbar_slot(McClient *client, int16_t slot,
+    char *error, size_t error_size);
+/* Sends a release-aware inventory click while in PLAY. */
+int mc_client_click_window(McClient *client, const McWindowClick *click,
+    char *error, size_t error_size);
 /* Sends one primary entity attack while the client is in PLAY. */
 int mc_client_attack_entity(McClient *client, int32_t entity_id,
     char *error, size_t error_size);
