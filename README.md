@@ -219,9 +219,13 @@ Add `--check` to reject missing, changed, or unexpected managed outputs. A
 manifest may use source-validated field overrides, integer constants, and the
 `single_attribute_no_modifiers`, `scoreboard_objective`, `scoreboard_score`,
 `scoreboard_reset`, `plain_item_slot`, `plain_item_contents`,
-`plain_window_items`, `empty_window_click`, and `chunk_envelope` projections for
-schema-checked conditional packets. The chunk projection covers 1.13 through
-the current schema while exposing section data, heightmaps and validated light
+`plain_window_items`, `empty_window_click`, `source_validated_minecart_steps`,
+and `chunk_envelope` projections for schema-checked conditional packets. The
+minecart projection requires a non-empty `source_validation` explanation. It
+checks the known `minecraft-data` envelope while following Vanilla's actual
+`MinecartStep.STREAM_CODEC`: six doubles, two signed rotation bytes, and one
+float per step, with an allocation-free limit of 64 steps. The chunk projection
+covers 1.13 through the current schema while exposing section data, heightmaps and validated light
 data without interpreting release-specific block palettes, and deliberately
 accepts only an empty block-entity array. Plain-item projections deliberately
 reject componentful slots instead of exposing an unchecked opaque tail.

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -68,6 +69,14 @@ DOCUMENT = {
         "UntrustedSlot": PLAIN_SLOT,
         "HashedSlot": ["container", []],
         "chunkBlockEntity": ["container", []],
+        "vec3f": [
+            "container",
+            [
+                {"name": "x", "type": "f32"},
+                {"name": "y", "type": "f32"},
+                {"name": "z", "type": "f32"},
+            ],
+        ],
     },
     "play": {
         "toClient": {
@@ -95,6 +104,7 @@ DOCUMENT = {
                                         "0xb": "map_chunk",
                                         "0xc": "modern_chunk",
                                         "0xd": "tile_entity_data",
+                                        "0xe": "move_minecart",
                                     },
                                 },
                             ],
@@ -119,6 +129,7 @@ DOCUMENT = {
                                         "map_chunk": "packet_map_chunk",
                                         "modern_chunk": "packet_modern_chunk",
                                         "tile_entity_data": "packet_tile_entity_data",
+                                        "move_minecart": "packet_move_minecart",
                                     },
                                 },
                             ],
@@ -156,6 +167,31 @@ DOCUMENT = {
                         {"name": "location", "type": "position"},
                         {"name": "action", "type": "varint"},
                         {"name": "nbtData", "type": "anonOptionalNbt"},
+                    ],
+                ],
+                "packet_move_minecart": [
+                    "container",
+                    [
+                        {"name": "entityId", "type": "varint"},
+                        {
+                            "name": "steps",
+                            "type": [
+                                "array",
+                                {
+                                    "countType": "varint",
+                                    "type": [
+                                        "container",
+                                        [
+                                            {"name": "position", "type": "vec3f"},
+                                            {"name": "movement", "type": "vec3f"},
+                                            {"name": "yaw", "type": "f32"},
+                                            {"name": "pitch", "type": "f32"},
+                                            {"name": "weight", "type": "f32"},
+                                        ],
+                                    ],
+                                },
+                            ],
+                        },
                     ],
                 ],
                 "packet_attributes": [
@@ -600,6 +636,37 @@ def main() -> None:
         "position", "varint", "nbt"
     ]
 
+    minecart = COMPILER.compile_manifest_packet(
+        compiler,
+        {
+            "state": "play",
+            "direction": "toClient",
+            "name": "move_minecart",
+            "expected_id": 14,
+            "projection": "source_validated_minecart_steps",
+            "source_validation": (
+                "Vanilla MinecartStep STREAM_CODEC uses Vec3 doubles and rotation bytes"
+            ),
+        },
+    )
+    assert minecart.projection == "minecart_steps:movement"
+    assert [field.wire.suffix for field in minecart.fields] == ["varint", "varint"]
+    try:
+        COMPILER.compile_manifest_packet(
+            compiler,
+            {
+                "state": "play",
+                "direction": "toClient",
+                "name": "move_minecart",
+                "expected_id": 14,
+                "projection": "source_validated_minecart_steps",
+            },
+        )
+    except ValueError as error:
+        assert "requires source_validation" in str(error)
+    else:
+        raise AssertionError("minecart projection accepted no source validation")
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -616,6 +683,7 @@ def main() -> None:
             chunk,
             modern_chunk,
             tile_entity,
+            minecart,
         ),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
@@ -648,6 +716,14 @@ def main() -> None:
     assert "PerryMcTestTileEntityData" in header
     assert "mc_reader_nbt(&reader, false, &decoded.nbt_data)" in source
     assert "mc_packet_nbt(packet, false, &value->nbt_data)" in source
+    assert "double position_x" in header
+    assert "double movement_z" in header
+    assert "int8_t yaw" in header
+    assert "steps[64]" in header
+    assert "mc_reader_double(&reader, &decoded.steps[index].position_x)" in source
+    assert "mc_reader_i8(&reader, &decoded.steps[index].yaw)" in source
+    assert "mc_packet_double(packet, value->steps[index].movement_z)" in source
+    assert "mc_packet_i8(packet, value->steps[index].pitch)" in source
 
     outputs = {
         "protocol_test.h": header,
@@ -658,6 +734,22 @@ def main() -> None:
         output = Path(temporary)
         COMPILER.write_manifest_outputs(outputs, output, check=False)
         COMPILER.write_manifest_outputs(outputs, output, check=True)
+        subprocess.run(
+            [
+                "cc",
+                "-std=c11",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                f"-I{ROOT}",
+                f"-I{output}",
+                "-c",
+                str(output / "protocol_test.c"),
+                "-o",
+                str(output / "protocol_test.o"),
+            ],
+            check=True,
+        )
         (output / "protocol_unexpected.c").write_text("stale\n", encoding="utf-8")
         try:
             COMPILER.write_manifest_outputs(outputs, output, check=True)
@@ -667,7 +759,7 @@ def main() -> None:
             raise AssertionError("staleness check accepted an unexpected generated file")
 
     print(
-        "PASS schema compiler manifest, overrides, scoreboard/inventory/chunk "
+        "PASS schema compiler manifest, overrides, minecart, scoreboard/inventory/chunk "
         "projections and staleness"
     )
 

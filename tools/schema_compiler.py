@@ -435,6 +435,78 @@ def manifest_attribute_projection(compiler: Compiler, packet_name: str,
     return tuple(fields)
 
 
+def validate_manifest_vec3f(compiler: Compiler, schema: Any,
+                            types: dict[str, Any], description: str) -> None:
+    fields = manifest_container(compiler, schema, types, description)
+    if [field.get("name") for field in fields] != ["x", "y", "z"]:
+        raise ValueError(f"{description} is not an x/y/z vector")
+    if any(
+        required_manifest_wire(
+            compiler, field.get("type"), types, description
+        ).suffix != "float"
+        for field in fields
+    ):
+        raise ValueError(f"{description} is not a float vector")
+
+
+def manifest_minecart_steps_projection(
+    compiler: Compiler,
+    packet_name: str,
+    raw_fields: list[dict[str, Any]],
+    types: dict[str, Any],
+) -> tuple[tuple[ManifestField, ...], str]:
+    if (
+        len(raw_fields) != 2
+        or raw_fields[0].get("name") != "entityId"
+        or raw_fields[1].get("name") != "steps"
+    ):
+        raise ValueError(f"packet {packet_name} minecart step envelope changed")
+    entity_wire = required_manifest_wire(
+        compiler, raw_fields[0].get("type"), types, "minecart entity ID"
+    )
+    count_schema, step_schema = manifest_array(
+        compiler, raw_fields[1].get("type"), types,
+        f"packet {packet_name} steps",
+    )
+    count_wire = required_manifest_wire(
+        compiler, count_schema, types, "minecart step count"
+    )
+    if entity_wire.suffix != "varint" or count_wire.suffix != "varint":
+        raise ValueError(f"packet {packet_name} minecart envelope is not VarInt based")
+    step_fields = manifest_container(
+        compiler, step_schema, types, f"packet {packet_name} step"
+    )
+    step_names = [field.get("name") for field in step_fields]
+    if (
+        len(step_fields) != 5
+        or step_names[0] != "position"
+        or step_names[1] not in {"movement", "velocity"}
+        or step_names[2:] != ["yaw", "pitch", "weight"]
+    ):
+        raise ValueError(f"packet {packet_name} minecart step fields changed")
+    validate_manifest_vec3f(
+        compiler, step_fields[0].get("type"), types,
+        f"packet {packet_name} step position",
+    )
+    validate_manifest_vec3f(
+        compiler, step_fields[1].get("type"), types,
+        f"packet {packet_name} step movement",
+    )
+    for field in step_fields[2:]:
+        if required_manifest_wire(
+            compiler,
+            field.get("type"),
+            types,
+            f"packet {packet_name} step {field.get('name')}",
+        ).suffix != "float":
+            raise ValueError(f"packet {packet_name} minecart scalar fields changed")
+    fields = (
+        ManifestField("entityId", "entity_id", entity_wire),
+        ManifestField("steps.count", "step_count", count_wire),
+    )
+    return fields, f"minecart_steps:{step_names[1]}"
+
+
 def required_manifest_wire(compiler: Compiler, schema: Any,
                            types: dict[str, Any], description: str) -> ManifestWire:
     wire = manifest_wire(compiler, schema, types)
@@ -955,6 +1027,24 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
             fields = manifest_attribute_projection(compiler, name, raw_fields, types)
             return ManifestPacket(
                 name, manifest_c_name(name), packet_id, state, str(raw_direction), fields)
+        if projection == "source_validated_minecart_steps":
+            source_validation = spec.get("source_validation")
+            if not isinstance(source_validation, str) or not source_validation.strip():
+                raise ValueError(
+                    "source_validated_minecart_steps requires source_validation"
+                )
+            fields, variant = manifest_minecart_steps_projection(
+                compiler, name, raw_fields, types
+            )
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
         if projection in {
             "scoreboard_objective", "scoreboard_score", "scoreboard_reset"
         }:
@@ -1150,6 +1240,25 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
                 "    McBytes chunk_data;",
                 "    McBytes auxiliary_data;",
             ])
+        elif (
+            packet.projection is not None
+            and packet.projection.startswith("minecart_steps:")
+        ):
+            lines.extend([
+                "    int32_t entity_id;",
+                "    size_t step_count;",
+                "    struct {",
+                "        double position_x;",
+                "        double position_y;",
+                "        double position_z;",
+                "        double movement_x;",
+                "        double movement_y;",
+                "        double movement_z;",
+                "        int8_t yaw;",
+                "        int8_t pitch;",
+                "        float weight;",
+                "    } steps[64];",
+            ])
         elif packet.projection == "inventory:plain_window_items":
             lines.extend([
                 f"    {packet.fields[0].wire.c_type} window_id;",
@@ -1204,6 +1313,69 @@ def manifest_writer(profile: ManifestProfile, field: ManifestField) -> str:
             f"{address}value->{field.c_field})"
         )
     return f"mc_packet_{field.wire.suffix}(packet, {address}value->{field.c_field})"
+
+
+def render_minecart_steps_projection(
+    profile: ManifestProfile,
+    packet: ManifestPacket,
+    type_name: str,
+) -> list[str]:
+    if packet.projection not in {
+        "minecart_steps:movement", "minecart_steps:velocity"
+    }:
+        raise ValueError(f"unknown minecart step projection {packet.projection}")
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    return [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    int32_t step_count = -1;",
+        "    mc_reader_init(&reader, payload, payload_size);",
+        "    if (!mc_reader_varint(&reader, &decoded.entity_id) ||",
+        "        !mc_reader_varint(&reader, &step_count) || step_count < 0 ||",
+        "        (size_t)step_count > sizeof(decoded.steps) / sizeof(decoded.steps[0]))",
+        "        return false;",
+        "    decoded.step_count = (size_t)step_count;",
+        "    for (size_t index = 0U; index < decoded.step_count; ++index) {",
+        "        if (!mc_reader_double(&reader, &decoded.steps[index].position_x) ||",
+        "            !mc_reader_double(&reader, &decoded.steps[index].position_y) ||",
+        "            !mc_reader_double(&reader, &decoded.steps[index].position_z) ||",
+        "            !mc_reader_double(&reader, &decoded.steps[index].movement_x) ||",
+        "            !mc_reader_double(&reader, &decoded.steps[index].movement_y) ||",
+        "            !mc_reader_double(&reader, &decoded.steps[index].movement_z) ||",
+        "            !mc_reader_i8(&reader, &decoded.steps[index].yaw) ||",
+        "            !mc_reader_i8(&reader, &decoded.steps[index].pitch) ||",
+        "            !mc_reader_float(&reader, &decoded.steps[index].weight)) return false;",
+        "    }",
+        "    if (mc_reader_remaining(&reader) != 0U) return false;",
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL ||",
+        "        value->step_count > sizeof(value->steps) / sizeof(value->steps[0]) ||",
+        "        !mc_packet_varint(packet, value->entity_id) ||",
+        "        !mc_packet_varint(packet, (int32_t)value->step_count)) return false;",
+        "    for (size_t index = 0U; index < value->step_count; ++index) {",
+        "        if (!mc_packet_double(packet, value->steps[index].position_x) ||",
+        "            !mc_packet_double(packet, value->steps[index].position_y) ||",
+        "            !mc_packet_double(packet, value->steps[index].position_z) ||",
+        "            !mc_packet_double(packet, value->steps[index].movement_x) ||",
+        "            !mc_packet_double(packet, value->steps[index].movement_y) ||",
+        "            !mc_packet_double(packet, value->steps[index].movement_z) ||",
+        "            !mc_packet_i8(packet, value->steps[index].yaw) ||",
+        "            !mc_packet_i8(packet, value->steps[index].pitch) ||",
+        "            !mc_packet_float(packet, value->steps[index].weight)) return false;",
+        "    }",
+        "    return !packet->failed;",
+        "}",
+        "",
+    ]
 
 
 def render_scoreboard_projection(profile: ManifestProfile,
@@ -1829,7 +2001,9 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
     for packet in profile.packets:
         type_name = f"PerryMc{profile.c_profile.title().replace('_', '')}{packet.c_packet.title().replace('_', '')}"
         if packet.projection is not None:
-            if packet.projection.startswith("inventory:"):
+            if packet.projection.startswith("minecart_steps:"):
+                renderer = render_minecart_steps_projection
+            elif packet.projection.startswith("inventory:"):
                 renderer = render_inventory_projection
             elif packet.projection.startswith("scoreboard_"):
                 renderer = render_scoreboard_projection
