@@ -291,6 +291,41 @@ static void block_dig_bodies_are_versioned(void)
     assert(!mc_packet_block_dig(NULL, 776, &cases[4].dig));
 }
 
+static void block_changes_are_versioned(void)
+{
+    static const unsigned char legacy[] = {
+        0xffU,0xffU,0xffU,0xf7U,0x40U,0x00U,0x00U,0x00U,0x0bU,0x80U,0x01U,
+    };
+    McReader reader;
+    McPosition position = {0};
+    int32_t state_id = -1;
+    mc_reader_init(&reader, legacy, sizeof(legacy));
+    assert(mc_reader_block_change(&reader, 4, &position, &state_id));
+    assert(position.x == -9 && position.y == 64 && position.z == 11);
+    assert(state_id == 128 && mc_reader_remaining(&reader) == 0U);
+
+    unsigned char modern[16];
+    McPacket packet;
+    mc_packet_init(&packet, modern, sizeof(modern));
+    assert(mc_packet_position(&packet, 776, (McPosition){-9, -60, 11}));
+    assert(mc_packet_varint(&packet, 30417));
+    mc_reader_init(&reader, modern, packet.length);
+    position = (McPosition){0};
+    state_id = -1;
+    assert(mc_reader_block_change(&reader, 776, &position, &state_id));
+    assert(position.x == -9 && position.y == -60 && position.z == 11);
+    assert(state_id == 30417 && mc_reader_remaining(&reader) == 0U);
+
+    static const unsigned char negative_state[] = {
+        0x00U,0x00U,0x00U,0x00U,0x40U,0x00U,0x00U,0x00U,0x00U,
+        0xffU,0xffU,0xffU,0xffU,0x0fU,
+    };
+    mc_reader_init(&reader, negative_state, sizeof(negative_state));
+    assert(!mc_reader_block_change(&reader, 5, &position, &state_id));
+    assert(reader.failed);
+    assert(!mc_reader_block_change(NULL, 776, &position, &state_id));
+}
+
 static void block_place_bodies_are_versioned(void)
 {
     static const unsigned char body_5[] = {
@@ -721,6 +756,7 @@ int main(int argc, char **argv)
     expect_player_abilities(776);
     attack_and_respawn_bodies_are_versioned();
     block_dig_bodies_are_versioned();
+    block_changes_are_versioned();
     block_place_bodies_are_versioned();
     untrusted_component_items_match_node();
     empty_window_clicks_are_versioned();

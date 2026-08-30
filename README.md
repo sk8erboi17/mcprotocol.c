@@ -159,6 +159,7 @@ Available symmetric field codecs are:
 | `bytes`, `skip`, `buffer_i32`, `buffer_varint` | Raw or length-prefixed borrowed bytes | bitsets, legacy chunks, signatures and plugin data |
 | `uuid` | 16 network bytes | player IDs, profiles and resource packs |
 | `position` | Release-aware packed block position | block use, digging and block updates |
+| `block_change` | Complete release-aware block-change body | authoritative block-state observations from 1.7 through current |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |

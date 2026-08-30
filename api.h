@@ -378,6 +378,10 @@ bool mc_reader_buffer_i32(McReader *reader, McBytes *value);
 bool mc_reader_buffer_varint(McReader *reader, McBytes *value);
 bool mc_reader_string(McReader *reader, McBytes *value);
 bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
+/* Decodes one complete clientbound block_change body. Protocols 1.7.x use
+ * x:i32/y:u8/z:i32 while 1.8+ use the release-aware packed position. */
+bool mc_reader_block_change(McReader *reader, int protocol,
+    McPosition *position, int32_t *state_id);
 bool mc_reader_uuid(McReader *reader, McUuid *value);
 bool mc_reader_plain_item(McReader *reader, int protocol,
     int32_t *item_id, int32_t *count);

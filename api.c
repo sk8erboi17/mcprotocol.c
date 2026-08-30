@@ -3299,6 +3299,36 @@ bool mc_reader_position(McReader *reader, int protocol, McPosition *value)
     return true;
 }
 
+bool mc_reader_block_change(McReader *reader, int protocol,
+    McPosition *position, int32_t *state_id)
+{
+    McPosition decoded = {0};
+    int32_t decoded_state = -1;
+    if (reader == NULL || position == NULL || state_id == NULL
+        || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (protocol <= 5) {
+        uint8_t y = 0U;
+        if (!mc_reader_i32(reader, &decoded.x)
+            || !mc_reader_u8(reader, &y)
+            || !mc_reader_i32(reader, &decoded.z)) {
+            return false;
+        }
+        decoded.y = (int32_t)y;
+    } else if (!mc_reader_position(reader, protocol, &decoded)) {
+        return false;
+    }
+    if (!mc_reader_varint(reader, &decoded_state) || decoded_state < 0) {
+        reader->failed = true;
+        return false;
+    }
+    *position = decoded;
+    *state_id = decoded_state;
+    return true;
+}
+
 bool mc_reader_uuid(McReader *reader, McUuid *value)
 {
     McBytes bytes;
