@@ -536,6 +536,45 @@ static void empty_window_clicks_are_versioned(void)
     assert(!mc_packet_empty_window_click(NULL, 776, &click));
 }
 
+static void legacy_window_clicks_include_predicted_stacks(void)
+{
+    static const struct {
+        int protocol;
+        unsigned char bytes[14];
+        size_t size;
+    } cases[] = {
+        {4, {0x00U,0x00U,0x25U,0x00U,0x00U,0x07U,0x00U,0x00U,0x80U,
+             0x20U,0x00U,0x00U,0xffU,0xffU}, 14U},
+        {47, {0x00U,0x00U,0x25U,0x00U,0x00U,0x07U,0x00U,0x00U,0x80U,
+              0x20U,0x00U,0x00U,0x00U}, 13U},
+        {754, {0x00U,0x00U,0x25U,0x00U,0x00U,0x07U,0x00U,0x01U,
+               0x80U,0x01U,0x20U,0x00U}, 12U},
+    };
+    const McWindowClick click = {
+        .window_id = 0,
+        .state_id = 0,
+        .slot = 37,
+        .mouse_button = 0,
+        .action_number = 7,
+        .mode = 0,
+        .clicked_item_id = 128,
+        .clicked_item_count = 32,
+    };
+    unsigned char storage[32];
+    McPacket packet;
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_window_click(&packet, cases[index].protocol, &click));
+        assert(packet.length == cases[index].size);
+        assert(memcmp(packet.data, cases[index].bytes, packet.length) == 0);
+    }
+
+    McWindowClick invalid = click;
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_window_click(&packet, 755, &invalid));
+    assert(packet.failed);
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -601,6 +640,7 @@ int main(int argc, char **argv)
     block_place_bodies_are_versioned();
     untrusted_component_items_match_node();
     empty_window_clicks_are_versioned();
+    legacy_window_clicks_include_predicted_stacks();
     puts("PASS command, abilities, block actions, window clicks, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }

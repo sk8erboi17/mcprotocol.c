@@ -2877,11 +2877,14 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
         && mc_packet_varint(packet, 0) && mc_packet_varint(packet, 0));
 }
 
-bool mc_packet_empty_window_click(McPacket *packet, int protocol,
-    const McEmptyWindowClick *value)
+bool mc_packet_window_click(McPacket *packet, int protocol,
+    const McWindowClick *value)
 {
     if (packet == NULL || value == NULL || !mc_protocol_supported(protocol)
         || value->state_id < 0 || value->mode < 0 || value->mode > 6
+        || value->clicked_item_count < 0 || value->clicked_item_count > 127
+        || (value->clicked_item_count != 0 && value->clicked_item_id <= 0)
+        || (protocol >= 755 && value->clicked_item_count != 0)
         || (protocol <= 5
             && (value->window_id < INT8_MIN || value->window_id > INT8_MAX))
         || (protocol >= 47 && protocol <= 765
@@ -2908,7 +2911,8 @@ bool mc_packet_empty_window_click(McPacket *packet, int protocol,
     if (protocol <= 754) {
         return mc_packet_i16(packet, value->action_number)
             && mc_packet_i8(packet, (int8_t)value->mode)
-            && mc_packet_plain_item(packet, protocol, 0, 0);
+            && mc_packet_plain_item(packet, protocol,
+                value->clicked_item_id, value->clicked_item_count);
     }
     if (!(protocol == 755
             ? mc_packet_i8(packet, (int8_t)value->mode)
@@ -2919,6 +2923,26 @@ bool mc_packet_empty_window_click(McPacket *packet, int protocol,
     return protocol < 770
         ? mc_packet_plain_item(packet, protocol, 0, 0)
         : mc_packet_bool(packet, false);
+}
+
+bool mc_packet_empty_window_click(McPacket *packet, int protocol,
+    const McEmptyWindowClick *value)
+{
+    if (value == NULL) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    const McWindowClick click = {
+        .window_id = value->window_id,
+        .state_id = value->state_id,
+        .slot = value->slot,
+        .mouse_button = value->mouse_button,
+        .action_number = value->action_number,
+        .mode = value->mode,
+        .clicked_item_id = 0,
+        .clicked_item_count = 0
+    };
+    return mc_packet_window_click(packet, protocol, &click);
 }
 
 bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,

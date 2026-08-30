@@ -164,7 +164,7 @@ Available symmetric field codecs are:
 | `player_position` | Release-aware position/look body | movement and teleport responses |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
 | `block_place` | Release-aware use-on-block body, including optional 1.7/1.8 reported damage and named-root NBT | placement and container activation |
-| `empty_window_click` | Release-aware click with empty changed/carried slots | inventory moves and outside drops |
+| `window_click` / `empty_window_click` | Release-aware click with a legacy predicted stack or empty changed/carried slots | crafting, inventory moves and outside drops |
 | `attack_entity` | Release-aware primary entity attack | legacy use-entity and dedicated modern attack |
 | `respawn_request` | Release-aware perform-respawn action | client command after death |
 
