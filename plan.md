@@ -48,7 +48,7 @@ Questi numeri sono una fotografia locale, non ancora un gate: le soglie del
 - [x] Fase 0: guardrail di distribuzione, generazione ed export.
 - [x] Fase 1: error model strutturato e reader strict/exact.
 - [x] Fase 2: parser stream incrementale puro e riuso nel networking.
-- [ ] Fase 3: embedding deterministico del generated code.
+- [x] Fase 3: embedding deterministico del generated code.
 - [ ] Fase 4: codec Tier A e packet-family mapping.
 - [ ] Fase 5: canonical IR lossless.
 - [ ] Fase 6: replay, differential testing e fuzzing.

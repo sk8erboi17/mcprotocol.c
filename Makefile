@@ -9,6 +9,7 @@ MINECRAFT_DATA_ROOT ?= ../minecraft-data
 SCHEMA_PROTOCOL_JSON ?= $(MINECRAFT_DATA_ROOT)/data/pc/26.1/protocol.json
 SCHEMA_PROTOCOL_OVERLAY ?= schema/overlays/776.json
 GENERATED_PROTOCOL ?= 776
+EMBEDDED_REPORT ?= generated/mc_protocol_$(GENERATED_PROTOCOL).json
 
 .PHONY: all clean shared benchmark generate generate-check \
 	test test-unit test-codec test-stream test-generated test-schema test-amalgamation \
@@ -36,28 +37,31 @@ generate:
 	$(PYTHON) tools/schema_compiler.py \
 		--protocol-json "$(SCHEMA_PROTOCOL_JSON)" \
 		--protocol-number "$(GENERATED_PROTOCOL)" \
-		--out-dir generated \
 		--overlay "$(SCHEMA_PROTOCOL_OVERLAY)" \
 		--packet play:serverbound:use_item \
-		--packet play:serverbound:block_dig
+		--packet play:serverbound:block_dig \
+		--embed --api-header api.h --api-source api.c \
+		--embedded-report "$(EMBEDDED_REPORT)"
 
 generate-check:
 	$(PYTHON) tools/schema_compiler.py \
 		--protocol-number "$(GENERATED_PROTOCOL)" \
-		--out-dir generated \
 		--overlay "$(SCHEMA_PROTOCOL_OVERLAY)" \
-		--verify-existing
+		--api-header api.h --api-source api.c \
+		--embedded-report "$(EMBEDDED_REPORT)" \
+		--verify-embedded
 	@if [ -f "$(SCHEMA_PROTOCOL_JSON)" ]; then \
 		$(PYTHON) tools/schema_compiler.py \
 			--protocol-json "$(SCHEMA_PROTOCOL_JSON)" \
 			--protocol-number "$(GENERATED_PROTOCOL)" \
-			--out-dir generated \
 			--overlay "$(SCHEMA_PROTOCOL_OVERLAY)" \
 			--packet play:serverbound:use_item \
 			--packet play:serverbound:block_dig \
+			--embed --api-header api.h --api-source api.c \
+			--embedded-report "$(EMBEDDED_REPORT)" \
 			--check; \
 	else \
-		printf '%s\n' "minecraft-data unavailable: committed-byte integrity checked; full regeneration skipped"; \
+		printf '%s\n' "minecraft-data unavailable: embedded-region integrity checked; full regeneration skipped"; \
 	fi
 
 test: test-unit test-codec test-stream test-generated test-schema
@@ -107,11 +111,9 @@ tests/stream_test: tests/stream_test.c api.c api.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 $(WARNINGS) -UNDEBUG \
 		-I. tests/stream_test.c api.c -lz -o $@
 
-tests/generated_test: tests/generated_test.c generated/mc_protocol_776.c \
-		generated/mc_protocol_776.h api.c api.h
+tests/generated_test: tests/generated_test.c api.c api.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 $(WARNINGS) -UNDEBUG \
-		-I. -Igenerated tests/generated_test.c generated/mc_protocol_776.c \
-		api.c -lz -o $@
+		-I. tests/generated_test.c api.c -lz -o $@
 
 clean:
 	rm -f api.o libmcprotocol.a libmcprotocol.so libmcprotocol.dylib \

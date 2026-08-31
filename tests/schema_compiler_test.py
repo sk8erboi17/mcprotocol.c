@@ -1209,9 +1209,115 @@ def main() -> None:
         else:
             raise AssertionError("integrity check accepted modified generated source")
 
+    embedded_header = """/* Generated from minecraft-data; do not edit. */
+#ifndef MC_PROTOCOL_GENERATED_999_H
+#define MC_PROTOCOL_GENERATED_999_H
+
+#include "api.h"
+
+#define MC999_PLAY_CLIENTBOUND_SAMPLE 1
+
+extern const McPacketInfo mc999_generated_packet_ids[];
+extern const size_t mc999_generated_packet_id_count;
+
+typedef struct Mc999Sample { int32_t value; } Mc999Sample;
+bool mc999_play_clientbound_sample_decode(McReader *reader, Mc999Sample *value);
+
+#endif /* MC_PROTOCOL_GENERATED_999_H */
+"""
+    embedded_source = """/* Generated from minecraft-data; do not edit. */
+#include "mc_protocol_999.h"
+
+const McPacketInfo mc999_generated_packet_ids[] = {
+    {MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, 1, "sample"},
+};
+const size_t mc999_generated_packet_id_count = 1U;
+
+bool mc999_play_clientbound_sample_decode(McReader *reader, Mc999Sample *value)
+{
+    return reader != NULL && value != NULL && mc_reader_varint(reader, &value->value);
+}
+"""
+    embedded_manifest = {
+        "generator_version": 1,
+        "protocol": 999,
+        "source_sha256": "0" * 64,
+        "overlay_sha256": None,
+    }
+    with tempfile.TemporaryDirectory(prefix="mcprotocol-embedded-schema-") as temporary:
+        output = Path(temporary)
+        api_header = output / "api.h"
+        api_source = output / "api.c"
+        report = output / "mc_protocol_999.json"
+        api_header.write_text(
+            "manual header before\n"
+            f"{COMPILER.PUBLIC_BEGIN}\nold public\n{COMPILER.PUBLIC_END}\n"
+            "manual header after\n",
+            encoding="utf-8",
+        )
+        api_source.write_text(
+            "manual source before\n"
+            f"{COMPILER.PRIVATE_BEGIN}\nold private\n{COMPILER.PRIVATE_END}\n"
+            "manual source after\n",
+            encoding="utf-8",
+        )
+        embedded_outputs = COMPILER.embedded_schema_outputs(
+            999,
+            embedded_header,
+            embedded_source,
+            embedded_manifest,
+            api_header,
+            api_source,
+            report,
+        )
+        COMPILER.write_embedded_schema_outputs(embedded_outputs, check=False)
+        assert api_header.read_text(encoding="utf-8").startswith("manual header before\n")
+        assert api_header.read_text(encoding="utf-8").endswith("manual header after\n")
+        assert api_source.read_text(encoding="utf-8").startswith("manual source before\n")
+        assert api_source.read_text(encoding="utf-8").endswith("manual source after\n")
+        assert '#include "api.h"' not in COMPILER.marked_region(
+            api_header.read_text(encoding="utf-8"),
+            COMPILER.PUBLIC_BEGIN,
+            COMPILER.PUBLIC_END,
+        )
+        assert "generated_packet_ids" not in api_source.read_text(encoding="utf-8")
+        fresh_outputs = COMPILER.embedded_schema_outputs(
+            999,
+            embedded_header,
+            embedded_source,
+            embedded_manifest,
+            api_header,
+            api_source,
+            report,
+        )
+        COMPILER.write_embedded_schema_outputs(fresh_outputs, check=True)
+        COMPILER.verify_existing_embedded(api_header, api_source, report, 999, None)
+        api_source.write_text(
+            api_source.read_text(encoding="utf-8").replace(
+                "Do not edit inside", "tampered generated", 1
+            ),
+            encoding="utf-8",
+        )
+        try:
+            COMPILER.verify_existing_embedded(api_header, api_source, report, 999, None)
+        except ValueError as error:
+            assert "hash mismatch" in str(error)
+        else:
+            raise AssertionError("integrity check accepted a modified embedded region")
+        try:
+            COMPILER.marked_region(
+                api_header.read_text(encoding="utf-8") + COMPILER.PUBLIC_BEGIN,
+                COMPILER.PUBLIC_BEGIN,
+                COMPILER.PUBLIC_END,
+            )
+        except ValueError as error:
+            assert "exactly one" in str(error)
+        else:
+            raise AssertionError("duplicate generated marker was accepted")
+
     print(
         "PASS schema compiler manifest, overrides, minecart, NOTE particle, "
-        "scoreboard/inventory/chunk projections, integrity and staleness"
+        "scoreboard/inventory/chunk projections, embedded regions, integrity and staleness"
     )
 
 

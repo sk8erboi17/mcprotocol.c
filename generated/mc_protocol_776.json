@@ -1,5 +1,9 @@
 {
   "catalog_validation_count": 255,
+  "embedded_outputs": {
+    "api.c": "343b08b3da8ba7c0c0b54e2601bc860926559502fa46bfe41105e8fa35a194ba",
+    "api.h": "e0f03c3acdd1dcf164ca77a84b736d2ea602739104c03455f09d5f0f1be94aa4"
+  },
   "generated_packets": [
     {
       "packet_id": 67,
@@ -12,12 +16,8 @@
       "type": "Mc776PlayServerboundBlockDig"
     }
   ],
-  "generator_version": 1,
+  "generator_version": 2,
   "overlay_sha256": "552856dafa54dd03f76a437f810043fc902187784dd24f77866159b996fd2e6b",
-  "outputs": {
-    "mc_protocol_776.c": "2010d20a50604834a62bed47aac1908198c8788e796b4ffebcb8ae1496e4715c",
-    "mc_protocol_776.h": "077774c3f91b8f049f85dc1c9f4303ed87b216bccf71912a31318fe9467bb242"
-  },
   "packet_id_count": 257,
   "protocol": 776,
   "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"

@@ -1,13 +1,15 @@
-#include "generated/mc_protocol_776.h"
+#include "api.h"
 
 #include <assert.h>
 #include <stdio.h>
 
 static void test_complete_packet_catalog(void)
 {
-    assert(mc776_generated_packet_id_count != 0U);
-    for (size_t index = 0U; index < mc776_generated_packet_id_count; ++index) {
-        const McPacketInfo expected = mc776_generated_packet_ids[index];
+    const size_t count = mc_packet_count(776);
+    assert(count != 0U);
+    for (size_t index = 0U; index < count; ++index) {
+        McPacketInfo expected;
+        assert(mc_packet_at(776, index, &expected));
         const int32_t actual =
             mc_packet_id(776, expected.state, expected.direction, expected.name);
         if (actual != expected.id) {

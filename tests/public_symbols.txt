@@ -1,4 +1,8 @@
 # One reviewed public definition per line. Keep sorted.
+mc776_play_serverbound_block_dig_decode
+mc776_play_serverbound_block_dig_encode
+mc776_play_serverbound_use_item_decode
+mc776_play_serverbound_use_item_encode
 mc_backend_name
 mc_client_attack_entity
 mc_client_backend

@@ -184,7 +184,7 @@ Available symmetric field codecs are:
 
 `tools/schema_compiler.py` turns a pinned `minecraft-data` `protocol.json` into
 deterministic packet-ID constants, C structs and allocation-free body codecs in
-`generated/`. It rejects unsupported schema nodes instead of guessing or
+the marked regions of `api.h` and `api.c`. It rejects unsupported schema nodes instead of guessing or
 emitting an opaque remainder. Both `anonymousNbt` and `anonOptionalNbt` map to
 the validated borrowed-NBT codec; the latter preserves the root `END` marker
 used for an absent value. Because the pinned `minecraft-data` checkout
@@ -204,8 +204,11 @@ make test
 ```
 
 Override `MINECRAFT_DATA_ROOT` or `SCHEMA_PROTOCOL_JSON` when the data checkout
-is elsewhere. Generated sources are checked in so downstream test binaries do
-not need Python or JSON at build/runtime.
+is elsewhere. `make generate` replaces only `MC_GENERATED_PUBLIC_*` and
+`MC_GENERATED_PRIVATE_*`; manual code outside those markers is byte-preserved.
+The JSON file under `generated/` is an integrity report only. No generated C or
+header is needed by the build, and downstream users need neither Python nor
+JSON at build/runtime.
 
 For downstream multi-release suites, the same compiler accepts a pinned profile
 manifest and generates deterministic packet IDs, flat typed structs and codecs:

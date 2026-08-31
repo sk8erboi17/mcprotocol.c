@@ -34,7 +34,7 @@ def defined_symbols(object_path: Path) -> set[str]:
         if len(symbol_type) != 1 or not symbol_type.isupper() or symbol_type == "U":
             continue
         name = columns[-1]
-        if name.startswith("_mc_"):
+        if name.startswith("_mc"):
             name = name[1:]
         symbols.add(name)
     return symbols
