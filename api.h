@@ -214,6 +214,23 @@ typedef struct {
     bool on_ground;
 } McPlayerPosition;
 
+/* Decoded clientbound position/correction. `position.y` is normalized to
+ * feet Y for 1.7 even though that wire family carries stance/eye Y. The
+ * velocity delta fields and 9-bit relative flags are present only from
+ * 1.21.2; older families leave them zero. Teleport IDs start in 1.9 and the
+ * dismount flag exists only from 1.17 through 1.19.4. */
+typedef struct {
+    McPlayerPosition position;
+    double delta_x;
+    double delta_y;
+    double delta_z;
+    uint32_t relative_flags;
+    int32_t teleport_id;
+    bool has_velocity_delta;
+    bool has_teleport_id;
+    bool dismount_vehicle;
+} McClientboundPlayerPosition;
+
 typedef struct {
     const char *locale;
     int8_t view_distance;
@@ -459,6 +476,11 @@ bool mc_reader_buffer_i32(McReader *reader, McBytes *value);
 bool mc_reader_buffer_varint(McReader *reader, McBytes *value);
 bool mc_reader_string(McReader *reader, McBytes *value);
 bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
+/* Decodes the release-aware clientbound position packet body (without packet
+ * ID). The caller may require mc_reader_remaining(reader) == 0 to reject a
+ * body with trailing fields. */
+bool mc_reader_clientbound_player_position(McReader *reader, int protocol,
+    McClientboundPlayerPosition *value);
 /* Decodes one complete clientbound block_change body. Protocols 1.7.x use
  * x:i32/y:u8/z:i32 plus separate block-id/metadata fields; their returned
  * state_id is (block_id << 4) | metadata. 1.8+ returns the wire state ID. */

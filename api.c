@@ -3526,6 +3526,84 @@ bool mc_reader_position(McReader *reader, int protocol, McPosition *value)
     return true;
 }
 
+bool mc_reader_clientbound_player_position(McReader *reader, int protocol,
+    McClientboundPlayerPosition *value)
+{
+    McClientboundPlayerPosition decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+
+    int32_t flags = 0;
+    int32_t teleport_id = 0;
+    const bool has_delta =
+        (mc_protocol_features(protocol) & MC_PROTOCOL_FEATURE_POSITION_DELTA) != 0U;
+    if (has_delta) {
+        if (!mc_reader_varint(reader, &teleport_id) || teleport_id < 0
+            || !mc_reader_double(reader, &decoded.position.x)
+            || !mc_reader_double(reader, &decoded.position.y)
+            || !mc_reader_double(reader, &decoded.position.z)
+            || !mc_reader_double(reader, &decoded.delta_x)
+            || !mc_reader_double(reader, &decoded.delta_y)
+            || !mc_reader_double(reader, &decoded.delta_z)
+            || !mc_reader_float(reader, &decoded.position.yaw)
+            || !mc_reader_float(reader, &decoded.position.pitch)
+            || !mc_reader_i32(reader, &flags) || flags < 0
+            || (flags & ~0x1ff) != 0) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_velocity_delta = true;
+        decoded.has_teleport_id = true;
+        decoded.teleport_id = teleport_id;
+    } else {
+        uint8_t legacy_flags = 0U;
+        if (!mc_reader_double(reader, &decoded.position.x)
+            || !mc_reader_double(reader, &decoded.position.y)
+            || !mc_reader_double(reader, &decoded.position.z)
+            || !mc_reader_float(reader, &decoded.position.yaw)
+            || !mc_reader_float(reader, &decoded.position.pitch)
+            || !mc_reader_u8(reader, &legacy_flags)
+            || (legacy_flags & UINT8_C(0xe0)) != 0U) {
+            reader->failed = true;
+            return false;
+        }
+        flags = (int32_t)legacy_flags;
+        if (protocol <= 5) {
+            /* EntityPlayerSP applies the historical eye/stance coordinate;
+             * serverbound Position then requires feet followed by stance. */
+            decoded.position.y -= 1.6200000047683716;
+        }
+        if (protocol >= 107) {
+            if (!mc_reader_varint(reader, &teleport_id) || teleport_id < 0) {
+                reader->failed = true;
+                return false;
+            }
+            decoded.has_teleport_id = true;
+            decoded.teleport_id = teleport_id;
+        }
+        if (protocol >= 755 && protocol <= 762) {
+            uint8_t dismount = 0U;
+            if (!mc_reader_u8(reader, &dismount) || dismount > 1U) {
+                reader->failed = true;
+                return false;
+            }
+            decoded.dismount_vehicle = dismount != 0U;
+        }
+    }
+    if (!isfinite(decoded.position.x) || !isfinite(decoded.position.y)
+        || !isfinite(decoded.position.z) || !isfinite(decoded.position.yaw)
+        || !isfinite(decoded.position.pitch) || !isfinite(decoded.delta_x)
+        || !isfinite(decoded.delta_y) || !isfinite(decoded.delta_z)) {
+        reader->failed = true;
+        return false;
+    }
+    decoded.relative_flags = (uint32_t)flags;
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_block_change(McReader *reader, int protocol,
     McPosition *position, int32_t *state_id)
 {
@@ -5940,46 +6018,26 @@ static int handle_play(McClient *client, int32_t packet_id, McCursor body,
     if (packet_id == client->profile->player_position
         && (client->automatic_replies
             & (MC_AUTOMATIC_TELEPORT | MC_AUTOMATIC_PLAYER_LOADED)) != 0U) {
-        int32_t teleport_id = -1;
-        if ((client->profile->flags & MC_PROTOCOL_FEATURE_POSITION_DELTA) != 0U) {
-            if (!mc_reader_varint(&body, &teleport_id)) {
-                set_error(error, error_size, "Teleport ID non valido");
-                return -1;
-            }
-        } else if (client->profile->protocol >= 107) {
-            if (!mc_reader_skip(&body, 24U + 8U + 1U)
-                || !mc_reader_varint(&body, &teleport_id)) {
-                set_error(error, error_size, "Player Position non valido");
-                return -1;
-            }
-        } else {
-            double x = 0.0;
-            double y = 0.0;
-            double z = 0.0;
-            float yaw = 0.0F;
-            float pitch = 0.0F;
-            if (!mc_reader_double(&body, &x)
-                || !mc_reader_double(&body, &y)
-                || !mc_reader_double(&body, &z)
-                || !mc_reader_float(&body, &yaw)
-                || !mc_reader_float(&body, &pitch)
-                || !mc_reader_skip(&body, 1U)) {
-                set_error(error, error_size,
-                    "Player Position legacy non valido");
-                return -1;
-            }
+        McClientboundPlayerPosition decoded = {0};
+        if (!mc_reader_clientbound_player_position(
+                &body, client->profile->protocol, &decoded)
+            || mc_reader_remaining(&body) != 0U) {
+            set_error(error, error_size, "Player Position non valido");
+            return -1;
+        }
+        const int32_t teleport_id =
+            decoded.has_teleport_id ? decoded.teleport_id : -1;
+        if (client->profile->protocol < 107) {
             unsigned char storage[48];
             McPacket movement;
             mc_packet_init(&movement, storage, sizeof(storage));
             McPlayerPosition response = {
-                .x = x,
-                /* 1.7 clientbound Position carries eye/stance Y, while its
-                 * serverbound reply requires feet Y followed by stance Y. */
-                .y = client->profile->protocol <= 5
-                    ? y - 1.6200000047683716
-                    : y,
-                .z = z,
-                .yaw = yaw, .pitch = pitch, .on_ground = true
+                .x = decoded.position.x,
+                .y = decoded.position.y,
+                .z = decoded.position.z,
+                .yaw = decoded.position.yaw,
+                .pitch = decoded.position.pitch,
+                .on_ground = true
             };
             mc_packet_player_position(&movement,
                 client->profile->protocol, &response);

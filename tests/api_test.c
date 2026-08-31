@@ -547,6 +547,71 @@ static void player_positions_are_versioned(void)
     assert(packet.length == 33U);
 }
 
+static void clientbound_player_positions_are_versioned(void)
+{
+    static const int protocols[] = {4, 47, 107, 754, 755, 762, 763, 767, 768, 776};
+    for (size_t index = 0U; index < sizeof(protocols) / sizeof(protocols[0]); ++index) {
+        const int protocol = protocols[index];
+        unsigned char storage[96] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        if (protocol >= 768) {
+            assert(mc_packet_varint(&packet, 17));
+        }
+        assert(mc_packet_double(&packet, -8.5));
+        assert(mc_packet_double(&packet,
+            protocol <= 5 ? 65.6200000047683716 : 64.0));
+        assert(mc_packet_double(&packet, 9.5));
+        if (protocol >= 768) {
+            assert(mc_packet_double(&packet, 0.25));
+            assert(mc_packet_double(&packet, -0.5));
+            assert(mc_packet_double(&packet, 0.75));
+        }
+        assert(mc_packet_float(&packet, 12.0F));
+        assert(mc_packet_float(&packet, 34.0F));
+        if (protocol >= 768) {
+            assert(mc_packet_i32(&packet, 0x101));
+        } else {
+            assert(mc_packet_u8(&packet, 0x05U));
+            if (protocol >= 107) assert(mc_packet_varint(&packet, 17));
+            if (protocol >= 755 && protocol <= 762) {
+                assert(mc_packet_bool(&packet, true));
+            }
+        }
+
+        McReader reader;
+        McClientboundPlayerPosition decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_clientbound_player_position(
+            &reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.position.x == -8.5);
+        assert(fabs(decoded.position.y - 64.0) < 1.0e-12);
+        assert(decoded.position.z == 9.5);
+        assert(decoded.position.yaw == 12.0F);
+        assert(decoded.position.pitch == 34.0F);
+        assert(decoded.relative_flags == (protocol >= 768 ? 0x101U : 0x05U));
+        assert(decoded.has_velocity_delta == (protocol >= 768));
+        assert(decoded.has_teleport_id == (protocol >= 107));
+        assert(decoded.teleport_id == (protocol >= 107 ? 17 : 0));
+        assert(decoded.dismount_vehicle == (protocol >= 755 && protocol <= 762));
+        assert(decoded.delta_x == (protocol >= 768 ? 0.25 : 0.0));
+        assert(decoded.delta_y == (protocol >= 768 ? -0.5 : 0.0));
+        assert(decoded.delta_z == (protocol >= 768 ? 0.75 : 0.0));
+    }
+
+    unsigned char malformed[] = {0U};
+    McReader reader;
+    McClientboundPlayerPosition decoded = {0};
+    mc_reader_init(&reader, malformed, sizeof(malformed));
+    assert(!mc_reader_clientbound_player_position(&reader, 47, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, malformed, sizeof(malformed));
+    assert(!mc_reader_clientbound_player_position(&reader, 999, &decoded));
+    assert(reader.failed);
+    assert(!mc_reader_clientbound_player_position(NULL, 47, &decoded));
+}
+
 static void movement_and_hotbar_bodies_match_node(void)
 {
     /* Bodies excluding ID. The 1.7 position pair follows the canonical
@@ -1154,6 +1219,7 @@ int main(int argc, char **argv)
     client_information_bodies_match_node();
     player_action_bodies_match_node();
     player_positions_are_versioned();
+    clientbound_player_positions_are_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
     use_item_bodies_match_node();

@@ -162,6 +162,7 @@ Available symmetric field codecs are:
 | `uuid` | 16 network bytes | player IDs, profiles and resource packs |
 | `position` | Release-aware packed block position | block use, digging and block updates |
 | `block_change` | Complete release-aware block-change body | authoritative block-state observations from 1.7 through current |
+| `clientbound_player_position` | Release-aware correction body with normalized 1.7 feet Y, teleport/dismount boundaries and modern velocity deltas | observing authoritative movement and teleport responses |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `held_item_slot` | Validated hotbar index as a big-endian short | selected-slot changes in every release |
@@ -169,7 +170,7 @@ Available symmetric field codecs are:
 | `entity_action`, `player_input` | Canonical actions and modern input bitsets | sneaking, sprinting and vehicle/player controls across the 1.21.6 enum change |
 | `arm_animation` | Release-aware legacy entity swing, empty 1.8 body or modern hand | primary/off-hand animation |
 | `nbt`, `nbt_value`, `nbt_name` | Validated borrowed NBT | registries, item metadata and block entities |
-| `player_position` | Release-aware position/look body | movement and teleport responses |
+| `player_position` | Release-aware serverbound position/look body | publishing movement observations |
 | `player_abilities` | Release-aware flags and legacy speed floats | client flying/ability state |
 | `block_place` | Release-aware use-on-block body, including optional 1.7/1.8 reported damage and named-root NBT | placement and container activation |
 | `use_item` | Legacy block-place sentinel or modern hand/sequence/rotation body | consuming or activating the held item without a block target |
