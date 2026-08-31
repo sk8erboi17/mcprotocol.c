@@ -3,6 +3,8 @@ libmcprotocol.a
 libmcprotocol.dylib
 libmcprotocol.so
 tests/api_test
+tests/codec_test
 tests/generated_test
+tests/stream_test
 __pycache__/
 *.pyc

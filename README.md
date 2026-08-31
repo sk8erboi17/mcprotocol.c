@@ -199,6 +199,7 @@ With `minecraft-data` checked out next to this repository:
 
 ```sh
 make generate
+make generate-check
 make test
 ```
 
@@ -335,6 +336,58 @@ if (!mc_reader_i64(&body, &token)
 Views returned as `McBytes` point into the callback payload and must not outlive
 the callback unless copied by the application.
 
+For packet-driven tests, strict mode returns stable error codes and rejects
+non-canonical VarInts, boolean bytes other than `0/1`, and trailing bytes:
+
+```c
+McError decode_error;
+McReader strict;
+mc_reader_init_mode(&strict, payload, payload_size,
+    MC_DECODE_STRICT, &decode_error);
+
+if (!mc_reader_i64(&strict, &token) || !mc_reader_finish(&strict)) {
+    fprintf(stderr, "%s at byte %zu\n",
+        mc_error_name(decode_error.code), decode_error.offset);
+}
+```
+
+`mc_reader_init` retains the existing Vanilla-compatible behavior and has no
+structured error sink. `mc_reader_string_bounded` lets a schema choose a
+tighter byte limit than `MC_DEFAULT_MAX_STRING_BYTES`.
+
+## Incremental stream framing
+
+`McStreamDecoder` extracts packet IDs and borrowed payloads from arbitrary TCP
+chunks without a socket. It retains partial frames, emits multiple coalesced
+frames, enforces configured memory limits, and validates the complete zlib
+stream before publishing a compressed packet.
+
+```c
+McStreamDecoderConfig config;
+McError frame_error;
+McDecodedFrame frames[16];
+size_t frame_count = 0;
+
+mc_stream_decoder_config_init(&config);
+config.mode = MC_DECODE_STRICT;
+McStreamDecoder *stream = mc_stream_decoder_create(&config, &frame_error);
+
+if (stream == NULL || mc_stream_decoder_feed(stream, tcp_bytes, tcp_size,
+        frames, 16U, &frame_count, &frame_error) != 0) {
+    /* frame_error.code and frame_error.offset are stable test inputs. */
+}
+
+for (size_t index = 0; index < frame_count; ++index) {
+    /* frames[index].payload is valid until the next feed/reset/destroy. */
+}
+mc_stream_decoder_destroy(stream);
+```
+
+Set compression between frames with
+`mc_stream_decoder_set_compression(stream, threshold, &frame_error)`. Pass
+`-1` to disable it. At EOF, `mc_stream_decoder_finish` reports
+`MC_ERROR_PARTIAL_INPUT` if an incomplete frame remains buffered.
+
 ## Batch sends
 
 `mc_client_send_batch` encodes each packet with the current compression settings,
@@ -423,6 +476,8 @@ mc_packet_id/name              resolve packet names and IDs
 
 mc_packet_*                    build caller-owned packet bodies
 mc_reader_*                    decode borrowed packet bodies
+mc_error_name                  stable structured decode error identifier
+mc_stream_decoder_*            pure incremental framing and decompression
 mc_uuid_* / mc_offline_uuid    UUID conversion and offline player UUIDs
 
 mc_client_create/destroy       allocate or release a client/peer
@@ -462,6 +517,24 @@ active backend is available through `mc_client_backend` and
 `mc_backend_name`.
 
 ## Verification
+
+The local verification gates are:
+
+```sh
+make test
+make test-amalgamation
+make test-exports
+make generate-check
+make test-sanitize
+make check
+```
+
+The amalgamation test copies only `api.c` and `api.h` to an isolated temporary
+directory and compiles a consumer with zlib. The export test compares every
+global definition in `api.o` with a reviewed allowlist. `generate-check`
+performs a full read-only regeneration when the configured minecraft-data
+checkout exists; an offline checkout still verifies the committed generated
+byte hashes and overlay hash.
 
 The public API has been exercised against Perry using all 51 supported
 revisions for session/login, movement correction, inventory translation and

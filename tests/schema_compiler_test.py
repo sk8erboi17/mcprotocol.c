@@ -1192,9 +1192,26 @@ def main() -> None:
         else:
             raise AssertionError("staleness check accepted an unexpected generated file")
 
+    with tempfile.TemporaryDirectory(prefix="mcprotocol-single-schema-") as temporary:
+        output = Path(temporary)
+        single_outputs = COMPILER.single_schema_outputs(
+            999, header, source, {"generator_version": 1, "protocol": 999}
+        )
+        COMPILER.write_single_schema_outputs(single_outputs, output, check=False)
+        COMPILER.write_single_schema_outputs(single_outputs, output, check=True)
+        COMPILER.verify_existing_single_schema(output, 999, None)
+        generated_source = output / "mc_protocol_999.c"
+        generated_source.write_text(source + "/* stale */\n", encoding="utf-8")
+        try:
+            COMPILER.verify_existing_single_schema(output, 999, None)
+        except ValueError as error:
+            assert "hash mismatch" in str(error)
+        else:
+            raise AssertionError("integrity check accepted modified generated source")
+
     print(
         "PASS schema compiler manifest, overrides, minecart, NOTE particle, "
-        "scoreboard/inventory/chunk projections and staleness"
+        "scoreboard/inventory/chunk projections, integrity and staleness"
     )
 
 

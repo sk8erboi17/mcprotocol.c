@@ -9,10 +9,16 @@
 extern "C" {
 #endif
 
-#define MC_PROTOCOL_API_VERSION 1
+#define MC_PROTOCOL_API_VERSION 2
 #define MC_DEFAULT_PORT 25565U
 #define MC_UUID_STRING_SIZE 37U
 #define MC_HANDSHAKE_HOST_SIZE 256U
+#define MC_DEFAULT_MAX_STRING_BYTES (1024U * 1024U)
+#define MC_DEFAULT_MAX_FRAME_SIZE (16U * 1024U * 1024U)
+#define MC_DEFAULT_MAX_DECOMPRESSED_SIZE (16U * 1024U * 1024U)
+#define MC_DEFAULT_MAX_STREAM_BUFFERED_SIZE (64U * 1024U * 1024U)
+#define MC_DEFAULT_MAX_STREAM_OUTPUT_SIZE (32U * 1024U * 1024U)
+#define MC_ERROR_OFFSET_UNKNOWN SIZE_MAX
 
 /* mcprotocol.c deliberately exposes the protocol rather than a game bot. The
  * client takes care of connection state, framing and mandatory protocol
@@ -30,8 +36,10 @@ extern "C" {
 
 typedef struct McClient McClient;
 typedef struct McServer McServer;
+typedef struct McStreamDecoder McStreamDecoder;
 
 typedef enum {
+    MC_STATE_UNKNOWN = -1,
     MC_STATE_DISCONNECTED = 0,
     MC_STATE_LOGIN,
     MC_STATE_CONFIGURATION,
@@ -48,9 +56,64 @@ typedef enum {
 } McBackend;
 
 typedef enum {
+    MC_PACKET_DIRECTION_UNKNOWN = -1,
     MC_PACKET_SERVERBOUND = 0,
     MC_PACKET_CLIENTBOUND
 } McPacketDirection;
+
+
+/* ============================================================
+ * ERROR MODEL / DECODE POLICY
+ * ============================================================ */
+
+/* Error codes are stable machine-readable identifiers. Diagnostic strings may
+ * change and must not be used as test or control-flow identifiers. */
+typedef enum {
+    MC_ERROR_NONE = 0,
+    MC_ERROR_INVALID_ARGUMENT,
+    MC_ERROR_UNSUPPORTED_PROTOCOL,
+    MC_ERROR_INVALID_STATE,
+    MC_ERROR_INVALID_DIRECTION,
+    MC_ERROR_UNKNOWN_PACKET,
+    MC_ERROR_PARTIAL_INPUT,
+    MC_ERROR_VARINT_OVERFLOW,
+    MC_ERROR_VARINT_NON_CANONICAL,
+    MC_ERROR_FRAME_TOO_LARGE,
+    MC_ERROR_BUFFER_LIMIT,
+    MC_ERROR_DECOMPRESSED_TOO_LARGE,
+    MC_ERROR_COMPRESSION_HEADER,
+    MC_ERROR_COMPRESSION_THRESHOLD,
+    MC_ERROR_ZLIB,
+    MC_ERROR_TRAILING_BYTES,
+    MC_ERROR_INVALID_BOOLEAN,
+    MC_ERROR_STRING_TOO_LARGE,
+    MC_ERROR_NBT_DEPTH,
+    MC_ERROR_NBT_LENGTH,
+    MC_ERROR_INVALID_LENGTH,
+    MC_ERROR_INTEGER_OVERFLOW,
+    MC_ERROR_INVALID_PACKET_BODY,
+    MC_ERROR_OUT_OF_MEMORY,
+    MC_ERROR_IO,
+    MC_ERROR_TIMEOUT,
+    MC_ERROR_INTERNAL
+} McErrorCode;
+
+typedef struct {
+    McErrorCode code;
+    size_t offset;
+    int protocol;
+    McState state;
+    McPacketDirection direction;
+    int32_t packet_id;
+} McError;
+
+typedef enum {
+    MC_DECODE_VANILLA_COMPAT = 0,
+    MC_DECODE_STRICT = 1
+} McDecodeMode;
+
+void mc_error_clear(McError *error);
+const char *mc_error_name(McErrorCode code);
 
 typedef struct {
     McState state;
@@ -181,6 +244,11 @@ typedef struct {
     size_t size;
     size_t offset;
     bool failed;
+    /* Initialized by mc_reader_init()/mc_reader_init_mode(). Direct aggregate
+     * initialization is not supported because future additive policy fields
+     * may be appended here. */
+    McDecodeMode mode;
+    McError *error;
 } McReader;
 
 typedef enum {
@@ -456,7 +524,15 @@ bool mc_packet_command(McPacket *packet, int protocol, const char *command,
     int64_t timestamp_ms, int64_t salt);
 
 void mc_reader_init(McReader *reader, const void *data, size_t size);
+/* The structured error is optional and borrowed for the reader lifetime. It is
+ * cleared by initialization. Strict mode additionally requires canonical
+ * VarInt/VarLong encodings and boolean bytes 0 or 1. */
+void mc_reader_init_mode(McReader *reader, const void *data, size_t size,
+    McDecodeMode mode, McError *error);
 size_t mc_reader_remaining(const McReader *reader);
+/* Succeeds only for a healthy, exactly consumed reader. A remaining byte is a
+ * stable MC_ERROR_TRAILING_BYTES failure at the first trailing offset. */
+bool mc_reader_finish(McReader *reader);
 bool mc_reader_bytes(McReader *reader, size_t size, McBytes *value);
 bool mc_reader_skip(McReader *reader, size_t size);
 bool mc_reader_bool(McReader *reader, bool *value);
@@ -475,6 +551,8 @@ bool mc_reader_varlong(McReader *reader, int64_t *value);
 bool mc_reader_buffer_i32(McReader *reader, McBytes *value);
 bool mc_reader_buffer_varint(McReader *reader, McBytes *value);
 bool mc_reader_string(McReader *reader, McBytes *value);
+bool mc_reader_string_bounded(McReader *reader, size_t max_size,
+    McBytes *value);
 bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
 /* Decodes the release-aware clientbound position packet body (without packet
  * ID). The caller may require mc_reader_remaining(reader) == 0 to reject a
@@ -498,6 +576,49 @@ bool mc_reader_plain_item(McReader *reader, int protocol,
 bool mc_reader_nbt_name(McReader *reader, McBytes *name);
 bool mc_reader_nbt_value(McReader *reader, McNbtType type, McBytes *encoded);
 bool mc_reader_nbt(McReader *reader, bool named_root, McBytes *encoded);
+
+
+/* ============================================================
+ * INCREMENTAL STREAM FRAMING
+ * ============================================================ */
+
+typedef struct {
+    size_t max_frame_size;
+    size_t max_decompressed_size;
+    size_t max_buffered_size;
+    size_t max_output_size;
+    McDecodeMode mode;
+} McStreamDecoderConfig;
+
+typedef struct {
+    int32_t packet_id;
+    McBytes payload;
+    bool compressed;
+} McDecodedFrame;
+
+/* Static catalogs and pure readers are thread-safe. An McStreamDecoder is
+ * single-owner unless the caller provides external synchronization. Frame
+ * payloads borrow decoder storage and remain valid only until the next feed,
+ * reset or destroy call. */
+void mc_stream_decoder_config_init(McStreamDecoderConfig *config);
+McStreamDecoder *mc_stream_decoder_create(
+    const McStreamDecoderConfig *config, McError *error);
+void mc_stream_decoder_destroy(McStreamDecoder *decoder);
+/* Reset discards partial input, retained output and the compression setting. */
+void mc_stream_decoder_reset(McStreamDecoder *decoder);
+/* Compression may change only between frames; -1 disables it and values >= 0
+ * enable the Minecraft compression envelope at the supplied threshold. */
+int mc_stream_decoder_set_compression(McStreamDecoder *decoder, int threshold,
+    McError *error);
+/* Appends one arbitrary TCP chunk and extracts up to frame_capacity complete
+ * frames. Complete excess frames remain buffered and can be drained by a
+ * later zero-size feed. A successful partial feed returns zero frames. */
+int mc_stream_decoder_feed(McStreamDecoder *decoder, const void *data,
+    size_t size, McDecodedFrame *frames, size_t frame_capacity,
+    size_t *frame_count, McError *error);
+/* Call at EOF. It fails with MC_ERROR_PARTIAL_INPUT when buffered bytes do not
+ * form a complete frame; complete buffered frames must first be drained. */
+int mc_stream_decoder_finish(McStreamDecoder *decoder, McError *error);
 
 
 /* ============================================================

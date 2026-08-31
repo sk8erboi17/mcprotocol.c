@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <math.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -2278,6 +2279,7 @@ struct McClient {
     uint32_t automatic_replies;
     unsigned int read_timeout_ms;
     McStreamTransforms transforms;
+    McStreamDecoder *stream_decoder;
     bool player_loaded_sent;
     bool server_side;
 #if defined(__linux__)
@@ -2308,6 +2310,75 @@ static const McProfile *find_profile(int protocol)
         if (profiles[index].protocol == protocol) return &profiles[index];
     }
     return NULL;
+}
+
+
+/* ============================================================
+ * ERROR MODEL
+ * ============================================================ */
+
+void mc_error_clear(McError *error)
+{
+    if (error == NULL) return;
+    *error = (McError){
+        .code = MC_ERROR_NONE,
+        .offset = MC_ERROR_OFFSET_UNKNOWN,
+        .protocol = -1,
+        .state = MC_STATE_UNKNOWN,
+        .direction = MC_PACKET_DIRECTION_UNKNOWN,
+        .packet_id = -1,
+    };
+}
+
+const char *mc_error_name(McErrorCode code)
+{
+    switch (code) {
+    case MC_ERROR_NONE: return "MC_ERROR_NONE";
+    case MC_ERROR_INVALID_ARGUMENT: return "MC_ERROR_INVALID_ARGUMENT";
+    case MC_ERROR_UNSUPPORTED_PROTOCOL: return "MC_ERROR_UNSUPPORTED_PROTOCOL";
+    case MC_ERROR_INVALID_STATE: return "MC_ERROR_INVALID_STATE";
+    case MC_ERROR_INVALID_DIRECTION: return "MC_ERROR_INVALID_DIRECTION";
+    case MC_ERROR_UNKNOWN_PACKET: return "MC_ERROR_UNKNOWN_PACKET";
+    case MC_ERROR_PARTIAL_INPUT: return "MC_ERROR_PARTIAL_INPUT";
+    case MC_ERROR_VARINT_OVERFLOW: return "MC_ERROR_VARINT_OVERFLOW";
+    case MC_ERROR_VARINT_NON_CANONICAL: return "MC_ERROR_VARINT_NON_CANONICAL";
+    case MC_ERROR_FRAME_TOO_LARGE: return "MC_ERROR_FRAME_TOO_LARGE";
+    case MC_ERROR_BUFFER_LIMIT: return "MC_ERROR_BUFFER_LIMIT";
+    case MC_ERROR_DECOMPRESSED_TOO_LARGE:
+        return "MC_ERROR_DECOMPRESSED_TOO_LARGE";
+    case MC_ERROR_COMPRESSION_HEADER: return "MC_ERROR_COMPRESSION_HEADER";
+    case MC_ERROR_COMPRESSION_THRESHOLD: return "MC_ERROR_COMPRESSION_THRESHOLD";
+    case MC_ERROR_ZLIB: return "MC_ERROR_ZLIB";
+    case MC_ERROR_TRAILING_BYTES: return "MC_ERROR_TRAILING_BYTES";
+    case MC_ERROR_INVALID_BOOLEAN: return "MC_ERROR_INVALID_BOOLEAN";
+    case MC_ERROR_STRING_TOO_LARGE: return "MC_ERROR_STRING_TOO_LARGE";
+    case MC_ERROR_NBT_DEPTH: return "MC_ERROR_NBT_DEPTH";
+    case MC_ERROR_NBT_LENGTH: return "MC_ERROR_NBT_LENGTH";
+    case MC_ERROR_INVALID_LENGTH: return "MC_ERROR_INVALID_LENGTH";
+    case MC_ERROR_INTEGER_OVERFLOW: return "MC_ERROR_INTEGER_OVERFLOW";
+    case MC_ERROR_INVALID_PACKET_BODY: return "MC_ERROR_INVALID_PACKET_BODY";
+    case MC_ERROR_OUT_OF_MEMORY: return "MC_ERROR_OUT_OF_MEMORY";
+    case MC_ERROR_IO: return "MC_ERROR_IO";
+    case MC_ERROR_TIMEOUT: return "MC_ERROR_TIMEOUT";
+    case MC_ERROR_INTERNAL: return "MC_ERROR_INTERNAL";
+    }
+    return "MC_ERROR_UNKNOWN";
+}
+
+static void record_error(McError *error, McErrorCode code, size_t offset)
+{
+    if (error == NULL || error->code != MC_ERROR_NONE) return;
+    error->code = code;
+    error->offset = offset;
+}
+
+static bool reader_fail(McReader *reader, McErrorCode code, size_t offset)
+{
+    if (reader != NULL && !reader->failed) {
+        record_error(reader->error, code, offset);
+        reader->failed = true;
+    }
+    return false;
 }
 
 
@@ -2609,11 +2680,28 @@ bool mc_packet_string(McPacket *packet, const char *value)
 
 void mc_reader_init(McReader *reader, const void *data, size_t size)
 {
-    if (reader == NULL) return;
+    mc_reader_init_mode(reader, data, size, MC_DECODE_VANILLA_COMPAT, NULL);
+}
+
+void mc_reader_init_mode(McReader *reader, const void *data, size_t size,
+    McDecodeMode mode, McError *error)
+{
+    mc_error_clear(error);
+    if (reader == NULL) {
+        record_error(error, MC_ERROR_INVALID_ARGUMENT, MC_ERROR_OFFSET_UNKNOWN);
+        return;
+    }
     reader->data = data;
     reader->size = size;
     reader->offset = 0U;
-    reader->failed = data == NULL && size != 0U;
+    reader->failed = false;
+    reader->mode = mode;
+    reader->error = error;
+    if ((data == NULL && size != 0U)
+        || (mode != MC_DECODE_VANILLA_COMPAT && mode != MC_DECODE_STRICT)) {
+        (void)reader_fail(reader, MC_ERROR_INVALID_ARGUMENT,
+            MC_ERROR_OFFSET_UNKNOWN);
+    }
 }
 
 size_t mc_reader_remaining(const McReader *reader)
@@ -2622,13 +2710,25 @@ size_t mc_reader_remaining(const McReader *reader)
     return reader->size - reader->offset;
 }
 
+bool mc_reader_finish(McReader *reader)
+{
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (reader->offset != reader->size) {
+        return reader_fail(reader, MC_ERROR_TRAILING_BYTES, reader->offset);
+    }
+    return true;
+}
+
 bool mc_reader_bytes(McReader *reader, size_t size, McBytes *value)
 {
-    if (reader == NULL || value == NULL || reader->failed
-        || reader->offset > reader->size
-        || size > reader->size - reader->offset) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL || reader->offset > reader->size) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
+    if (size > reader->size - reader->offset) {
+        return reader_fail(reader, MC_ERROR_PARTIAL_INPUT, reader->size);
     }
     value->data = size == 0U ? reader->data : reader->data + reader->offset;
     value->size = size;
@@ -2645,10 +2745,12 @@ bool mc_reader_skip(McReader *reader, size_t size)
 bool mc_reader_u8(McReader *reader, uint8_t *value)
 {
     McBytes bytes;
-    if (value == NULL || !mc_reader_bytes(reader, 1U, &bytes)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_bytes(reader, 1U, &bytes)) return false;
     *value = bytes.data[0];
     return true;
 }
@@ -2656,9 +2758,14 @@ bool mc_reader_u8(McReader *reader, uint8_t *value)
 bool mc_reader_bool(McReader *reader, bool *value)
 {
     uint8_t encoded = 0U;
-    if (value == NULL || !mc_reader_u8(reader, &encoded)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
+    if (!mc_reader_u8(reader, &encoded)) return false;
+    if (reader->mode == MC_DECODE_STRICT && encoded > 1U) {
+        return reader_fail(reader, MC_ERROR_INVALID_BOOLEAN, reader->offset - 1U);
     }
     *value = encoded != 0U;
     return true;
@@ -2667,10 +2774,12 @@ bool mc_reader_bool(McReader *reader, bool *value)
 bool mc_reader_i8(McReader *reader, int8_t *value)
 {
     uint8_t encoded = 0U;
-    if (value == NULL || !mc_reader_u8(reader, &encoded)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_u8(reader, &encoded)) return false;
     *value = (int8_t)encoded;
     return true;
 }
@@ -2678,10 +2787,12 @@ bool mc_reader_i8(McReader *reader, int8_t *value)
 bool mc_reader_u16(McReader *reader, uint16_t *value)
 {
     McBytes bytes;
-    if (value == NULL || !mc_reader_bytes(reader, 2U, &bytes)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_bytes(reader, 2U, &bytes)) return false;
     *value = (uint16_t)((uint16_t)bytes.data[0] << 8U)
         | (uint16_t)bytes.data[1];
     return true;
@@ -2690,10 +2801,12 @@ bool mc_reader_u16(McReader *reader, uint16_t *value)
 bool mc_reader_i16(McReader *reader, int16_t *value)
 {
     uint16_t encoded = 0U;
-    if (value == NULL || !mc_reader_u16(reader, &encoded)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_u16(reader, &encoded)) return false;
     *value = (int16_t)encoded;
     return true;
 }
@@ -2701,10 +2814,12 @@ bool mc_reader_i16(McReader *reader, int16_t *value)
 bool mc_reader_u32(McReader *reader, uint32_t *value)
 {
     McBytes bytes;
-    if (value == NULL || !mc_reader_bytes(reader, 4U, &bytes)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_bytes(reader, 4U, &bytes)) return false;
     uint32_t decoded = 0U;
     for (size_t index = 0U; index < 4U; ++index) {
         decoded = (decoded << 8U) | bytes.data[index];
@@ -2716,10 +2831,12 @@ bool mc_reader_u32(McReader *reader, uint32_t *value)
 bool mc_reader_i32(McReader *reader, int32_t *value)
 {
     uint32_t encoded = 0U;
-    if (value == NULL || !mc_reader_u32(reader, &encoded)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_u32(reader, &encoded)) return false;
     *value = (int32_t)encoded;
     return true;
 }
@@ -2727,10 +2844,12 @@ bool mc_reader_i32(McReader *reader, int32_t *value)
 bool mc_reader_u64(McReader *reader, uint64_t *value)
 {
     McBytes bytes;
-    if (value == NULL || !mc_reader_bytes(reader, 8U, &bytes)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_bytes(reader, 8U, &bytes)) return false;
     uint64_t decoded = 0U;
     for (size_t index = 0U; index < 8U; ++index) {
         decoded = (decoded << 8U) | bytes.data[index];
@@ -2742,10 +2861,12 @@ bool mc_reader_u64(McReader *reader, uint64_t *value)
 bool mc_reader_i64(McReader *reader, int64_t *value)
 {
     uint64_t encoded = 0U;
-    if (value == NULL || !mc_reader_u64(reader, &encoded)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_u64(reader, &encoded)) return false;
     *value = (int64_t)encoded;
     return true;
 }
@@ -2753,10 +2874,12 @@ bool mc_reader_i64(McReader *reader, int64_t *value)
 bool mc_reader_float(McReader *reader, float *value)
 {
     uint32_t bits = 0U;
-    if (value == NULL || !mc_reader_u32(reader, &bits)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_u32(reader, &bits)) return false;
     memcpy(value, &bits, sizeof(bits));
     return true;
 }
@@ -2764,60 +2887,99 @@ bool mc_reader_float(McReader *reader, float *value)
 bool mc_reader_double(McReader *reader, double *value)
 {
     uint64_t bits = 0U;
-    if (value == NULL || !mc_reader_u64(reader, &bits)) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    if (!mc_reader_u64(reader, &bits)) return false;
     memcpy(value, &bits, sizeof(bits));
     return true;
 }
 
+static size_t varint_size_u32(uint32_t value)
+{
+    size_t size = 1U;
+    while ((value >>= 7U) != 0U) ++size;
+    return size;
+}
+
+static size_t varlong_size_u64(uint64_t value)
+{
+    size_t size = 1U;
+    while ((value >>= 7U) != 0U) ++size;
+    return size;
+}
+
 bool mc_reader_varint(McReader *reader, int32_t *value)
 {
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
     uint32_t result = 0U;
     for (unsigned int index = 0U; index < 5U; ++index) {
         uint8_t byte = 0U;
-        if (value == NULL || !mc_reader_u8(reader, &byte)
-            || (index == 4U && (byte & 0xf0U) != 0U)) {
-            if (reader != NULL) reader->failed = true;
-            return false;
+        if (!mc_reader_u8(reader, &byte)) return false;
+        if (index == 4U && (byte & 0xf0U) != 0U) {
+            return reader_fail(reader, MC_ERROR_VARINT_OVERFLOW,
+                reader->offset - 1U);
         }
         result |= (uint32_t)(byte & 0x7fU) << (index * 7U);
         if ((byte & 0x80U) == 0U) {
+            if (reader->mode == MC_DECODE_STRICT
+                && varint_size_u32(result) != (size_t)index + 1U) {
+                return reader_fail(reader, MC_ERROR_VARINT_NON_CANONICAL,
+                    reader->offset - 1U);
+            }
             *value = (int32_t)result;
             return true;
         }
     }
-    if (reader != NULL) reader->failed = true;
-    return false;
+    return reader_fail(reader, MC_ERROR_VARINT_OVERFLOW, reader->offset - 1U);
 }
 
 bool mc_reader_varlong(McReader *reader, int64_t *value)
 {
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
     uint64_t result = 0U;
     for (unsigned int index = 0U; index < 10U; ++index) {
         uint8_t byte = 0U;
-        if (value == NULL || !mc_reader_u8(reader, &byte)
-            || (index == 9U && (byte & 0xfeU) != 0U)) {
-            if (reader != NULL) reader->failed = true;
-            return false;
+        if (!mc_reader_u8(reader, &byte)) return false;
+        if (index == 9U && (byte & 0xfeU) != 0U) {
+            return reader_fail(reader, MC_ERROR_VARINT_OVERFLOW,
+                reader->offset - 1U);
         }
         result |= (uint64_t)(byte & 0x7fU) << (index * 7U);
         if ((byte & 0x80U) == 0U) {
+            if (reader->mode == MC_DECODE_STRICT
+                && varlong_size_u64(result) != (size_t)index + 1U) {
+                return reader_fail(reader, MC_ERROR_VARINT_NON_CANONICAL,
+                    reader->offset - 1U);
+            }
             *value = (int64_t)result;
             return true;
         }
     }
-    if (reader != NULL) reader->failed = true;
-    return false;
+    return reader_fail(reader, MC_ERROR_VARINT_OVERFLOW, reader->offset - 1U);
 }
 
 bool mc_reader_buffer_i32(McReader *reader, McBytes *value)
 {
     int32_t size = -1;
-    if (value == NULL || !mc_reader_i32(reader, &size) || size < 0) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
+    if (!mc_reader_i32(reader, &size)) return false;
+    if (size < 0) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader->offset - 4U);
     }
     return mc_reader_bytes(reader, (size_t)size, value);
 }
@@ -2825,19 +2987,35 @@ bool mc_reader_buffer_i32(McReader *reader, McBytes *value)
 bool mc_reader_buffer_varint(McReader *reader, McBytes *value)
 {
     int32_t size = -1;
-    if (value == NULL || !mc_reader_varint(reader, &size) || size < 0) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
     }
+    size_t start = reader->offset;
+    if (!mc_reader_varint(reader, &size)) return false;
+    if (size < 0) return reader_fail(reader, MC_ERROR_INVALID_LENGTH, start);
     return mc_reader_bytes(reader, (size_t)size, value);
 }
 
 bool mc_reader_string(McReader *reader, McBytes *value)
 {
+    return mc_reader_string_bounded(reader, MC_DEFAULT_MAX_STRING_BYTES, value);
+}
+
+bool mc_reader_string_bounded(McReader *reader, size_t max_size, McBytes *value)
+{
     int32_t size = -1;
-    if (value == NULL || !mc_reader_varint(reader, &size) || size < 0) {
-        if (reader != NULL) reader->failed = true;
-        return false;
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
+    size_t start = reader->offset;
+    if (!mc_reader_varint(reader, &size)) return false;
+    if (size < 0) return reader_fail(reader, MC_ERROR_INVALID_LENGTH, start);
+    if ((size_t)size > max_size) {
+        return reader_fail(reader, MC_ERROR_STRING_TOO_LARGE, start);
     }
     return mc_reader_bytes(reader, (size_t)size, value);
 }
@@ -3855,6 +4033,538 @@ bool mc_reader_nbt(McReader *reader, bool named_root, McBytes *encoded)
 }
 #undef MC_NBT_MAX_DEPTH
 
+
+/* ============================================================
+ * STREAM FRAMING
+ * ============================================================ */
+
+struct McStreamDecoder {
+    McStreamDecoderConfig config;
+    unsigned char *buffer;
+    size_t buffer_size;
+    size_t buffer_capacity;
+    unsigned char *output;
+    size_t output_size;
+    size_t output_capacity;
+    size_t stream_offset;
+    int compression_threshold;
+    bool failed;
+    McError last_error;
+};
+
+typedef enum {
+    MC_VARINT_COMPLETE = 0,
+    MC_VARINT_PARTIAL,
+    MC_VARINT_INVALID
+} McVarIntStatus;
+
+static size_t saturating_add(size_t left, size_t right)
+{
+    return right > SIZE_MAX - left ? SIZE_MAX : left + right;
+}
+
+static size_t stream_absolute_offset(const McStreamDecoder *decoder,
+    size_t relative)
+{
+    return saturating_add(decoder->stream_offset, relative);
+}
+
+static void copy_error(McError *target, const McError *source)
+{
+    if (target != NULL && source != NULL) *target = *source;
+}
+
+static int stream_fail(McStreamDecoder *decoder, McErrorCode code,
+    size_t offset, McError *error)
+{
+    if (decoder != NULL && !decoder->failed) {
+        mc_error_clear(&decoder->last_error);
+        decoder->last_error.code = code;
+        decoder->last_error.offset = offset;
+        decoder->failed = true;
+    }
+    if (decoder != NULL) {
+        copy_error(error, &decoder->last_error);
+    } else {
+        mc_error_clear(error);
+        record_error(error, code, offset);
+    }
+    return -1;
+}
+
+static McVarIntStatus stream_varint(const unsigned char *data, size_t size,
+    McDecodeMode mode, int32_t *value, size_t *encoded_size,
+    McErrorCode *error_code, size_t *error_offset)
+{
+    uint32_t result = 0U;
+    size_t limit = size < 5U ? size : 5U;
+    for (size_t index = 0U; index < limit; ++index) {
+        uint8_t byte = data[index];
+        if (index == 4U && (byte & 0xf0U) != 0U) {
+            *error_code = MC_ERROR_VARINT_OVERFLOW;
+            *error_offset = index;
+            return MC_VARINT_INVALID;
+        }
+        result |= (uint32_t)(byte & 0x7fU) << ((unsigned int)index * 7U);
+        if ((byte & 0x80U) == 0U) {
+            if (mode == MC_DECODE_STRICT
+                && varint_size_u32(result) != index + 1U) {
+                *error_code = MC_ERROR_VARINT_NON_CANONICAL;
+                *error_offset = index;
+                return MC_VARINT_INVALID;
+            }
+            *value = (int32_t)result;
+            *encoded_size = index + 1U;
+            return MC_VARINT_COMPLETE;
+        }
+    }
+    if (size < 5U) return MC_VARINT_PARTIAL;
+    *error_code = MC_ERROR_VARINT_OVERFLOW;
+    *error_offset = 4U;
+    return MC_VARINT_INVALID;
+}
+
+static bool stream_reserve(unsigned char **buffer, size_t *capacity,
+    size_t needed, size_t maximum)
+{
+    if (needed > maximum) return false;
+    if (needed <= *capacity) return true;
+    size_t grown = *capacity == 0U ? 4096U : *capacity;
+    if (grown > maximum) grown = maximum;
+    while (grown < needed) {
+        size_t next = grown > maximum / 2U ? maximum : grown * 2U;
+        if (next <= grown) {
+            grown = needed;
+            break;
+        }
+        grown = next;
+    }
+    unsigned char *resized = realloc(*buffer, grown);
+    if (resized == NULL) return false;
+    *buffer = resized;
+    *capacity = grown;
+    return true;
+}
+
+static bool stream_reserve_output(McStreamDecoder *decoder, size_t needed,
+    McDecodedFrame *frames, size_t frame_count)
+{
+    if (needed > decoder->config.max_output_size) return false;
+    if (needed <= decoder->output_capacity) return true;
+    size_t grown = decoder->output_capacity == 0U
+        ? 4096U : decoder->output_capacity;
+    if (grown > decoder->config.max_output_size) {
+        grown = decoder->config.max_output_size;
+    }
+    while (grown < needed) {
+        size_t next = grown > decoder->config.max_output_size / 2U
+            ? decoder->config.max_output_size : grown * 2U;
+        if (next <= grown) {
+            grown = needed;
+            break;
+        }
+        grown = next;
+    }
+    unsigned char *replacement = malloc(grown);
+    if (replacement == NULL) return false;
+    if (decoder->output_size != 0U) {
+        memcpy(replacement, decoder->output, decoder->output_size);
+    }
+    for (size_t index = 0U; index < frame_count; ++index) {
+        if (frames[index].payload.data != NULL) {
+            size_t offset = (size_t)(frames[index].payload.data - decoder->output);
+            frames[index].payload.data = replacement + offset;
+        }
+    }
+    free(decoder->output);
+    decoder->output = replacement;
+    decoder->output_capacity = grown;
+    return true;
+}
+
+static int stream_finish_packet(McStreamDecoder *decoder, size_t start,
+    size_t packet_size, bool compressed, McDecodedFrame *frames,
+    size_t frame_index, size_t packet_offset, McError *error)
+{
+    if (packet_size == 0U) {
+        decoder->output_size = start;
+        return stream_fail(decoder, MC_ERROR_INVALID_PACKET_BODY,
+            packet_offset, error);
+    }
+    int32_t packet_id = -1;
+    size_t id_size = 0U;
+    size_t varint_error_offset = 0U;
+    McErrorCode varint_error = MC_ERROR_NONE;
+    McVarIntStatus status = stream_varint(decoder->output + start, packet_size,
+        decoder->config.mode, &packet_id, &id_size, &varint_error,
+        &varint_error_offset);
+    if (status != MC_VARINT_COMPLETE || packet_id < 0) {
+        decoder->output_size = start;
+        McErrorCode code = status == MC_VARINT_INVALID
+            ? varint_error : MC_ERROR_INVALID_PACKET_BODY;
+        return stream_fail(decoder, code,
+            saturating_add(packet_offset, varint_error_offset), error);
+    }
+    decoder->output_size = start + packet_size;
+    frames[frame_index] = (McDecodedFrame){
+        .packet_id = packet_id,
+        .payload = {
+            .data = decoder->output + start + id_size,
+            .size = packet_size - id_size,
+        },
+        .compressed = compressed,
+    };
+    return 0;
+}
+
+static int stream_emit_uncompressed(McStreamDecoder *decoder,
+    const unsigned char *packet, size_t packet_size, bool compressed,
+    McDecodedFrame *frames, size_t frame_index, size_t packet_offset,
+    McError *error)
+{
+    if (packet_size > SIZE_MAX - decoder->output_size) {
+        return stream_fail(decoder, MC_ERROR_INTEGER_OVERFLOW,
+            packet_offset, error);
+    }
+    size_t start = decoder->output_size;
+    size_t needed = start + packet_size;
+    if (needed > decoder->config.max_output_size) {
+        return stream_fail(decoder, MC_ERROR_BUFFER_LIMIT, packet_offset, error);
+    }
+    if (!stream_reserve_output(decoder, needed, frames, frame_index)) {
+        return stream_fail(decoder, MC_ERROR_OUT_OF_MEMORY, packet_offset, error);
+    }
+    if (packet_size != 0U) memcpy(decoder->output + start, packet, packet_size);
+    return stream_finish_packet(decoder, start, packet_size, compressed,
+        frames, frame_index, packet_offset, error);
+}
+
+static int stream_emit_compressed(McStreamDecoder *decoder,
+    const unsigned char *compressed, size_t compressed_size,
+    size_t declared_size, McDecodedFrame *frames, size_t frame_index,
+    size_t packet_offset, McError *error)
+{
+    if (compressed_size > (size_t)UINT_MAX
+        || declared_size > (size_t)UINT_MAX) {
+        return stream_fail(decoder, MC_ERROR_INTEGER_OVERFLOW,
+            packet_offset, error);
+    }
+    if (declared_size > SIZE_MAX - decoder->output_size) {
+        return stream_fail(decoder, MC_ERROR_INTEGER_OVERFLOW,
+            packet_offset, error);
+    }
+    size_t start = decoder->output_size;
+    size_t needed = start + declared_size;
+    if (needed > decoder->config.max_output_size) {
+        return stream_fail(decoder, MC_ERROR_BUFFER_LIMIT, packet_offset, error);
+    }
+    if (!stream_reserve_output(decoder, needed, frames, frame_index)) {
+        return stream_fail(decoder, MC_ERROR_OUT_OF_MEMORY, packet_offset, error);
+    }
+
+    z_stream stream = {0};
+    int init_result = inflateInit(&stream);
+    if (init_result != Z_OK) {
+        return stream_fail(decoder, MC_ERROR_ZLIB, packet_offset, error);
+    }
+    stream.next_in = (Bytef *)(void *)compressed;
+    stream.avail_in = (uInt)compressed_size;
+    stream.next_out = decoder->output + start;
+    stream.avail_out = (uInt)declared_size;
+    int result = inflate(&stream, Z_FINISH);
+    uLong produced = stream.total_out;
+    uInt trailing = stream.avail_in;
+    (void)inflateEnd(&stream);
+    if (result != Z_STREAM_END || produced != (uLong)declared_size
+        || (decoder->config.mode == MC_DECODE_STRICT && trailing != 0U)) {
+        decoder->output_size = start;
+        return stream_fail(decoder, MC_ERROR_ZLIB, packet_offset, error);
+    }
+    return stream_finish_packet(decoder, start, declared_size, true,
+        frames, frame_index, packet_offset, error);
+}
+
+static int stream_decode_frame(McStreamDecoder *decoder,
+    const unsigned char *frame, size_t frame_size, McDecodedFrame *frames,
+    size_t frame_index, size_t frame_offset, McError *error)
+{
+    if (decoder->compression_threshold < 0) {
+        return stream_emit_uncompressed(decoder, frame, frame_size, false,
+            frames, frame_index, frame_offset, error);
+    }
+
+    int32_t declared = -1;
+    size_t header_size = 0U;
+    size_t varint_error_offset = 0U;
+    McErrorCode varint_error = MC_ERROR_NONE;
+    McVarIntStatus status = stream_varint(frame, frame_size,
+        decoder->config.mode, &declared, &header_size, &varint_error,
+        &varint_error_offset);
+    if (status != MC_VARINT_COMPLETE || declared < 0) {
+        McErrorCode code = status == MC_VARINT_INVALID
+            ? varint_error : MC_ERROR_COMPRESSION_HEADER;
+        return stream_fail(decoder, code,
+            saturating_add(frame_offset, varint_error_offset), error);
+    }
+    const unsigned char *body = frame + header_size;
+    size_t body_size = frame_size - header_size;
+    size_t body_offset = saturating_add(frame_offset, header_size);
+    if (declared == 0) {
+        if (decoder->config.mode == MC_DECODE_STRICT
+            && body_size >= (size_t)decoder->compression_threshold) {
+            return stream_fail(decoder, MC_ERROR_COMPRESSION_THRESHOLD,
+                frame_offset, error);
+        }
+        return stream_emit_uncompressed(decoder, body, body_size, false,
+            frames, frame_index, body_offset, error);
+    }
+    if ((size_t)declared > decoder->config.max_decompressed_size) {
+        return stream_fail(decoder, MC_ERROR_DECOMPRESSED_TOO_LARGE,
+            frame_offset, error);
+    }
+    if (decoder->config.mode == MC_DECODE_STRICT
+        && declared < decoder->compression_threshold) {
+        return stream_fail(decoder, MC_ERROR_COMPRESSION_THRESHOLD,
+            frame_offset, error);
+    }
+    return stream_emit_compressed(decoder, body, body_size, (size_t)declared,
+        frames, frame_index, body_offset, error);
+}
+
+void mc_stream_decoder_config_init(McStreamDecoderConfig *config)
+{
+    if (config == NULL) return;
+    *config = (McStreamDecoderConfig){
+        .max_frame_size = MC_DEFAULT_MAX_FRAME_SIZE,
+        .max_decompressed_size = MC_DEFAULT_MAX_DECOMPRESSED_SIZE,
+        .max_buffered_size = MC_DEFAULT_MAX_STREAM_BUFFERED_SIZE,
+        .max_output_size = MC_DEFAULT_MAX_STREAM_OUTPUT_SIZE,
+        .mode = MC_DECODE_VANILLA_COMPAT,
+    };
+}
+
+McStreamDecoder *mc_stream_decoder_create(
+    const McStreamDecoderConfig *config, McError *error)
+{
+    McStreamDecoderConfig effective;
+    mc_stream_decoder_config_init(&effective);
+    if (config != NULL) effective = *config;
+    mc_error_clear(error);
+    bool invalid_mode = effective.mode != MC_DECODE_VANILLA_COMPAT
+        && effective.mode != MC_DECODE_STRICT;
+    bool frame_overflow = effective.max_frame_size > SIZE_MAX - 5U;
+    if (effective.max_frame_size == 0U
+        || effective.max_frame_size > (size_t)INT32_MAX
+        || effective.max_decompressed_size == 0U
+        || effective.max_decompressed_size > (size_t)INT32_MAX
+        || effective.max_buffered_size == 0U
+        || effective.max_output_size == 0U
+        || effective.max_output_size < effective.max_decompressed_size
+        || frame_overflow
+        || (!frame_overflow && effective.max_buffered_size
+            < effective.max_frame_size + 5U)
+        || invalid_mode) {
+        record_error(error, MC_ERROR_INVALID_ARGUMENT, MC_ERROR_OFFSET_UNKNOWN);
+        return NULL;
+    }
+    McStreamDecoder *decoder = calloc(1U, sizeof(*decoder));
+    if (decoder == NULL) {
+        record_error(error, MC_ERROR_OUT_OF_MEMORY, MC_ERROR_OFFSET_UNKNOWN);
+        return NULL;
+    }
+    decoder->config = effective;
+    decoder->compression_threshold = -1;
+    mc_error_clear(&decoder->last_error);
+    return decoder;
+}
+
+void mc_stream_decoder_destroy(McStreamDecoder *decoder)
+{
+    if (decoder == NULL) return;
+    free(decoder->buffer);
+    free(decoder->output);
+    free(decoder);
+}
+
+void mc_stream_decoder_reset(McStreamDecoder *decoder)
+{
+    if (decoder == NULL) return;
+    decoder->buffer_size = 0U;
+    decoder->output_size = 0U;
+    decoder->stream_offset = 0U;
+    decoder->compression_threshold = -1;
+    decoder->failed = false;
+    mc_error_clear(&decoder->last_error);
+}
+
+int mc_stream_decoder_set_compression(McStreamDecoder *decoder, int threshold,
+    McError *error)
+{
+    mc_error_clear(error);
+    if (decoder == NULL || threshold < -1) {
+        if (decoder == NULL) {
+            record_error(error, MC_ERROR_INVALID_ARGUMENT,
+                MC_ERROR_OFFSET_UNKNOWN);
+            return -1;
+        }
+        record_error(error, MC_ERROR_INVALID_ARGUMENT,
+            stream_absolute_offset(decoder, decoder->buffer_size));
+        return -1;
+    }
+    if (decoder->failed) {
+        copy_error(error, &decoder->last_error);
+        return -1;
+    }
+    if (decoder->buffer_size != 0U) {
+        mc_error_clear(error);
+        record_error(error, MC_ERROR_INVALID_STATE,
+            stream_absolute_offset(decoder, decoder->buffer_size));
+        return -1;
+    }
+    decoder->compression_threshold = threshold;
+    return 0;
+}
+
+static void stream_consume(McStreamDecoder *decoder, size_t consumed)
+{
+    if (consumed == 0U) return;
+    size_t remaining = decoder->buffer_size - consumed;
+    if (remaining != 0U) {
+        memmove(decoder->buffer, decoder->buffer + consumed, remaining);
+    }
+    decoder->buffer_size = remaining;
+    decoder->stream_offset = saturating_add(decoder->stream_offset, consumed);
+}
+
+int mc_stream_decoder_feed(McStreamDecoder *decoder, const void *data,
+    size_t size, McDecodedFrame *frames, size_t frame_capacity,
+    size_t *frame_count, McError *error)
+{
+    mc_error_clear(error);
+    if (frame_count != NULL) *frame_count = 0U;
+    if (decoder == NULL || frame_count == NULL
+        || (size != 0U && data == NULL)
+        || (frame_capacity != 0U && frames == NULL)) {
+        if (decoder == NULL) {
+            record_error(error, MC_ERROR_INVALID_ARGUMENT,
+                MC_ERROR_OFFSET_UNKNOWN);
+            return -1;
+        }
+        return stream_fail(decoder, MC_ERROR_INVALID_ARGUMENT,
+            stream_absolute_offset(decoder, decoder->buffer_size), error);
+    }
+    if (decoder->failed) {
+        copy_error(error, &decoder->last_error);
+        return -1;
+    }
+    decoder->output_size = 0U;
+    if (size > decoder->config.max_buffered_size - decoder->buffer_size) {
+        return stream_fail(decoder, MC_ERROR_BUFFER_LIMIT,
+            stream_absolute_offset(decoder, decoder->buffer_size), error);
+    }
+    size_t needed = decoder->buffer_size + size;
+    if (!stream_reserve(&decoder->buffer, &decoder->buffer_capacity,
+            needed, decoder->config.max_buffered_size)) {
+        return stream_fail(decoder, MC_ERROR_OUT_OF_MEMORY,
+            stream_absolute_offset(decoder, decoder->buffer_size), error);
+    }
+    if (size != 0U) {
+        memcpy(decoder->buffer + decoder->buffer_size, data, size);
+        decoder->buffer_size = needed;
+    }
+
+    size_t consumed = 0U;
+    size_t emitted = 0U;
+    while (emitted < frame_capacity && consumed < decoder->buffer_size) {
+        int32_t encoded_size = -1;
+        size_t header_size = 0U;
+        size_t varint_error_offset = 0U;
+        McErrorCode varint_error = MC_ERROR_NONE;
+        McVarIntStatus status = stream_varint(
+            decoder->buffer + consumed, decoder->buffer_size - consumed,
+            decoder->config.mode, &encoded_size, &header_size,
+            &varint_error, &varint_error_offset);
+        if (status == MC_VARINT_PARTIAL) break;
+        if (status == MC_VARINT_INVALID) {
+            stream_consume(decoder, consumed);
+            *frame_count = emitted;
+            return stream_fail(decoder, varint_error,
+                stream_absolute_offset(decoder, varint_error_offset), error);
+        }
+        if (encoded_size <= 0) {
+            stream_consume(decoder, consumed);
+            *frame_count = emitted;
+            return stream_fail(decoder, MC_ERROR_INVALID_LENGTH,
+                stream_absolute_offset(decoder, 0U), error);
+        }
+        if ((size_t)encoded_size > decoder->config.max_frame_size) {
+            stream_consume(decoder, consumed);
+            *frame_count = emitted;
+            return stream_fail(decoder, MC_ERROR_FRAME_TOO_LARGE,
+                stream_absolute_offset(decoder, 0U), error);
+        }
+        size_t available = decoder->buffer_size - consumed - header_size;
+        if (available < (size_t)encoded_size) break;
+        size_t frame_offset = stream_absolute_offset(
+            decoder, consumed + header_size);
+        if (stream_decode_frame(decoder,
+                decoder->buffer + consumed + header_size,
+                (size_t)encoded_size, frames, emitted, frame_offset,
+                error) != 0) {
+            stream_consume(decoder, consumed);
+            *frame_count = emitted;
+            return -1;
+        }
+        consumed += header_size + (size_t)encoded_size;
+        ++emitted;
+    }
+    stream_consume(decoder, consumed);
+    *frame_count = emitted;
+    return 0;
+}
+
+int mc_stream_decoder_finish(McStreamDecoder *decoder, McError *error)
+{
+    mc_error_clear(error);
+    if (decoder == NULL) {
+        record_error(error, MC_ERROR_INVALID_ARGUMENT, MC_ERROR_OFFSET_UNKNOWN);
+        return -1;
+    }
+    if (decoder->failed) {
+        copy_error(error, &decoder->last_error);
+        return -1;
+    }
+    if (decoder->buffer_size != 0U) {
+        return stream_fail(decoder, MC_ERROR_PARTIAL_INPUT,
+            stream_absolute_offset(decoder, decoder->buffer_size), error);
+    }
+    return 0;
+}
+
+/* Internal readiness probe used by McClient before waiting on the socket. It
+ * does not publish or consume a frame; malformed buffered headers count as
+ * ready so the normal decoder path can report their structured error. */
+static bool stream_decoder_frame_ready(const McStreamDecoder *decoder)
+{
+    if (decoder == NULL) return false;
+    if (decoder->failed) return true;
+    if (decoder->buffer_size == 0U) return false;
+    int32_t encoded_size = -1;
+    size_t header_size = 0U;
+    size_t error_offset = 0U;
+    McErrorCode error_code = MC_ERROR_NONE;
+    McVarIntStatus status = stream_varint(decoder->buffer,
+        decoder->buffer_size, decoder->config.mode, &encoded_size,
+        &header_size, &error_code, &error_offset);
+    (void)error_code;
+    (void)error_offset;
+    if (status == MC_VARINT_INVALID) return true;
+    if (status == MC_VARINT_PARTIAL) return false;
+    if (encoded_size <= 0
+        || (size_t)encoded_size > decoder->config.max_frame_size) return true;
+    return decoder->buffer_size - header_size >= (size_t)encoded_size;
+}
+
 /* State and packet callbacks are synchronous. This keeps the body lifetime
  * obvious and prevents hidden worker threads from serializing application
  * callbacks behind the caller's back. */
@@ -4213,6 +4923,7 @@ int mc_client_wait(McClient *client, unsigned int timeout_ms,
         set_error(error, error_size, "Client non connesso");
         return -1;
     }
+    if (stream_decoder_frame_ready(client->stream_decoder)) return 1;
     int result = backend_wait(client, timeout_ms);
     if (result < 0) {
         set_error(error, error_size, "Attesa socket fallita: %s", strerror(errno));
@@ -4374,16 +5085,19 @@ static int send_all(McClient *client, const unsigned char *data, size_t size,
     return 0;
 }
 
-/* Framing code needs exact byte counts: a short TCP read is progress, not a
- * short Minecraft packet. These loops also keep traffic counters at the only
- * layer that observes every on-wire byte. */
-static int receive_all(McClient *client, unsigned char *data, size_t size,
-    char *error, size_t error_size)
+/* TCP is only a chunk source. McStreamDecoder below owns all packet boundary
+ * and compression decisions, so socket and replay inputs cannot diverge. */
+static int receive_some(McClient *client, unsigned char *data, size_t capacity,
+    size_t *received, char *error, size_t error_size)
 {
+    if (data == NULL || capacity == 0U || received == NULL) {
+        set_error(error, error_size, "Buffer ricezione non valido");
+        return -1;
+    }
+    *received = 0U;
     int socket_fd = atomic_load(&client->socket_fd);
-    size_t received = 0U;
-    while (received < size) {
-        ssize_t result = recv(socket_fd, data + received, size - received,
+    for (;;) {
+        ssize_t result = recv(socket_fd, data, capacity,
 #ifdef MSG_DONTWAIT
             MSG_DONTWAIT
 #else
@@ -4405,16 +5119,16 @@ static int receive_all(McClient *client, unsigned char *data, size_t size,
                 strerror(errno));
             return -1;
         }
-        received += (size_t)result;
         client->received_bytes += (uint64_t)result;
         if (client->transforms.decrypt != NULL
             && client->transforms.decrypt(client->transforms.userdata,
-                data + received - (size_t)result, (size_t)result) != 0) {
+                data, (size_t)result) != 0) {
             set_error(error, error_size, "Decifratura stream fallita");
             return -1;
         }
+        *received = (size_t)result;
+        return 0;
     }
-    return 0;
 }
 
 
@@ -4527,21 +5241,28 @@ static int send_frame(McClient *client, int32_t packet_id,
     return result;
 }
 
-static int read_socket_varint(McClient *client, int32_t *value,
+static int copy_decoded_frame(const McDecodedFrame *decoded, McFrame *packet,
     char *error, size_t error_size)
 {
-    uint32_t result = 0U;
-    for (unsigned int index = 0U; index < 5U; ++index) {
-        unsigned char byte = 0U;
-        if (receive_all(client, &byte, 1U, error, error_size) != 0) return -1;
-        result |= (uint32_t)(byte & 0x7fU) << (index * 7U);
-        if ((byte & 0x80U) == 0U) {
-            *value = (int32_t)result;
-            return 0;
-        }
+    unsigned char id[5];
+    size_t id_size = encode_varint(id, decoded->packet_id);
+    if (decoded->payload.size > SIZE_MAX - id_size) {
+        set_error(error, error_size, "Dimensione packet decodificato non valida");
+        return -1;
     }
-    set_error(error, error_size, "VarInt frame non valido");
-    return -1;
+    size_t size = id_size + decoded->payload.size;
+    unsigned char *data = malloc(size);
+    if (data == NULL) {
+        set_error(error, error_size, "Memoria insufficiente per il frame");
+        return -1;
+    }
+    memcpy(data, id, id_size);
+    if (decoded->payload.size != 0U) {
+        memcpy(data + id_size, decoded->payload.data, decoded->payload.size);
+    }
+    packet->data = data;
+    packet->size = size;
+    return 0;
 }
 
 static int read_frame(McClient *client, McFrame *packet,
@@ -4549,62 +5270,38 @@ static int read_frame(McClient *client, McFrame *packet,
 {
     packet->data = NULL;
     packet->size = 0U;
-    int32_t encoded_size = 0;
-    if (read_socket_varint(client, &encoded_size, error, error_size) != 0) return -1;
-    /* Validate advertised sizes before allocating or entering zlib. Apart from
-     * bounding memory use, this prevents a tiny hostile frame from claiming an
-     * arbitrarily large decompressed destination. */
-    if (encoded_size <= 0 || (uint32_t)encoded_size > MC_MAX_PACKET) {
-        set_error(error, error_size, "Lunghezza frame non valida: %d", encoded_size);
+    if (client == NULL || client->stream_decoder == NULL) {
+        set_error(error, error_size, "Decoder stream non inizializzato");
         return -1;
     }
-    size_t frame_size = (size_t)encoded_size;
-    unsigned char *frame = malloc(frame_size);
-    if (frame == NULL || receive_all(client, frame, frame_size,
-            error, error_size) != 0) {
-        free(frame);
-        if (frame == NULL) set_error(error, error_size, "Memoria insufficiente");
-        return -1;
+    unsigned char chunk[8192];
+    for (;;) {
+        McDecodedFrame decoded;
+        McError decode_error;
+        size_t frame_count = 0U;
+        if (mc_stream_decoder_feed(client->stream_decoder, NULL, 0U,
+                &decoded, 1U, &frame_count, &decode_error) != 0) {
+            set_error(error, error_size, "Frame Minecraft non valido: %s a %zu",
+                mc_error_name(decode_error.code), decode_error.offset);
+            return -1;
+        }
+        if (frame_count == 1U) {
+            return copy_decoded_frame(&decoded, packet, error, error_size);
+        }
+
+        size_t received = 0U;
+        if (receive_some(client, chunk, sizeof(chunk), &received,
+                error, error_size) != 0) return -1;
+        if (mc_stream_decoder_feed(client->stream_decoder, chunk, received,
+                &decoded, 1U, &frame_count, &decode_error) != 0) {
+            set_error(error, error_size, "Frame Minecraft non valido: %s a %zu",
+                mc_error_name(decode_error.code), decode_error.offset);
+            return -1;
+        }
+        if (frame_count == 1U) {
+            return copy_decoded_frame(&decoded, packet, error, error_size);
+        }
     }
-    if (client->compression_threshold < 0) {
-        packet->data = frame;
-        packet->size = frame_size;
-        return 0;
-    }
-    McCursor cursor;
-    mc_reader_init(&cursor, frame, frame_size);
-    int32_t uncompressed_size = 0;
-    if (!mc_reader_varint(&cursor, &uncompressed_size) || uncompressed_size < 0
-        || (uint32_t)uncompressed_size > MC_MAX_PACKET) {
-        free(frame);
-        set_error(error, error_size, "Header compressione non valido");
-        return -1;
-    }
-    size_t body_size = frame_size - cursor.offset;
-    if (uncompressed_size == 0) {
-        memmove(frame, frame + cursor.offset, body_size);
-        packet->data = frame;
-        packet->size = body_size;
-        return 0;
-    }
-    unsigned char *plain = malloc((size_t)uncompressed_size);
-    if (plain == NULL) {
-        free(frame);
-        set_error(error, error_size, "Memoria insufficiente");
-        return -1;
-    }
-    uLongf destination = (uLongf)uncompressed_size;
-    int zresult = uncompress(plain, &destination, frame + cursor.offset,
-        (uLong)body_size);
-    free(frame);
-    if (zresult != Z_OK || destination != (uLongf)uncompressed_size) {
-        free(plain);
-        set_error(error, error_size, "Frame zlib non valido");
-        return -1;
-    }
-    packet->data = plain;
-    packet->size = (size_t)destination;
-    return 0;
 }
 
 
@@ -4973,6 +5670,14 @@ McClient *mc_client_create(int protocol, const McCallbacks *callbacks,
     client->compression_threshold = -1;
     client->automatic_replies = MC_AUTOMATIC_ALL;
     client->read_timeout_ms = 30000U;
+    McError stream_error;
+    client->stream_decoder = mc_stream_decoder_create(NULL, &stream_error);
+    if (client->stream_decoder == NULL) {
+        set_error(error, error_size, "Decoder stream non allocabile: %s",
+            mc_error_name(stream_error.code));
+        free(client);
+        return NULL;
+    }
     if (callbacks != NULL) client->callbacks = *callbacks;
     client->userdata = userdata;
 #if defined(__linux__)
@@ -5003,7 +5708,7 @@ void mc_client_disconnect(McClient *client)
     if (client == NULL) return;
     /* Exchange the descriptor before close so a concurrent disconnect cannot
      * close a descriptor number that the operating system has already reused.
-     * shutdown wakes a thread blocked in receive_all(). */
+     * shutdown wakes a thread blocked in receive_some(). */
     atomic_store(&client->stop, true);
     int socket_fd = atomic_exchange(&client->socket_fd, -1);
     if (socket_fd >= 0) {
@@ -5018,6 +5723,7 @@ void mc_client_destroy(McClient *client)
 {
     if (client == NULL) return;
     mc_client_disconnect(client);
+    mc_stream_decoder_destroy(client->stream_decoder);
     free(client);
 }
 
@@ -5046,6 +5752,13 @@ int mc_client_set_compression(McClient *client, int threshold,
     }
     if (threshold < -1) {
         set_error(error, error_size, "Soglia compressione non valida");
+        return -1;
+    }
+    McError stream_error;
+    if (mc_stream_decoder_set_compression(
+            client->stream_decoder, threshold, &stream_error) != 0) {
+        set_error(error, error_size, "Compressione non applicabile: %s a %zu",
+            mc_error_name(stream_error.code), stream_error.offset);
         return -1;
     }
     client->compression_threshold = threshold;
@@ -5724,6 +6437,7 @@ int mc_client_open(McClient *client, const char *host, uint16_t port,
         return -1;
     }
     atomic_store(&client->stop, false);
+    mc_stream_decoder_reset(client->stream_decoder);
     client->compression_threshold = -1;
     client->player_loaded_sent = false;
     client->transforms = (McStreamTransforms){0};
@@ -5806,7 +6520,11 @@ int mc_client_connect(McClient *client, const char *host, uint16_t port,
                 set_error(error, error_size, "Soglia compressione non valida");
                 goto fail;
             }
-            client->compression_threshold = threshold;
+            if (mc_client_set_compression(client, threshold,
+                    error, error_size) != 0) {
+                free(frame.data);
+                goto fail;
+            }
             free(frame.data);
             continue;
         }
@@ -5845,12 +6563,14 @@ static int status_read_packet(McClient *client, unsigned int timeout_ms,
     McFrame *frame, int32_t *packet_id, McReader *body,
     char *error, size_t error_size)
 {
-    int ready = backend_wait(client, timeout_ms);
-    if (ready <= 0) {
-        set_error(error, error_size, ready == 0
-            ? "Timeout status Minecraft" : "Attesa status fallita: %s",
-            strerror(errno));
-        return -1;
+    if (!stream_decoder_frame_ready(client->stream_decoder)) {
+        int ready = backend_wait(client, timeout_ms);
+        if (ready <= 0) {
+            set_error(error, error_size, ready == 0
+                ? "Timeout status Minecraft" : "Attesa status fallita: %s",
+                strerror(errno));
+            return -1;
+        }
     }
     if (read_frame(client, frame, error, error_size) != 0) return -1;
     mc_reader_init(body, frame->data, frame->size);
@@ -6083,12 +6803,14 @@ int mc_client_poll(McClient *client, unsigned int timeout_ms,
         return -1;
     }
     if (atomic_load(&client->stop)) return 0;
-    int ready = backend_wait(client, timeout_ms);
-    if (ready == 0) return 0;
-    if (ready < 0) {
-        set_error(error, error_size, "Attesa socket fallita: %s", strerror(errno));
-        mc_client_disconnect(client);
-        return -1;
+    if (!stream_decoder_frame_ready(client->stream_decoder)) {
+        int ready = backend_wait(client, timeout_ms);
+        if (ready == 0) return 0;
+        if (ready < 0) {
+            set_error(error, error_size, "Attesa socket fallita: %s", strerror(errno));
+            mc_client_disconnect(client);
+            return -1;
+        }
     }
     McFrame frame;
     McCursor body;
