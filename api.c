@@ -3604,6 +3604,182 @@ bool mc_reader_clientbound_player_position(McReader *reader, int protocol,
     return true;
 }
 
+static bool mc_reader_respawn_bool(McReader *reader, bool *value)
+{
+    uint8_t encoded = 0U;
+    if (value == NULL || !mc_reader_u8(reader, &encoded) || encoded > 1U) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    *value = encoded != 0U;
+    return true;
+}
+
+static bool mc_reader_respawn_last_death(McReader *reader, int protocol,
+    McClientboundRespawn *decoded)
+{
+    bool present = false;
+    if (!mc_reader_respawn_bool(reader, &present)) return false;
+    decoded->has_last_death_location = present;
+    return !present
+        || (mc_reader_string(reader, &decoded->last_death_dimension)
+            && mc_reader_position(reader, protocol,
+                &decoded->last_death_position));
+}
+
+static bool mc_reader_respawn_identity_tail(McReader *reader,
+    McClientboundRespawn *decoded)
+{
+    return mc_reader_i64(reader, &decoded->hashed_seed)
+        && mc_reader_u8(reader, &decoded->game_mode)
+        && mc_reader_i8(reader, &decoded->previous_game_mode)
+        && mc_reader_respawn_bool(reader, &decoded->debug)
+        && mc_reader_respawn_bool(reader, &decoded->flat);
+}
+
+bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
+    McClientboundRespawn *value)
+{
+    McClientboundRespawn decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+
+    bool copy_data = false;
+    int32_t variable = 0;
+    if (protocol <= 404) {
+        if (!mc_reader_i32(reader, &decoded.legacy_dimension)
+            || !mc_reader_u8(reader, &decoded.difficulty)
+            || !mc_reader_u8(reader, &decoded.game_mode)
+            || !mc_reader_string(reader, &decoded.level_type)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_legacy_dimension = true;
+        decoded.has_difficulty = true;
+        decoded.has_level_type = true;
+    } else if (protocol <= 498) {
+        if (!mc_reader_i32(reader, &decoded.legacy_dimension)
+            || !mc_reader_u8(reader, &decoded.game_mode)
+            || !mc_reader_string(reader, &decoded.level_type)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_legacy_dimension = true;
+        decoded.has_level_type = true;
+    } else if (protocol <= 578) {
+        if (!mc_reader_i32(reader, &decoded.legacy_dimension)
+            || !mc_reader_i64(reader, &decoded.hashed_seed)
+            || !mc_reader_u8(reader, &decoded.game_mode)
+            || !mc_reader_string(reader, &decoded.level_type)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_legacy_dimension = true;
+        decoded.has_hashed_seed = true;
+        decoded.has_level_type = true;
+    } else if (protocol <= 736) {
+        if (!mc_reader_string(reader, &decoded.dimension_identifier)
+            || !mc_reader_string(reader, &decoded.world_name)
+            || !mc_reader_respawn_identity_tail(reader, &decoded)
+            || !mc_reader_respawn_bool(reader, &copy_data)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_dimension_identifier = true;
+        decoded.has_world_name = true;
+        decoded.has_hashed_seed = true;
+        decoded.has_previous_game_mode = true;
+        decoded.keep_data_mask = copy_data ? 3U : 0U;
+    } else if (protocol <= 758) {
+        if (!mc_reader_nbt(reader, true, &decoded.dimension_nbt)
+            || !mc_reader_string(reader, &decoded.world_name)
+            || !mc_reader_respawn_identity_tail(reader, &decoded)
+            || !mc_reader_respawn_bool(reader, &copy_data)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_dimension_nbt = true;
+        decoded.has_world_name = true;
+        decoded.has_hashed_seed = true;
+        decoded.has_previous_game_mode = true;
+        decoded.keep_data_mask = copy_data ? 3U : 0U;
+    } else if (protocol <= 765) {
+        if (!mc_reader_string(reader, &decoded.dimension_identifier)
+            || !mc_reader_string(reader, &decoded.world_name)
+            || !mc_reader_respawn_identity_tail(reader, &decoded)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_dimension_identifier = true;
+        decoded.has_world_name = true;
+        decoded.has_hashed_seed = true;
+        decoded.has_previous_game_mode = true;
+        if (protocol <= 763
+            && !mc_reader_respawn_bool(reader, &copy_data)) {
+            reader->failed = true;
+            return false;
+        }
+        if (!mc_reader_respawn_last_death(reader, protocol, &decoded)) {
+            reader->failed = true;
+            return false;
+        }
+        if (protocol >= 763) {
+            if (!mc_reader_varint(reader, &variable) || variable < 0) {
+                reader->failed = true;
+                return false;
+            }
+            decoded.portal_cooldown = variable;
+            decoded.has_portal_cooldown = true;
+        }
+        if (protocol >= 764
+            && !mc_reader_respawn_bool(reader, &copy_data)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.keep_data_mask = copy_data ? 3U : 0U;
+    } else {
+        if (!mc_reader_varint(reader, &decoded.dimension_type_id)
+            || decoded.dimension_type_id < 0
+            || !mc_reader_string(reader, &decoded.world_name)
+            || !mc_reader_respawn_identity_tail(reader, &decoded)
+            || !mc_reader_respawn_last_death(reader, protocol, &decoded)
+            || !mc_reader_varint(reader, &variable) || variable < 0) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_dimension_type_id = true;
+        decoded.has_world_name = true;
+        decoded.has_hashed_seed = true;
+        decoded.has_previous_game_mode = true;
+        decoded.portal_cooldown = variable;
+        decoded.has_portal_cooldown = true;
+        if (protocol >= 768) {
+            if (!mc_reader_varint(reader, &decoded.sea_level)) {
+                reader->failed = true;
+                return false;
+            }
+            decoded.has_sea_level = true;
+        }
+        if (!mc_reader_u8(reader, &decoded.keep_data_mask)
+            || (decoded.keep_data_mask & ~UINT8_C(3)) != 0U) {
+            reader->failed = true;
+            return false;
+        }
+    }
+
+    if (decoded.game_mode > 3U
+        || (decoded.has_previous_game_mode
+            && (decoded.previous_game_mode < -1
+                || decoded.previous_game_mode > 3))) {
+        reader->failed = true;
+        return false;
+    }
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_block_change(McReader *reader, int protocol,
     McPosition *position, int32_t *state_id)
 {

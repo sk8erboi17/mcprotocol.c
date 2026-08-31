@@ -612,6 +612,133 @@ static void clientbound_player_positions_are_versioned(void)
     assert(!mc_reader_clientbound_player_position(NULL, 47, &decoded));
 }
 
+static void build_clientbound_respawn_body(McPacket *packet, int protocol)
+{
+    static const unsigned char empty_named_compound[] = {10U, 0U, 0U, 0U};
+    static const McBytes dimension_nbt = {
+        empty_named_compound, sizeof(empty_named_compound)
+    };
+    if (protocol <= 404) {
+        assert(mc_packet_i32(packet, 0));
+        assert(mc_packet_u8(packet, 1U));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_string(packet, "flat"));
+    } else if (protocol <= 498) {
+        assert(mc_packet_i32(packet, 0));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_string(packet, "flat"));
+    } else if (protocol <= 578) {
+        assert(mc_packet_i32(packet, 0));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_string(packet, "flat"));
+    } else if (protocol <= 736) {
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, true));
+    } else if (protocol <= 758) {
+        assert(mc_packet_nbt(packet, true, &dimension_nbt));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, true));
+    } else if (protocol <= 765) {
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        if (protocol <= 763) assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, false));
+        if (protocol >= 763) assert(mc_packet_varint(packet, 7));
+        if (protocol >= 764) assert(mc_packet_bool(packet, true));
+    } else {
+        assert(mc_packet_varint(packet, 0));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_varint(packet, 7));
+        if (protocol >= 768) assert(mc_packet_varint(packet, 63));
+        assert(mc_packet_u8(packet, 3U));
+    }
+}
+
+static void clientbound_respawns_are_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count != 0U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        unsigned char storage[256] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        build_clientbound_respawn_body(&packet, protocol);
+        assert(!packet.failed);
+
+        McReader reader;
+        McClientboundRespawn decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_clientbound_respawn(&reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.game_mode == 0U);
+        if (protocol <= 578) {
+            assert(decoded.has_legacy_dimension);
+            assert(decoded.legacy_dimension == 0);
+            assert(decoded.has_level_type);
+            assert(decoded.level_type.size == 4U);
+            assert(memcmp(decoded.level_type.data, "flat", 4U) == 0);
+            assert(decoded.has_difficulty == (protocol <= 404));
+            assert(decoded.has_hashed_seed == (protocol >= 573));
+        } else {
+            assert(decoded.has_world_name);
+            assert(decoded.world_name.size == strlen("minecraft:overworld"));
+            assert(memcmp(decoded.world_name.data, "minecraft:overworld",
+                decoded.world_name.size) == 0);
+            assert(decoded.has_hashed_seed);
+            assert(decoded.has_previous_game_mode);
+            assert(decoded.previous_game_mode == -1);
+            assert(decoded.flat);
+            assert(decoded.keep_data_mask == 3U);
+        }
+        assert(decoded.has_dimension_identifier
+            == ((protocol >= 735 && protocol <= 736)
+                || (protocol >= 759 && protocol <= 765)));
+        assert(decoded.has_dimension_nbt
+            == (protocol >= 751 && protocol <= 758));
+        assert(decoded.has_dimension_type_id == (protocol >= 766));
+        assert(decoded.has_portal_cooldown == (protocol >= 763));
+        assert(decoded.has_sea_level == (protocol >= 768));
+        if (decoded.has_portal_cooldown) assert(decoded.portal_cooldown == 7);
+        if (decoded.has_sea_level) assert(decoded.sea_level == 63);
+    }
+
+    unsigned char malformed[] = {0U, 0U, 0U, 0U, 1U, 4U,
+        'f', 'l', 'a', 't'};
+    McReader reader;
+    McClientboundRespawn decoded = {0};
+    mc_reader_init(&reader, malformed, sizeof(malformed));
+    assert(!mc_reader_clientbound_respawn(&reader, 4, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, malformed, sizeof(malformed));
+    assert(!mc_reader_clientbound_respawn(&reader, 999, &decoded));
+    assert(!mc_reader_clientbound_respawn(NULL, 47, &decoded));
+}
+
 static void movement_and_hotbar_bodies_match_node(void)
 {
     /* Bodies excluding ID. The 1.7 position pair follows the canonical
@@ -1220,6 +1347,7 @@ int main(int argc, char **argv)
     player_action_bodies_match_node();
     player_positions_are_versioned();
     clientbound_player_positions_are_versioned();
+    clientbound_respawns_are_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
     use_item_bodies_match_node();

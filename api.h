@@ -231,6 +231,42 @@ typedef struct {
     bool dismount_vehicle;
 } McClientboundPlayerPosition;
 
+/* Normalized clientbound Respawn body. String/NBT fields are borrowed from
+ * the reader input and become invalid with that packet buffer. Legacy
+ * dimensions expose legacy_dimension; 1.16--1.18 expose dimension_nbt;
+ * registry-based modern layouts expose dimension_type_id. */
+typedef struct {
+    int32_t legacy_dimension;
+    int32_t dimension_type_id;
+    McBytes dimension_identifier;
+    McBytes dimension_nbt;
+    McBytes world_name;
+    McBytes level_type;
+    McBytes last_death_dimension;
+    McPosition last_death_position;
+    int64_t hashed_seed;
+    int32_t portal_cooldown;
+    int32_t sea_level;
+    uint8_t difficulty;
+    uint8_t game_mode;
+    int8_t previous_game_mode;
+    uint8_t keep_data_mask;
+    bool has_legacy_dimension;
+    bool has_dimension_type_id;
+    bool has_dimension_identifier;
+    bool has_dimension_nbt;
+    bool has_world_name;
+    bool has_level_type;
+    bool has_hashed_seed;
+    bool has_difficulty;
+    bool has_previous_game_mode;
+    bool debug;
+    bool flat;
+    bool has_last_death_location;
+    bool has_portal_cooldown;
+    bool has_sea_level;
+} McClientboundRespawn;
+
 typedef struct {
     const char *locale;
     int8_t view_distance;
@@ -481,6 +517,10 @@ bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
  * body with trailing fields. */
 bool mc_reader_clientbound_player_position(McReader *reader, int protocol,
     McClientboundPlayerPosition *value);
+/* Decodes and validates one complete release-aware Respawn body (without its
+ * packet ID). The caller may require mc_reader_remaining(reader) == 0. */
+bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
+    McClientboundRespawn *value);
 /* Decodes one complete clientbound block_change body. Protocols 1.7.x use
  * x:i32/y:u8/z:i32 plus separate block-id/metadata fields; their returned
  * state_id is (block_id << 4) | metadata. 1.8+ returns the wire state ID. */

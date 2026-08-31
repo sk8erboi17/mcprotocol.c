@@ -163,6 +163,7 @@ Available symmetric field codecs are:
 | `position` | Release-aware packed block position | block use, digging and block updates |
 | `block_change` | Complete release-aware block-change body | authoritative block-state observations from 1.7 through current |
 | `clientbound_player_position` | Release-aware correction body with normalized 1.7 feet Y, teleport/dismount boundaries and modern velocity deltas | observing authoritative movement and teleport responses |
+| `clientbound_respawn` | Release-aware dimension identity, world, spawn info, last-death location, portal/sea-level and keep-data fields | observing authoritative respawn and dimension-change projections |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `held_item_slot` | Validated hotbar index as a big-endian short | selected-slot changes in every release |
