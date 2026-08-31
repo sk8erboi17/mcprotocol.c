@@ -222,7 +222,7 @@ manifest may use source-validated field overrides, integer constants, and the
 `scoreboard_reset`, `plain_item_slot`, `plain_item_contents`,
 `plain_window_items`, `empty_window_click`, `source_validated_minecart_steps`,
 `source_validated_minecart_metadata`, `source_validated_primed_tnt_metadata`,
-and `chunk_envelope` projections for
+`direct_sound_event`, and `chunk_envelope` projections for
 schema-checked conditional packets. Both minecart projections require a
 non-empty `source_validation` explanation. The step projection checks the known
 `minecraft-data` envelope while following Vanilla's actual
@@ -235,7 +235,10 @@ requires an explicit `metadata_layout` of `block_state_and_flag` or
 primed-TNT projection derives the fuse accessor boundary (5, 6, 7 or 8)
 from the selected protocol, requires `fuse` through 1.20.2 and
 `fuse_and_block_state` from 1.20.3 onward, and rejects unrelated or duplicate
-metadata entries. The chunk
+metadata entries. The direct-sound projection validates the modern
+`Holder<SoundEvent>` envelope, emits the self-contained direct-holder branch,
+and rejects registered holder IDs because resolving those requires the
+recipient's registry map. The chunk
 projection covers 1.13 through the current schema while exposing section data,
 heightmaps and validated light data without interpreting release-specific block
 palettes, and deliberately accepts only an empty block-entity array. Plain-item
