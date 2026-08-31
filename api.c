@@ -3615,6 +3615,30 @@ static bool mc_reader_respawn_bool(McReader *reader, bool *value)
     return true;
 }
 
+static bool mc_reader_respawn_keep_data(McReader *reader, int protocol,
+    uint8_t *mask)
+{
+    uint8_t encoded = 0U;
+    if (mask == NULL || !mc_reader_u8(reader, &encoded)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (protocol >= 761) {
+        if ((encoded & ~UINT8_C(3)) != 0U) {
+            reader->failed = true;
+            return false;
+        }
+        *mask = encoded;
+        return true;
+    }
+    if (encoded > 1U) {
+        reader->failed = true;
+        return false;
+    }
+    *mask = encoded != 0U ? 3U : 0U;
+    return true;
+}
+
 static bool mc_reader_respawn_last_death(McReader *reader, int protocol,
     McClientboundRespawn *decoded)
 {
@@ -3646,7 +3670,6 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
         return false;
     }
 
-    bool copy_data = false;
     int32_t variable = 0;
     if (protocol <= 404) {
         if (!mc_reader_i32(reader, &decoded.legacy_dimension)
@@ -3683,7 +3706,8 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
         if (!mc_reader_string(reader, &decoded.dimension_identifier)
             || !mc_reader_string(reader, &decoded.world_name)
             || !mc_reader_respawn_identity_tail(reader, &decoded)
-            || !mc_reader_respawn_bool(reader, &copy_data)) {
+            || !mc_reader_respawn_keep_data(reader, protocol,
+                &decoded.keep_data_mask)) {
             reader->failed = true;
             return false;
         }
@@ -3691,12 +3715,12 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
         decoded.has_world_name = true;
         decoded.has_hashed_seed = true;
         decoded.has_previous_game_mode = true;
-        decoded.keep_data_mask = copy_data ? 3U : 0U;
     } else if (protocol <= 758) {
         if (!mc_reader_nbt(reader, true, &decoded.dimension_nbt)
             || !mc_reader_string(reader, &decoded.world_name)
             || !mc_reader_respawn_identity_tail(reader, &decoded)
-            || !mc_reader_respawn_bool(reader, &copy_data)) {
+            || !mc_reader_respawn_keep_data(reader, protocol,
+                &decoded.keep_data_mask)) {
             reader->failed = true;
             return false;
         }
@@ -3704,7 +3728,6 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
         decoded.has_world_name = true;
         decoded.has_hashed_seed = true;
         decoded.has_previous_game_mode = true;
-        decoded.keep_data_mask = copy_data ? 3U : 0U;
     } else if (protocol <= 765) {
         if (!mc_reader_string(reader, &decoded.dimension_identifier)
             || !mc_reader_string(reader, &decoded.world_name)
@@ -3717,7 +3740,8 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
         decoded.has_hashed_seed = true;
         decoded.has_previous_game_mode = true;
         if (protocol <= 763
-            && !mc_reader_respawn_bool(reader, &copy_data)) {
+            && !mc_reader_respawn_keep_data(reader, protocol,
+                &decoded.keep_data_mask)) {
             reader->failed = true;
             return false;
         }
@@ -3734,11 +3758,11 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
             decoded.has_portal_cooldown = true;
         }
         if (protocol >= 764
-            && !mc_reader_respawn_bool(reader, &copy_data)) {
+            && !mc_reader_respawn_keep_data(reader, protocol,
+                &decoded.keep_data_mask)) {
             reader->failed = true;
             return false;
         }
-        decoded.keep_data_mask = copy_data ? 3U : 0U;
     } else {
         if (!mc_reader_varint(reader, &decoded.dimension_type_id)
             || decoded.dimension_type_id < 0

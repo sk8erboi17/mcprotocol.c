@@ -250,6 +250,8 @@ typedef struct {
     uint8_t difficulty;
     uint8_t game_mode;
     int8_t previous_game_mode;
+    /* 1.19.3+ exposes the two KEEP_* bits directly. Older copy-data
+     * booleans are normalized to either zero or both bits set. */
     uint8_t keep_data_mask;
     bool has_legacy_dimension;
     bool has_dimension_type_id;
