@@ -3930,6 +3930,47 @@ bool mc_reader_plain_item(McReader *reader, int protocol,
     return true;
 }
 
+bool mc_reader_inventory_slot_update(McReader *reader, int protocol,
+    bool direct_player_inventory, McInventorySlotUpdate *value)
+{
+    McInventorySlotUpdate decoded = {
+        .window_id = -1,
+        .state_id = -1,
+        .slot = -1,
+        .direct_player_inventory = direct_player_inventory,
+    };
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)
+        || (direct_player_inventory && protocol < 768)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (direct_player_inventory) {
+        if (!mc_reader_varint(reader, &decoded.slot)
+            || decoded.slot < 0 || decoded.slot > 42) {
+            reader->failed = true;
+            return false;
+        }
+    } else {
+        uint8_t window_id = 0U;
+        uint16_t menu_slot = 0U;
+        if (!mc_reader_u8(reader, &window_id)
+            || (protocol >= 756
+                && (!mc_reader_varint(reader, &decoded.state_id)
+                    || decoded.state_id < 0))
+            || !mc_reader_u16(reader, &menu_slot)) {
+            return false;
+        }
+        decoded.window_id = window_id;
+        decoded.slot = (int16_t)menu_slot;
+    }
+    if (!mc_reader_plain_item(reader, protocol,
+            &decoded.item_id, &decoded.count)) {
+        return false;
+    }
+    *value = decoded;
+    return true;
+}
+
 bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot)
 {
     if (!mc_protocol_supported(protocol) || slot < MC_EQUIPMENT_MAIN_HAND

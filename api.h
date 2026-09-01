@@ -417,6 +417,18 @@ typedef struct {
     McEntityEquipmentEntry entries[MC_ENTITY_EQUIPMENT_MAX_ENTRIES];
 } McEntityEquipment;
 
+/* Normalized clientbound inventory-slot update. Releases through 1.21.1 use
+ * ContainerSetSlot (window/state/menu slot); 1.21.2+ may instead address the
+ * player's logical inventory directly. */
+typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    int32_t slot;
+    int32_t item_id;
+    int32_t count;
+    bool direct_player_inventory;
+} McInventorySlotUpdate;
+
 /* Normalized result of the one-entry metadata projection used to publish
  * player hand-use state. Pre-1.9 stores active use in shared entity flag 0x10
  * and cannot represent the off hand; newer releases use LivingEntity bits
@@ -573,6 +585,10 @@ bool mc_reader_block_change(McReader *reader, int protocol,
 bool mc_reader_uuid(McReader *reader, McUuid *value);
 bool mc_reader_plain_item(McReader *reader, int protocol,
     int32_t *item_id, int32_t *count);
+/* Decodes either clientbound set_slot/container_set_slot or the dedicated
+ * set_player_inventory body used from 1.21.2. Packet IDs are excluded. */
+bool mc_reader_inventory_slot_update(McReader *reader, int protocol,
+    bool direct_player_inventory, McInventorySlotUpdate *value);
 /* Reports whether the canonical equipment slot exists in the selected
  * release. Off hand starts in 1.9, body armor in 1.20.5 and saddle in 1.21.5. */
 bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot);

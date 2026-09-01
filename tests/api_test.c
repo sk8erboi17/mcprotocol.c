@@ -1488,6 +1488,61 @@ static void creative_slots_match_node_release_boundaries(void)
     assert(!mc_packet_set_creative_slot(NULL, 776, 37, 3, 7));
 }
 
+static void inventory_slot_updates_are_versioned(void)
+{
+    static const unsigned char legacy[] = {
+        0x00U, 0x00U, 0x24U, 0x00U, 0x01U, 0x40U, 0x00U, 0x00U, 0x00U,
+    };
+    static const unsigned char stateful_empty[] = {
+        0x00U, 0x07U, 0x00U, 0x2dU, 0x00U,
+    };
+    static const unsigned char component_item[] = {
+        0x00U, 0x09U, 0x00U, 0x24U, 0x40U, 0x01U, 0x00U, 0x00U,
+    };
+    static const unsigned char direct_item[] = {
+        0x28U, 0x40U, 0x01U, 0x00U, 0x00U,
+    };
+    static const struct {
+        int protocol;
+        bool direct;
+        const unsigned char *body;
+        size_t body_size;
+        int32_t window_id;
+        int32_t state_id;
+        int32_t slot;
+        int32_t item_id;
+        int32_t count;
+    } cases[] = {
+        {107, false, legacy, sizeof(legacy), 0, -1, 36, 1, 64},
+        {756, false, stateful_empty, sizeof(stateful_empty), 0, 7, 45, 0, 0},
+        {767, false, component_item, sizeof(component_item), 0, 9, 36, 1, 64},
+        {768, true, direct_item, sizeof(direct_item), -1, -1, 40, 1, 64},
+    };
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        McReader reader;
+        McInventorySlotUpdate decoded = {0};
+        mc_reader_init(&reader, cases[index].body, cases[index].body_size);
+        assert(mc_reader_inventory_slot_update(
+            &reader, cases[index].protocol, cases[index].direct, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.direct_player_inventory == cases[index].direct);
+        assert(decoded.window_id == cases[index].window_id);
+        assert(decoded.state_id == cases[index].state_id);
+        assert(decoded.slot == cases[index].slot);
+        assert(decoded.item_id == cases[index].item_id);
+        assert(decoded.count == cases[index].count);
+    }
+
+    McReader reader;
+    McInventorySlotUpdate decoded = {0};
+    mc_reader_init(&reader, direct_item, sizeof(direct_item));
+    assert(!mc_reader_inventory_slot_update(&reader, 767, true, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, stateful_empty, sizeof(stateful_empty) - 1U);
+    assert(!mc_reader_inventory_slot_update(&reader, 756, false, &decoded));
+    assert(reader.failed);
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -1568,6 +1623,7 @@ int main(int argc, char **argv)
     container_buttons_match_node_and_source();
     close_windows_and_container_ids_are_versioned();
     creative_slots_match_node_release_boundaries();
+    inventory_slot_updates_are_versioned();
     puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }
