@@ -17,6 +17,10 @@ crafting and combat belong to the application.
   accept/handshake;
 - complete versioned packet name/ID catalogs plus allocation-free C readers and
   writers for the important Minecraft wire types;
+- stable structured errors, strict/Vanilla-compatible decoding and a pure
+  exact-consumption dispatcher for typed packet families;
+- bounded incremental stream framing, canonical cross-version views,
+  deterministic replay and borrowed inventory/chunk iterators;
 - zlib framing, ordered multi-packet batching and optional external stream
   transforms for online-mode encryption;
 - native readiness backends: `io_uring` with `epoll` fallback on Linux,
@@ -42,6 +46,13 @@ make
 
 This creates `libmcprotocol.a`. `make shared` additionally creates
 `libmcprotocol.dylib` on macOS or `libmcprotocol.so` on Linux.
+
+The distribution contract is deliberately smaller than the repository. A
+consumer may copy only `api.c` and `api.h` and compile directly with zlib:
+
+```sh
+cc -O3 -std=c11 app.c api.c -lz -o app
+```
 
 ## Offline client
 
@@ -182,18 +193,20 @@ Available symmetric field codecs are:
 
 ## Generated packet schemas
 
-`tools/schema_compiler.py` turns a pinned `minecraft-data` `protocol.json` into
-deterministic packet-ID constants, C structs and allocation-free body codecs in
-the marked regions of `api.h` and `api.c`. It rejects unsupported schema nodes instead of guessing or
-emitting an opaque remainder. Both `anonymousNbt` and `anonOptionalNbt` map to
+`tools/schema_compiler.py` turns pinned `minecraft-data` schemas into
+deterministic packet-ID constants, C structs, body codecs and complete bounded
+modern Slot-component validators in the marked regions of `api.h` and `api.c`.
+It rejects unsupported schema nodes instead of guessing or emitting an opaque
+remainder. Both `anonymousNbt` and `anonOptionalNbt` map to
 the validated borrowed-NBT codec; the latter preserves the root `END` marker
 used for an absent value. Because the pinned `minecraft-data` checkout
 currently inherits 26.2 protocol data from 26.1, the reviewed wire-only delta
 is explicit in `schema/overlays/776.json`; it cannot become gameplay state.
-The initial vertical slice covers the 26.2
-`use_item` and `block_dig` packets used by Perry's canonical player-action
-tests; additional schema families can be added without moving gameplay
-semantics into this library.
+The embedded catalog covers protocol 776, the source-compiled Slot validators
+cover every component wire profile from protocol 766 through 776, and the
+schema-compiled typed slice includes the 26.2 `use_item` and `block_dig`
+packets. Family-based codecs cover the declared cross-version Tier A/Tier B
+surface without adding another production source file.
 
 With `minecraft-data` checked out next to this repository:
 
@@ -243,8 +256,9 @@ metadata entries. The chunk
 projection covers 1.13 through the current schema while exposing section data,
 heightmaps and validated light data without interpreting release-specific block
 palettes, and deliberately accepts only an empty block-entity array. Plain-item
-projections deliberately reject componentful slots instead of exposing an
-unchecked opaque tail.
+manifest projections remain metadata-free. Runtime typed inventory codecs
+instead validate NBT and every component value before publishing a borrowed
+`McItemStackView`; they never accept an unchecked opaque component tail.
 
 ### Send a command or chat packet
 
@@ -391,6 +405,43 @@ Set compression between frames with
 `-1` to disable it. At EOF, `mc_stream_decoder_finish` reports
 `MC_ERROR_PARTIAL_INPUT` if an incomplete frame remains buffered.
 
+## Typed packets, canonical views and replay
+
+`mc_packet_family` maps moving wire IDs onto stable `McPacketFamily` values.
+`mc_decode_packet` decodes an already-extracted body without sockets or heap
+allocation and requires exact consumption in both modes:
+
+```c
+McPlayerMovementPacket movement;
+McPacketFamily family = MC_FAMILY_UNKNOWN;
+McError decode_error;
+
+int32_t id = mc_packet_id(protocol, MC_STATE_PLAY,
+    MC_PACKET_SERVERBOUND, "position_look");
+if (mc_decode_packet(protocol, MC_STATE_PLAY, MC_PACKET_SERVERBOUND,
+        id, payload, payload_size, MC_DECODE_STRICT,
+        &movement, sizeof(movement), &family, &decode_error) != 0) {
+    fprintf(stderr, "%s at byte %zu\n",
+        mc_error_name(decode_error.code), decode_error.offset);
+}
+```
+
+Typed families cover movement, actions, combat, block interaction, inventory,
+entity movement and the bounded Tier B envelopes declared in `api.h` across
+all 51 supported protocols. Inventory items, metadata, chunk sections and
+large lists are borrowed views or iterators; normal packet decode does not
+allocate.
+
+`McCanonicalHeader` retains protocol, direction, packet ID, family and the
+complete raw payload. Family-specific canonical decoders normalize movement,
+actions, inventory and block changes while preserving presence bits, raw flags
+and historical wire distinctions. They do not simulate gameplay.
+
+The `MCTR` replay reader consumes a versioned, network-byte-order binary trace
+with bounded record counts and payload lengths. Test harnesses can replay
+packet sequences without network timing or JSON; the runtime still depends
+only on zlib.
+
 ## Batch sends
 
 `mc_client_send_batch` encodes each packet with the current compression settings,
@@ -480,6 +531,10 @@ mc_packet_id/name              resolve packet names and IDs
 mc_packet_*                    build caller-owned packet bodies
 mc_reader_*                    decode borrowed packet bodies
 mc_error_name                  stable structured decode error identifier
+mc_packet_family/decode_packet exact typed dispatch without allocation
+mc_decode_canonical_*          family-specific cross-version projections
+mc_reader_item_stack and bounded borrowed inventory/chunk iterators
+mc_replay_reader_*             deterministic bounded binary-trace replay
 mc_stream_decoder_*            pure incremental framing and decompression
 mc_uuid_* / mc_offline_uuid    UUID conversion and offline player UUIDs
 
@@ -529,6 +584,9 @@ make test-amalgamation
 make test-exports
 make generate-check
 make test-sanitize
+make fuzz-smoke
+make coverage
+make benchmark-codec
 make check
 ```
 
@@ -538,6 +596,15 @@ global definition in `api.o` with a reviewed allowlist. `generate-check`
 performs a full read-only regeneration when the configured minecraft-data
 checkout exists; an offline checkout still verifies the committed generated
 byte hashes and overlay hash.
+
+`make test` is split into unit, codec, stream, typed-packet, bounded-envelope,
+canonical, golden, replay, property and generator tests. The golden harness
+checks every truncated prefix and strict trailing data for 165 packet/version
+fixtures. `make test-differential` independently decodes and re-encodes that
+same corpus with `node-minecraft-protocol`; Node.js is tooling-only and is not
+part of `make test` or the library. Eight libFuzzer targets compile as exactly
+`target.c + api.c`, and the coverage target emits both LLVM source coverage and
+a 51-protocol family matrix.
 
 The public API has been exercised against Perry using all 51 supported
 revisions for session/login, movement correction, inventory translation and
@@ -551,6 +618,16 @@ Perry remains private and is not needed to build or use this repository.
 
 ## Benchmark
 
+`make benchmark-codec` runs allocation-free codec workloads for VarInt,
+movement, position/look, attack, NBT, framing, compressed framing and canonical
+normalization, plus simulated 1/32/256-stream, burst and mixed-corpus loads. It
+records ns/op, packets/s, bytes/s, instrumented `api.c` allocations/op,
+retained buffer capacity and peak process RSS in
+`benchmark/codec_results.json`; a matching checked-in environment applies
+the calibrated 5% primitive and 10% complex-path regression gates. The default
+run uses two discarded warm-ups, nine measured repetitions and medians over one
+million operations per workload.
+
 The reproducible benchmark compares this library with
 `minecraft-protocol` 1.68.0 on protocol 47 offline workloads inspired by
 multi-client test traffic. It contains no Perry source or fixture.
@@ -559,9 +636,9 @@ multi-client test traffic. It contains no Perry source or fixture.
 
 | Workload | Work per run | mcprotocol.c | minecraft-protocol | Speedup |
 | --- | ---: | ---: | ---: | ---: |
-| Sequential offline login | 32 sessions | 5.544 ms | 588.778 ms | 106.20× |
-| Keep-alive stream | 10,000 echoes | 235.514 ms | 464.691 ms | 1.97× |
-| 32 concurrent streams | 8,192 echoes | 105.331 ms | 866.085 ms | 8.22× |
+| Sequential offline login | 32 sessions | 15.064 ms | 619.477 ms | 41.12× |
+| Keep-alive stream | 10,000 echoes | 243.425 ms | 495.815 ms | 2.04× |
+| 32 concurrent streams | 8,192 echoes | 120.796 ms | 893.234 ms | 7.39× |
 
 The checked-in run uses two discarded warm-ups and seven measured repetitions.
 The chart reports median operations per second with interquartile-range error

@@ -1,0 +1,90 @@
+{
+  "format_version": 1,
+  "environment": {
+    "system": "Darwin",
+    "release": "25.5.0",
+    "machine": "arm64",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+  },
+  "calibration": "reference is median plus two median absolute deviations; the 5%/10% regression gate is applied above that CI-noise envelope",
+  "cases": [
+    {
+      "name": "varint_decode",
+      "median_ns_per_operation": 6.68425,
+      "median_absolute_deviation": 0.010500000000000398,
+      "calibrated_reference_ns_per_operation": 6.7510924999999995
+    },
+    {
+      "name": "movement_decode",
+      "median_ns_per_operation": 26.894,
+      "median_absolute_deviation": 0.09800000000000253,
+      "calibrated_reference_ns_per_operation": 27.16294
+    },
+    {
+      "name": "position_look_decode",
+      "median_ns_per_operation": 50.085,
+      "median_absolute_deviation": 0.2430000000000021,
+      "calibrated_reference_ns_per_operation": 50.58585
+    },
+    {
+      "name": "attack_decode",
+      "median_ns_per_operation": 38.436,
+      "median_absolute_deviation": 0.16100000000000136,
+      "calibrated_reference_ns_per_operation": 38.82036
+    },
+    {
+      "name": "nbt_validate",
+      "median_ns_per_operation": 8.966,
+      "median_absolute_deviation": 0.03200000000000003,
+      "calibrated_reference_ns_per_operation": 9.05566
+    },
+    {
+      "name": "canonical_movement",
+      "median_ns_per_operation": 70.357,
+      "median_absolute_deviation": 0.117999999999995,
+      "calibrated_reference_ns_per_operation": 71.06057
+    },
+    {
+      "name": "frame_extract",
+      "median_ns_per_operation": 20.004,
+      "median_absolute_deviation": 0.06400000000000006,
+      "calibrated_reference_ns_per_operation": 20.204040000000003
+    },
+    {
+      "name": "compressed_frame_extract",
+      "median_ns_per_operation": 315.696,
+      "median_absolute_deviation": 0.9599999999999795,
+      "calibrated_reference_ns_per_operation": 318.85296000000005
+    },
+    {
+      "name": "streams_1",
+      "median_ns_per_operation": 18.498,
+      "median_absolute_deviation": 0.023999999999997357,
+      "calibrated_reference_ns_per_operation": 18.68298
+    },
+    {
+      "name": "streams_32",
+      "median_ns_per_operation": 18.992,
+      "median_absolute_deviation": 0.120000000000001,
+      "calibrated_reference_ns_per_operation": 19.232000000000003
+    },
+    {
+      "name": "streams_256",
+      "median_ns_per_operation": 19.345238,
+      "median_absolute_deviation": 0.16001000000000332,
+      "calibrated_reference_ns_per_operation": 19.665258000000005
+    },
+    {
+      "name": "small_packet_burst",
+      "median_ns_per_operation": 9.562,
+      "median_absolute_deviation": 0.036999999999999034,
+      "calibrated_reference_ns_per_operation": 9.65762
+    },
+    {
+      "name": "mixed_packet_corpus",
+      "median_ns_per_operation": 13.038,
+      "median_absolute_deviation": 0.09399999999999942,
+      "calibrated_reference_ns_per_operation": 13.225999999999999
+    }
+  ]
+}

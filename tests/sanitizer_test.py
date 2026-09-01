@@ -12,7 +12,17 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parent.parent
-TESTS = ("api_test", "codec_test", "stream_test")
+TESTS = (
+    "api_test",
+    "codec_test",
+    "stream_test",
+    "typed_packet_test",
+    "envelope_test",
+    "canonical_test",
+    "replay_test",
+    "property_test",
+    "generated_test",
+)
 
 
 def main() -> None:

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define MC_PROTOCOL_API_VERSION 2
+#define MC_PROTOCOL_API_VERSION 3
 #define MC_DEFAULT_PORT 25565U
 #define MC_UUID_STRING_SIZE 37U
 #define MC_HANDSHAKE_HOST_SIZE 256U
@@ -18,6 +18,17 @@ extern "C" {
 #define MC_DEFAULT_MAX_DECOMPRESSED_SIZE (16U * 1024U * 1024U)
 #define MC_DEFAULT_MAX_STREAM_BUFFERED_SIZE (64U * 1024U * 1024U)
 #define MC_DEFAULT_MAX_STREAM_OUTPUT_SIZE (32U * 1024U * 1024U)
+#define MC_MAX_PACKET_ARRAY_COUNT (1024U * 1024U)
+#define MC_MAX_NBT_DEPTH 64U
+#define MC_MAX_NBT_COLLECTION_COUNT (1024U * 1024U)
+#define MC_MAX_ITEM_COMPONENT_COUNT 256U
+#define MC_MAX_CONTAINER_SLOTS 4096U
+#define MC_MAX_ENTITY_METADATA_ENTRIES 256U
+#define MC_MAX_ATTRIBUTE_COUNT 1024U
+#define MC_MAX_ATTRIBUTE_MODIFIER_COUNT 1024U
+#define MC_MAX_CHUNK_SECTIONS 1024U
+#define MC_MAX_CHUNK_BLOCK_ENTITIES 65536U
+#define MC_MAX_CHUNK_LIGHT_ARRAYS 1024U
 #define MC_ERROR_OFFSET_UNKNOWN SIZE_MAX
 
 /* mcprotocol.c deliberately exposes the protocol rather than a game bot. The
@@ -373,6 +384,10 @@ typedef struct {
     bool inside_block;
     bool world_border_hit;
     int32_t sequence;
+    /* Decoders preserve the 1.7 gzip member as a borrowed wire slice instead
+     * of allocating an inflated copy. Encoders continue to accept uncompressed
+     * named-root NBT and therefore require this flag to be false. */
+    bool held_item_nbt_compressed;
 } McBlockPlace;
 
 typedef struct {
@@ -385,6 +400,7 @@ typedef struct {
     int32_t sequence;
     float yaw;
     float pitch;
+    bool held_item_nbt_compressed;
 } McUseItem;
 
 typedef struct {
@@ -417,6 +433,628 @@ typedef struct {
     int32_t type_id;
     McBytes data;
 } McItemComponentPatch;
+
+
+/* ============================================================
+ * TYPED PACKET FAMILIES
+ * ============================================================ */
+
+/* Family values are stable across wire packet-ID renumbering. UNKNOWN means
+ * catalog-only coverage; it never implies that a packet body was decoded. */
+typedef enum {
+    MC_FAMILY_UNKNOWN = 0,
+    MC_FAMILY_PLAYER_MOVEMENT,
+    MC_FAMILY_PLAYER_INPUT,
+    MC_FAMILY_ENTITY_ACTION,
+    MC_FAMILY_ABILITIES,
+    MC_FAMILY_VEHICLE_MOVE,
+    MC_FAMILY_STEER_VEHICLE,
+    MC_FAMILY_USE_ENTITY,
+    MC_FAMILY_ATTACK,
+    MC_FAMILY_ARM_ANIMATION,
+    MC_FAMILY_BLOCK_DIG,
+    MC_FAMILY_BLOCK_PLACE,
+    MC_FAMILY_USE_ITEM,
+    MC_FAMILY_HELD_ITEM_SLOT,
+    MC_FAMILY_TELEPORT_CONFIRM,
+    MC_FAMILY_WINDOW_CLICK,
+    MC_FAMILY_SET_CREATIVE_SLOT,
+    MC_FAMILY_CLIENT_COMMAND,
+    MC_FAMILY_CLOSE_WINDOW,
+    MC_FAMILY_SERVER_POSITION,
+    MC_FAMILY_ENTITY_VELOCITY,
+    MC_FAMILY_EXPLOSION,
+    MC_FAMILY_ENTITY_EFFECT,
+    MC_FAMILY_REMOVE_ENTITY_EFFECT,
+    MC_FAMILY_UPDATE_ATTRIBUTES,
+    MC_FAMILY_RELATIVE_ENTITY_MOVE,
+    MC_FAMILY_ENTITY_MOVE_LOOK,
+    MC_FAMILY_ENTITY_TELEPORT,
+    MC_FAMILY_ENTITY_HEAD_ROTATION,
+    MC_FAMILY_ENTITY_METADATA,
+    MC_FAMILY_ATTACH_ENTITY,
+    MC_FAMILY_SET_PASSENGERS,
+    MC_FAMILY_BLOCK_CHANGE,
+    MC_FAMILY_MULTI_BLOCK_CHANGE,
+    MC_FAMILY_MAP_CHUNK,
+    MC_FAMILY_UNLOAD_CHUNK,
+    MC_FAMILY_SET_SLOT,
+    MC_FAMILY_WINDOW_ITEMS,
+    MC_FAMILY_RESPAWN,
+    MC_FAMILY_GAME_STATE_CHANGE
+} McPacketFamily;
+
+enum {
+    MC_MOVE_HAS_POSITION = 1U << 0,
+    MC_MOVE_HAS_ROTATION = 1U << 1,
+    MC_MOVE_HAS_ON_GROUND = 1U << 2,
+    MC_MOVE_HAS_TELEPORT_ID = 1U << 3,
+    MC_MOVE_HAS_DELTA = 1U << 4,
+    MC_MOVE_HAS_STANCE_Y = 1U << 5,
+    MC_MOVE_HAS_HORIZONTAL_COLLISION = 1U << 6
+};
+
+typedef struct {
+    double x;
+    double y;
+    double z;
+    double wire_y;
+    float yaw;
+    float pitch;
+    bool on_ground;
+    bool horizontal_collision;
+    bool wire_y_is_stance;
+    uint32_t presence;
+    uint32_t raw_flags;
+} McPlayerMovementPacket;
+
+typedef struct {
+    float sideways;
+    float forward;
+    uint8_t flags;
+    bool bitset;
+} McPlayerInputPacket;
+
+typedef struct {
+    double x;
+    double y;
+    double z;
+    float yaw;
+    float pitch;
+    bool on_ground;
+    uint32_t presence;
+} McVehicleMovePacket;
+
+enum {
+    MC_USE_ENTITY_HAS_TARGET = 1U << 0,
+    MC_USE_ENTITY_HAS_HAND = 1U << 1,
+    MC_USE_ENTITY_HAS_SNEAKING = 1U << 2
+};
+
+typedef struct {
+    int32_t entity_id;
+    int32_t action;
+    float target_x;
+    float target_y;
+    float target_z;
+    int32_t hand;
+    bool sneaking;
+    uint32_t presence;
+} McUseEntityPacket;
+
+typedef struct {
+    int32_t entity_id;
+    int32_t hand;
+} McArmAnimationPacket;
+
+typedef struct {
+    int32_t slot;
+} McHeldItemSlotPacket;
+
+typedef struct {
+    int32_t teleport_id;
+} McTeleportConfirmPacket;
+
+typedef struct {
+    int32_t action;
+} McClientCommandPacket;
+
+typedef struct {
+    int32_t window_id;
+} McCloseWindowPacket;
+
+typedef struct {
+    int32_t entity_id;
+    int16_t velocity_x_raw;
+    int16_t velocity_y_raw;
+    int16_t velocity_z_raw;
+    double velocity_x;
+    double velocity_y;
+    double velocity_z;
+    /* Protocol 773+ replaces the three signed shorts with Mojang's bounded
+     * low-precision vector. These fields preserve that complete wire form. */
+    uint64_t velocity_packed;
+    uint64_t velocity_scale;
+    McBytes velocity_wire;
+    bool low_precision_encoding;
+} McEntityVelocityPacket;
+
+typedef struct {
+    int32_t entity_id;
+    int16_t delta_x_raw;
+    int16_t delta_y_raw;
+    int16_t delta_z_raw;
+    double delta_x;
+    double delta_y;
+    double delta_z;
+    uint8_t yaw_raw;
+    uint8_t pitch_raw;
+    float yaw;
+    float pitch;
+    bool on_ground;
+    uint32_t presence;
+} McEntityMovePacket;
+
+typedef struct {
+    int32_t entity_id;
+    double x;
+    double y;
+    double z;
+    double delta_x;
+    double delta_y;
+    double delta_z;
+    uint8_t yaw_raw;
+    uint8_t pitch_raw;
+    float yaw;
+    float pitch;
+    bool on_ground;
+    uint32_t presence;
+} McEntityTeleportPacket;
+
+typedef struct {
+    int32_t entity_id;
+    uint8_t yaw_raw;
+    float yaw;
+} McEntityHeadRotationPacket;
+
+typedef struct {
+    McPosition position;
+    int32_t state_id;
+} McBlockChangePacket;
+
+typedef enum {
+    MC_ITEM_WIRE_FULL = 0,
+    MC_ITEM_WIRE_UNTRUSTED,
+    MC_ITEM_WIRE_HASHED
+} McItemWireKind;
+
+/* Borrowed view of one complete ItemStack/Slot. `encoded` contains precisely
+ * the bytes consumed for the item. NBT and component sub-views point inside
+ * it and remain valid for the lifetime of the packet payload. */
+typedef struct {
+    bool present;
+    bool nbt_compressed;
+    bool component_values_length_prefixed;
+    McItemWireKind wire_kind;
+    int32_t item_id;
+    int32_t count;
+    int32_t damage;
+    uint32_t added_component_count;
+    uint32_t removed_component_count;
+    McBytes nbt;
+    McBytes components;
+    McBytes encoded;
+} McItemStackView;
+
+typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    int16_t slot;
+    int8_t mouse_button;
+    int16_t action_number;
+    int32_t mode;
+    uint32_t changed_slot_count;
+    McBytes changed_slots;
+    McItemStackView carried_item;
+    bool has_state_id;
+    bool has_action_number;
+    bool hashed_slots;
+} McWindowClickPacket;
+
+typedef struct {
+    int16_t slot;
+    McItemStackView item;
+} McSetCreativeSlotPacket;
+
+typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    int16_t slot;
+    McItemStackView item;
+    bool has_state_id;
+} McSetSlotPacket;
+
+typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    uint32_t item_count;
+    McBytes items;
+    McItemStackView carried_item;
+    McItemWireKind item_wire_kind;
+    bool has_state_id;
+    bool has_carried_item;
+} McWindowItemsPacket;
+
+typedef struct {
+    McReader reader;
+    int protocol;
+    McItemWireKind wire_kind;
+    uint32_t remaining;
+} McItemIterator;
+
+typedef enum {
+    MC_MULTI_BLOCK_RECORD_LEGACY_1_7 = 0,
+    MC_MULTI_BLOCK_RECORD_CHUNK,
+    MC_MULTI_BLOCK_RECORD_SECTION_VARLONG,
+    MC_MULTI_BLOCK_RECORD_SECTION_VARINT
+} McMultiBlockRecordFormat;
+
+typedef struct {
+    int32_t chunk_x;
+    int32_t chunk_z;
+    int32_t section_y;
+    uint32_t record_count;
+    McBytes records;
+    McMultiBlockRecordFormat format;
+    bool suppress_light_updates;
+    bool has_light_update_flag;
+} McMultiBlockChangePacket;
+
+typedef struct {
+    McReader reader;
+    McMultiBlockChangePacket packet;
+    uint32_t remaining;
+} McBlockChangeIterator;
+
+typedef struct {
+    McPosition position;
+    int32_t state_id;
+    uint64_t raw_record;
+} McBlockChangeRecord;
+
+
+/* ============================================================
+ * TIER B BOUNDED PACKET ENVELOPES
+ * ============================================================ */
+
+typedef struct {
+    double x;
+    double y;
+    double z;
+    float radius;
+    uint32_t affected_block_count;
+    McBytes affected_blocks;
+    double motion_x;
+    double motion_y;
+    double motion_z;
+    McBytes effects;
+    bool has_motion;
+} McExplosionPacket;
+
+typedef struct {
+    int32_t entity_id;
+    int32_t effect_id;
+    int32_t amplifier;
+    int32_t duration;
+    uint8_t flags;
+    McBytes factor_data;
+    bool has_factor_data;
+} McEntityEffectPacket;
+
+typedef struct {
+    int32_t entity_id;
+    int32_t effect_id;
+} McRemoveEntityEffectPacket;
+
+typedef struct {
+    int32_t entity_id;
+    uint32_t attribute_count;
+    uint32_t modifier_count;
+    McBytes attributes;
+} McUpdateAttributesPacket;
+
+typedef struct {
+    int32_t entity_id;
+    uint32_t entry_count;
+    McBytes entries;
+    bool terminated;
+} McEntityMetadataPacket;
+
+typedef struct {
+    int32_t entity_id;
+    int32_t vehicle_id;
+    bool leash;
+    bool has_leash;
+} McAttachEntityPacket;
+
+typedef struct {
+    int32_t entity_id;
+    uint32_t passenger_count;
+    McBytes passengers;
+} McPassengersPacket;
+
+typedef struct {
+    int32_t chunk_x;
+    int32_t chunk_z;
+} McUnloadChunkPacket;
+
+typedef struct {
+    int32_t dimension_id;
+    McBytes dimension;
+    McBytes world_name;
+    int64_t hashed_seed;
+    int32_t game_mode;
+    int32_t previous_game_mode;
+    int32_t portal_cooldown;
+    int32_t sea_level;
+    uint32_t raw_flags;
+    McBytes death_location;
+    bool has_dimension_id;
+    bool has_dimension_data;
+    bool has_world_name;
+    bool has_hashed_seed;
+    bool has_previous_game_mode;
+    bool has_death_location;
+    bool has_portal_cooldown;
+    bool has_sea_level;
+} McRespawnPacket;
+
+typedef struct {
+    uint8_t reason;
+    float value;
+} McGameStateChangePacket;
+
+typedef enum {
+    MC_CHUNK_HEIGHTMAP_NONE = 0,
+    MC_CHUNK_HEIGHTMAP_NAMED_NBT,
+    MC_CHUNK_HEIGHTMAP_ANONYMOUS_NBT,
+    MC_CHUNK_HEIGHTMAP_REGISTRY
+} McChunkHeightmapFormat;
+
+typedef struct {
+    int32_t chunk_x;
+    int32_t chunk_z;
+    uint64_t section_mask;
+    uint32_t section_mask_word_count;
+    uint32_t biome_count;
+    uint32_t block_entity_count;
+    uint32_t sky_light_count;
+    uint32_t block_light_count;
+    McBytes heightmaps;
+    McBytes biomes;
+    McBytes chunk_data;
+    McBytes block_entities;
+    McBytes light_data;
+    McChunkHeightmapFormat heightmap_format;
+    bool ground_up;
+    bool ignore_old_data;
+    bool trust_edges;
+    bool has_trust_edges;
+} McChunkEnvelope;
+
+typedef struct {
+    uint16_t non_air_block_count;
+    uint8_t block_bits_per_entry;
+    uint8_t biome_bits_per_entry;
+    uint32_t block_palette_count;
+    uint32_t biome_palette_count;
+    uint32_t block_long_count;
+    uint32_t biome_long_count;
+    McBytes block_palette;
+    McBytes biome_palette;
+    McBytes block_data;
+    McBytes biome_data;
+    McBytes encoded;
+} McChunkSectionView;
+
+typedef struct {
+    McReader reader;
+    int protocol;
+    uint32_t remaining;
+} McChunkSectionIterator;
+
+
+/* ============================================================
+ * CANONICAL PACKET IR
+ * ============================================================ */
+
+/* Canonical values normalize equivalent wire families while raw_payload,
+ * packet_id, presence and raw_flags preserve the information required for
+ * diagnostics and deterministic replay. No canonical decoder performs game
+ * simulation, collision checks or plausibility repair. */
+typedef struct {
+    int protocol;
+    McState state;
+    McPacketDirection direction;
+    int32_t packet_id;
+    McPacketFamily family;
+    McBytes raw_payload;
+} McCanonicalHeader;
+
+typedef struct {
+    int protocol;
+    int32_t packet_id;
+    McPacketDirection direction;
+    McPacketFamily family;
+    int32_t entity_id;
+    double x;
+    double y;
+    double z;
+    double wire_y;
+    float yaw;
+    float pitch;
+    double delta_x;
+    double delta_y;
+    double delta_z;
+    int32_t teleport_id;
+    uint32_t relative_flags;
+    uint32_t presence;
+    uint32_t raw_flags;
+    bool on_ground;
+    bool horizontal_collision;
+    bool wire_y_is_stance;
+} McCanonicalMovement;
+
+enum {
+    MC_ACTION_HAS_ENTITY = 1U << 0,
+    MC_ACTION_HAS_ACTION = 1U << 1,
+    MC_ACTION_HAS_HAND = 1U << 2,
+    MC_ACTION_HAS_POSITION = 1U << 3,
+    MC_ACTION_HAS_TARGET = 1U << 4,
+    MC_ACTION_HAS_SEQUENCE = 1U << 5,
+    MC_ACTION_HAS_SLOT = 1U << 6,
+    MC_ACTION_HAS_FLAGS = 1U << 7,
+    MC_ACTION_HAS_SPEEDS = 1U << 8,
+    MC_ACTION_HAS_BOOLEAN = 1U << 9
+};
+
+typedef struct {
+    int protocol;
+    int32_t packet_id;
+    McPacketDirection direction;
+    McPacketFamily family;
+    int32_t entity_id;
+    int32_t action;
+    int32_t hand;
+    int32_t sequence;
+    int32_t slot;
+    McPosition position;
+    float target_x;
+    float target_y;
+    float target_z;
+    float sideways;
+    float forward;
+    float flying_speed;
+    float walking_speed;
+    uint32_t presence;
+    uint32_t raw_flags;
+    bool boolean_value;
+} McCanonicalAction;
+
+typedef struct {
+    int protocol;
+    int32_t packet_id;
+    McPacketDirection direction;
+    McPacketFamily family;
+    int32_t window_id;
+    int32_t state_id;
+    int16_t slot;
+    int8_t mouse_button;
+    int16_t action_number;
+    int32_t mode;
+    uint32_t item_count;
+    uint32_t changed_slot_count;
+    McItemStackView item;
+    McBytes items;
+    McBytes changed_slots;
+    uint32_t presence;
+} McCanonicalInventory;
+
+typedef struct {
+    int protocol;
+    int32_t packet_id;
+    McPacketDirection direction;
+    McPacketFamily family;
+    McPosition position;
+    int32_t state_id;
+    uint32_t record_count;
+    McBytes records;
+    McMultiBlockRecordFormat record_format;
+    bool suppress_light_updates;
+} McCanonicalBlockChange;
+
+
+/* ============================================================
+ * DETERMINISTIC REPLAY FORMAT
+ * ============================================================ */
+
+#define MC_REPLAY_MAGIC_SIZE 4U
+#define MC_REPLAY_FORMAT_VERSION 1U
+
+typedef struct {
+    McPacketDirection direction;
+    McState state;
+    uint64_t delta_time_ns;
+    int32_t packet_id;
+    McBytes payload;
+} McReplayRecord;
+
+typedef struct {
+    McReader reader;
+    int protocol;
+    uint32_t record_count;
+    uint32_t record_index;
+    McError *error;
+} McReplayReader;
+
+McPacketFamily mc_packet_family(int protocol, McState state,
+    McPacketDirection direction, int32_t packet_id);
+const char *mc_packet_family_name(McPacketFamily family);
+/* Catalog/family tables are immutable. Readers, writers, typed decoders,
+ * canonical decoders and replay readers are thread-safe when each invocation
+ * uses separate caller-owned storage; the library has no mutable global
+ * decode cache. */
+/* Returns the family-specific caller-owned output size, or zero for
+ * catalog-only and envelope families without a typed decoder. */
+size_t mc_packet_decoded_size(McPacketFamily family);
+/* Pure exact-consumption dispatcher. output must be at least
+ * mc_packet_decoded_size(*family); no allocation or socket access occurs. */
+int mc_decode_packet(int protocol, McState state,
+    McPacketDirection direction, int32_t packet_id,
+    const void *payload, size_t payload_size, McDecodeMode mode,
+    void *output, size_t output_size, McPacketFamily *family,
+    McError *error);
+
+/* Standalone item and borrowed iterator APIs use the same bounded codecs as
+ * the typed dispatcher. Item/component counts are capped by the public limits
+ * above and every accepted item is consumed exactly. */
+bool mc_reader_item_stack(McReader *reader, int protocol,
+    McItemWireKind wire_kind, McItemStackView *item);
+bool mc_window_items_iterator(const McWindowItemsPacket *packet,
+    int protocol, McItemIterator *iterator);
+bool mc_item_iterator_next(McItemIterator *iterator, McItemStackView *item);
+bool mc_multi_block_change_iterator(const McMultiBlockChangePacket *packet,
+    McBlockChangeIterator *iterator);
+bool mc_block_change_iterator_next(McBlockChangeIterator *iterator,
+    McBlockChangeRecord *record);
+bool mc_canonical_header_init(McCanonicalHeader *header, int protocol,
+    McState state, McPacketDirection direction, int32_t packet_id,
+    const void *payload, size_t payload_size, McError *error);
+/* Catalog-only packets are valid headers with MC_FAMILY_UNKNOWN and retain
+ * their complete raw payload; family-specific canonical decoders reject them. */
+bool mc_decode_canonical_movement(const McCanonicalHeader *header,
+    McCanonicalMovement *value, McDecodeMode mode, McError *error);
+bool mc_decode_canonical_action(const McCanonicalHeader *header,
+    McCanonicalAction *value, McDecodeMode mode, McError *error);
+bool mc_decode_canonical_inventory(const McCanonicalHeader *header,
+    McCanonicalInventory *value, McDecodeMode mode, McError *error);
+bool mc_decode_canonical_block_change(const McCanonicalHeader *header,
+    McCanonicalBlockChange *value, McDecodeMode mode, McError *error);
+/* Trace layout: "MCTR", u16 version, u16 flags, i32 protocol, u32 count,
+ * followed by direction:u8, state:u8, delta_ns:u64, packet_id:i32,
+ * payload_size:u32 and payload bytes. Integers use network byte order. */
+bool mc_replay_reader_init(McReplayReader *reader, const void *data,
+    size_t size, McError *error);
+bool mc_replay_reader_next(McReplayReader *reader, McReplayRecord *record);
+bool mc_replay_reader_finish(McReplayReader *reader);
+/* Modern (1.18+) section views are initialized with the dimension section
+ * count supplied by the caller/profile. No 4096-entry array is materialized. */
+bool mc_chunk_section_iterator_init(const McChunkEnvelope *chunk, int protocol,
+    uint32_t section_count, McChunkSectionIterator *iterator);
+bool mc_chunk_section_iterator_next(McChunkSectionIterator *iterator,
+    McChunkSectionView *section);
+bool mc_chunk_section_block_state(const McChunkSectionView *section,
+    uint32_t block_index, int32_t *state_id);
 
 void mc_packet_init(McPacket *packet, void *storage, size_t capacity);
 bool mc_packet_bytes(McPacket *packet, const void *data, size_t size);
@@ -471,7 +1109,7 @@ bool mc_packet_container_button(McPacket *packet, int protocol,
  * byte through 1.21.1 and VarInt from 1.21.3 onward. */
 bool mc_packet_close_window(McPacket *packet, int protocol, int32_t window_id);
 /* Encodes a serverbound UntrustedSlot item with raw, length-prefixed added
- * component payloads and removed component type IDs (1.20.5+). */
+ * component payloads and removed component type IDs (1.21.5+). */
 bool mc_packet_untrusted_component_item(McPacket *packet, int protocol,
     int32_t item_id, int32_t count,
     const McItemComponentPatch *added, size_t added_count,
@@ -906,6 +1544,10 @@ int mc_stream_decoder_feed(McStreamDecoder *decoder, const void *data,
 /* Call at EOF. It fails with MC_ERROR_PARTIAL_INPUT when buffered bytes do not
  * form a complete frame; complete buffered frames must first be drained. */
 int mc_stream_decoder_finish(McStreamDecoder *decoder, McError *error);
+/* Observability helpers for tests and capacity monitoring. Retained size is
+ * buffer capacity plus decompression/output capacity, not live payload size. */
+size_t mc_stream_decoder_buffered_size(const McStreamDecoder *decoder);
+size_t mc_stream_decoder_retained_size(const McStreamDecoder *decoder);
 
 
 /* ============================================================

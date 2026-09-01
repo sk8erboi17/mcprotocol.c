@@ -57,6 +57,576 @@ PUBLIC_END = "/* MC_GENERATED_PUBLIC_END */"
 PRIVATE_BEGIN = "/* MC_GENERATED_PRIVATE_BEGIN */"
 PRIVATE_END = "/* MC_GENERATED_PRIVATE_END */"
 
+COMPONENT_PRIMITIVES = {
+    "bool", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64",
+    "f32", "f64", "varint", "varlong", "string", "UUID", "uuid",
+    "anonymousNbt", "anonOptionalNbt", "position", "void",
+}
+
+
+@dataclass(frozen=True)
+class ComponentCapture:
+    variable: str
+    kind: str
+    mappings: dict[str, int] | None = None
+
+
+class ComponentValidatorCompiler:
+    """Compile the complete modern Slot component schema into bounded C.
+
+    This is intentionally a source compiler, not a runtime schema interpreter.
+    Every switch, array and registry-holder branch becomes ordinary C in the
+    private generated region of api.c. Unknown schema nodes fail generation.
+    """
+
+    def __init__(self, document: dict[str, Any], protocol: int):
+        self.document = document
+        self.protocol = protocol
+        self.types = document.get("types")
+        if not isinstance(self.types, dict) or "SlotComponent" not in self.types:
+            raise ValueError(
+                f"protocol {protocol} has no top-level SlotComponent schema"
+            )
+        self.counter = 0
+        self.prefix = f"mc_generated_{protocol}_component"
+        self.aliases = self._reachable_aliases("SlotComponent")
+
+    def _reachable_aliases(self, root: str) -> tuple[str, ...]:
+        found: set[str] = set()
+
+        def visit(schema: Any, stack: tuple[str, ...]) -> None:
+            if isinstance(schema, str):
+                if schema in COMPONENT_PRIMITIVES:
+                    return
+                if schema not in self.types:
+                    raise ValueError(
+                        f"protocol {self.protocol}: unknown component type {schema}"
+                    )
+                if self.types[schema] == "native":
+                    raise ValueError(
+                        f"protocol {self.protocol}: unsupported native component type {schema}"
+                    )
+                found.add(schema)
+                if schema not in stack:
+                    visit(self.types[schema], stack + (schema,))
+                return
+            if not isinstance(schema, list) or len(schema) != 2:
+                raise ValueError(
+                    f"protocol {self.protocol}: invalid component schema {schema!r}"
+                )
+            kind, options = schema
+            if kind in {"mapper", "bitflags"}:
+                if not isinstance(options, dict) or "type" not in options:
+                    raise ValueError(f"invalid {kind} component schema")
+                visit(options["type"], stack)
+            elif kind == "container":
+                if not isinstance(options, list):
+                    raise ValueError("invalid component container")
+                for field in options:
+                    if not isinstance(field, dict) or "type" not in field:
+                        raise ValueError("invalid component container field")
+                    visit(field["type"], stack)
+            elif kind == "array":
+                if not isinstance(options, dict) or "type" not in options:
+                    raise ValueError("invalid component array")
+                if "countType" in options:
+                    visit(options["countType"], stack)
+                visit(options["type"], stack)
+            elif kind == "option":
+                visit(options, stack)
+            elif kind == "switch":
+                if not isinstance(options, dict) \
+                        or not isinstance(options.get("fields"), dict):
+                    raise ValueError("invalid component switch")
+                for branch in options["fields"].values():
+                    visit(branch, stack)
+                if "default" in options:
+                    visit(options["default"], stack)
+            elif kind == "registryEntryHolder":
+                if not isinstance(options, dict) \
+                        or not isinstance(options.get("otherwise"), dict):
+                    raise ValueError("invalid registryEntryHolder")
+                visit(options["otherwise"].get("type"), stack)
+            elif kind == "registryEntryHolderSet":
+                if not isinstance(options, dict) \
+                        or not isinstance(options.get("base"), dict) \
+                        or not isinstance(options.get("otherwise"), dict):
+                    raise ValueError("invalid registryEntryHolderSet")
+                visit(options["base"].get("type"), stack)
+                visit(options["otherwise"].get("type"), stack)
+            else:
+                raise ValueError(
+                    f"protocol {self.protocol}: unsupported component node {kind}"
+                )
+
+        visit(root, ())
+        return tuple(sorted(found))
+
+    def _name(self, alias: str) -> str:
+        return f"{self.prefix}_{c_name(alias)}"
+
+    def _variable(self, label: str) -> str:
+        self.counter += 1
+        return f"mc_{c_name(label)}_{self.counter}"
+
+    @staticmethod
+    def _invalid(indent: str, code: str = "MC_ERROR_INVALID_PACKET_BODY") -> str:
+        return (
+            f"{indent}return reader_fail(reader, {code}, "
+            "reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);"
+        )
+
+    def _primitive(self, schema: str, indent: str, label: str,
+                   capture: bool) -> tuple[list[str], ComponentCapture | None]:
+        variable = self._variable(label)
+        if schema == "void":
+            return [], None
+        if schema in {"UUID", "uuid"}:
+            return [f"{indent}if (!mc_reader_skip(reader, 16U)) return false;"], None
+        if schema == "position":
+            lines = [
+                f"{indent}McPosition {variable};",
+                f"{indent}if (!mc_reader_position(reader, {self.protocol}, &{variable})) return false;",
+            ]
+            return lines, None
+        if schema in {"anonymousNbt", "anonOptionalNbt"}:
+            return [
+                f"{indent}if (!mc_reader_nbt(reader, false, NULL)) return false;"
+            ], None
+        if schema == "string":
+            lines = [
+                f"{indent}McBytes {variable};",
+                f"{indent}if (!mc_reader_string(reader, &{variable})) return false;",
+            ]
+            return lines, None
+        specs = {
+            "bool": ("bool", "bool", "bool"),
+            "i8": ("int8_t", "i8", "integer"),
+            "u8": ("uint8_t", "u8", "integer"),
+            "i16": ("int16_t", "i16", "integer"),
+            "u16": ("uint16_t", "u16", "integer"),
+            "i32": ("int32_t", "i32", "integer"),
+            "u32": ("uint32_t", "u32", "integer"),
+            "i64": ("int64_t", "i64", "integer"),
+            "u64": ("uint64_t", "u64", "integer"),
+            "f32": ("float", "float", "float"),
+            "f64": ("double", "double", "float"),
+            "varint": ("int32_t", "varint", "integer"),
+            "varlong": ("int64_t", "varlong", "integer"),
+        }
+        if schema not in specs:
+            raise ValueError(
+                f"protocol {self.protocol}: unsupported component primitive {schema}"
+            )
+        c_type, suffix, kind = specs[schema]
+        initializer = "false" if schema == "bool" else "0"
+        lines = [
+            f"{indent}{c_type} {variable} = {initializer};",
+            f"{indent}if (!mc_reader_{suffix}(reader, &{variable})) return false;",
+        ]
+        if kind == "float":
+            lines.extend([
+                f"{indent}if (!isfinite({variable})) {{",
+                self._invalid(indent + "    "),
+                f"{indent}}}",
+            ])
+        result = ComponentCapture(variable, kind) if capture else None
+        return lines, result
+
+    def _references(self, schema: Any) -> set[str]:
+        references: set[str] = set()
+
+        def visit(node: Any) -> None:
+            if isinstance(node, str):
+                # Named aliases execute in their own generated function and
+                # therefore cannot reference a caller's container fields.
+                return
+            if not isinstance(node, list) or len(node) != 2:
+                return
+            kind, options = node
+            if kind == "container":
+                for field in options:
+                    visit(field["type"])
+            elif kind == "array":
+                count = options.get("count")
+                if isinstance(count, str):
+                    references.add(count)
+                if "countType" in options:
+                    visit(options["countType"])
+                visit(options["type"])
+            elif kind == "switch":
+                compare = options.get("compareTo")
+                if isinstance(compare, str):
+                    references.add(compare)
+                for branch in options.get("fields", {}).values():
+                    visit(branch)
+                if "default" in options:
+                    visit(options["default"])
+            elif kind in {"mapper", "bitflags"}:
+                visit(options.get("type"))
+            elif kind == "option":
+                visit(options)
+            elif kind == "registryEntryHolder":
+                visit(options["otherwise"]["type"])
+            elif kind == "registryEntryHolderSet":
+                visit(options["base"]["type"])
+                visit(options["otherwise"]["type"])
+
+        visit(schema)
+        return references
+
+    def _node(self, schema: Any, indent: str,
+              environment: dict[str, ComponentCapture], label: str,
+              capture: bool = False) -> tuple[list[str], ComponentCapture | None]:
+        if isinstance(schema, str):
+            if schema in COMPONENT_PRIMITIVES:
+                return self._primitive(schema, indent, label, capture)
+            if schema not in self.types:
+                raise ValueError(
+                    f"protocol {self.protocol}: unknown component alias {schema}"
+                )
+            if schema == "Slot":
+                if capture:
+                    raise ValueError("Slot cannot be used as a selector")
+                return ([
+                    f"{indent}if (!typed_skip_nested_item_stack(reader, "
+                    f"{self.protocol}, depth + 1U)) return false;"
+                ], None)
+            if capture:
+                return self._node(
+                    self.types[schema], indent, environment, label, True)
+            return ([
+                f"{indent}if (!{self._name(schema)}(reader, depth + 1U)) return false;"
+            ], None)
+        if not isinstance(schema, list) or len(schema) != 2:
+            raise ValueError(
+                f"protocol {self.protocol}: invalid component node {schema!r}"
+            )
+        kind, options = schema
+        if kind == "mapper":
+            if not isinstance(options, dict) \
+                    or not isinstance(options.get("mappings"), dict):
+                raise ValueError("invalid component mapper")
+            lines, parsed = self._node(
+                options.get("type"), indent, environment, label, True)
+            if parsed is None or parsed.kind not in {"integer", "bool"}:
+                raise ValueError("component mapper must use an integer scalar")
+            mappings = {
+                str(name): int(raw, 0)
+                for raw, name in options["mappings"].items()
+            }
+            allowed = sorted(set(mappings.values()))
+            condition = " && ".join(
+                f"{parsed.variable} != {value}" for value in allowed)
+            if condition:
+                lines.extend([
+                    f"{indent}if ({condition}) {{",
+                    self._invalid(indent + "    "),
+                    f"{indent}}}",
+                ])
+            mapped = ComponentCapture(parsed.variable, parsed.kind, mappings)
+            return lines, mapped if capture else None
+        if kind == "bitflags":
+            if not isinstance(options, dict):
+                raise ValueError("invalid component bitflags")
+            return self._node(
+                options.get("type"), indent, environment, label, capture)
+        if kind == "container":
+            if capture or not isinstance(options, list):
+                raise ValueError("component container cannot be a selector")
+            local = dict(environment)
+            references = self._references(schema)
+            lines: list[str] = []
+            for index, field in enumerate(options):
+                field_name = field.get("name")
+                field_label = str(field_name) if field_name is not None \
+                    else f"anonymous_{index}"
+                wants_value = isinstance(field_name, str) \
+                    and field_name in references
+                field_lines, parsed = self._node(
+                    field.get("type"), indent, local, field_label, wants_value)
+                lines.extend(field_lines)
+                if wants_value:
+                    if parsed is None:
+                        raise ValueError(
+                            f"component field {field_name} is not scalar"
+                        )
+                    local[field_name] = parsed
+            return lines, None
+        if kind == "array":
+            if capture or not isinstance(options, dict):
+                raise ValueError("component array cannot be a selector")
+            lines: list[str] = []
+            count_capture: ComponentCapture
+            if "countType" in options:
+                count_lines, parsed = self._node(
+                    options["countType"], indent, environment,
+                    f"{label}_count", True)
+                if parsed is None or parsed.kind != "integer":
+                    raise ValueError("component array count is not an integer")
+                lines.extend(count_lines)
+                count_capture = parsed
+            else:
+                count_name = options.get("count")
+                if not isinstance(count_name, str) or count_name not in environment:
+                    raise ValueError(
+                        f"component array references unknown count {count_name!r}"
+                    )
+                count_capture = environment[count_name]
+            count = self._variable(f"{label}_bounded_count")
+            lines.extend([
+                f"{indent}if ({count_capture.variable} < 0",
+                f"{indent}    || (uint64_t){count_capture.variable} > "
+                "(uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {",
+                self._invalid(indent + "    ", "MC_ERROR_INVALID_LENGTH"),
+                f"{indent}}}",
+                f"{indent}const uint32_t {count} = (uint32_t){count_capture.variable};",
+            ])
+            loop = self._variable(f"{label}_index")
+            lines.append(
+                f"{indent}for (uint32_t {loop} = 0U; {loop} < {count}; ++{loop}) {{"
+            )
+            element_lines, _ = self._node(
+                options.get("type"), indent + "    ", environment,
+                f"{label}_element")
+            lines.extend(element_lines)
+            lines.append(f"{indent}}}")
+            return lines, None
+        if kind == "option":
+            if capture:
+                raise ValueError("component option cannot be a selector")
+            present = self._variable(f"{label}_present")
+            lines = [
+                f"{indent}bool {present} = false;",
+                f"{indent}if (!mc_reader_bool(reader, &{present})) return false;",
+                f"{indent}if ({present}) {{",
+            ]
+            nested, _ = self._node(
+                options, indent + "    ", environment, f"{label}_value")
+            lines.extend(nested)
+            lines.append(f"{indent}}}")
+            return lines, None
+        if kind == "switch":
+            if capture or not isinstance(options, dict):
+                raise ValueError("component switch cannot be a selector")
+            compare = options.get("compareTo")
+            if not isinstance(compare, str) or compare not in environment:
+                raise ValueError(
+                    f"component switch references unknown selector {compare!r}"
+                )
+            selector = environment[compare]
+            raw_branches: list[tuple[int, Any]] = []
+            for key, branch in options.get("fields", {}).items():
+                if selector.mappings is not None:
+                    if key not in selector.mappings:
+                        raise ValueError(
+                            f"component switch has unknown mapped key {key!r}"
+                        )
+                    raw = selector.mappings[key]
+                elif selector.kind == "bool" and key in {"true", "false"}:
+                    raw = 1 if key == "true" else 0
+                else:
+                    raw = int(key, 0)
+                raw_branches.append((raw, branch))
+            raw_branches.sort(key=lambda item: item[0])
+            lines: list[str] = []
+            for index, (raw, branch) in enumerate(raw_branches):
+                keyword = "if" if index == 0 else "else if"
+                lines.append(
+                    f"{indent}{keyword} ({selector.variable} == {raw}) {{"
+                )
+                nested, _ = self._node(
+                    branch, indent + "    ", environment,
+                    f"{label}_branch_{raw}")
+                lines.extend(nested)
+                lines.append(f"{indent}}}")
+            if "default" in options:
+                lines.append(f"{indent}else {{")
+                nested, _ = self._node(
+                    options["default"], indent + "    ", environment,
+                    f"{label}_default")
+                lines.extend(nested)
+                lines.append(f"{indent}}}")
+            else:
+                lines.append(f"{indent}else {{")
+                lines.append(self._invalid(indent + "    "))
+                lines.append(f"{indent}}}")
+            return lines, None
+        if kind == "registryEntryHolder":
+            if capture or not isinstance(options, dict):
+                raise ValueError("registryEntryHolder cannot be a selector")
+            holder = self._variable(f"{label}_holder")
+            lines = [
+                f"{indent}int32_t {holder} = -1;",
+                f"{indent}if (!mc_reader_varint(reader, &{holder}) || {holder} < 0) {{",
+                self._invalid(indent + "    "),
+                f"{indent}}}",
+                f"{indent}if ({holder} == 0) {{",
+            ]
+            nested, _ = self._node(
+                options["otherwise"].get("type"), indent + "    ",
+                environment, f"{label}_inline")
+            lines.extend(nested)
+            lines.append(f"{indent}}}")
+            return lines, None
+        if kind == "registryEntryHolderSet":
+            if capture or not isinstance(options, dict):
+                raise ValueError("registryEntryHolderSet cannot be a selector")
+            holder = self._variable(f"{label}_holder_set")
+            lines = [
+                f"{indent}int32_t {holder} = -1;",
+                f"{indent}if (!mc_reader_varint(reader, &{holder}) || {holder} < 0) {{",
+                self._invalid(indent + "    "),
+                f"{indent}}}",
+                f"{indent}if ({holder} == 0) {{",
+            ]
+            base, _ = self._node(
+                options["base"].get("type"), indent + "    ", environment,
+                f"{label}_base")
+            lines.extend(base)
+            lines.append(f"{indent}}} else {{")
+            count = self._variable(f"{label}_holder_count")
+            lines.extend([
+                f"{indent}    const uint32_t {count} = (uint32_t)({holder} - 1);",
+                f"{indent}    if ({count} > MC_MAX_PACKET_ARRAY_COUNT) {{",
+                self._invalid(indent + "        ", "MC_ERROR_INVALID_LENGTH"),
+                f"{indent}    }}",
+            ])
+            loop = self._variable(f"{label}_holder_index")
+            lines.append(
+                f"{indent}    for (uint32_t {loop} = 0U; {loop} < {count}; ++{loop}) {{"
+            )
+            member, _ = self._node(
+                options["otherwise"].get("type"), indent + "        ",
+                environment, f"{label}_holder_member")
+            lines.extend(member)
+            lines.extend([f"{indent}    }}", f"{indent}}}"])
+            return lines, None
+        raise ValueError(
+            f"protocol {self.protocol}: unsupported component node {kind}"
+        )
+
+    def render(self) -> str:
+        aliases = tuple(alias for alias in self.aliases if alias != "Slot")
+        lines = [
+            f"/* Complete bounded Slot component validator for protocol {self.protocol}. */"
+        ]
+        for alias in aliases:
+            lines.append(
+                f"static bool {self._name(alias)}(McReader *reader, unsigned int depth);"
+            )
+        lines.append("")
+        for alias in aliases:
+            self.counter = 0
+            lines.extend([
+                f"static bool {self._name(alias)}(McReader *reader, unsigned int depth)",
+                "{",
+                "    if (reader == NULL) return false;",
+                "    if (depth > MC_MAX_NBT_DEPTH) {",
+                "        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);",
+                "    }",
+            ])
+            body, _ = self._node(
+                self.types[alias], "    ", {}, c_name(alias))
+            lines.extend(body)
+            lines.extend(["    return true;", "}", ""])
+        return "\n".join(lines).rstrip() + "\n"
+
+
+def generated_component_validators(
+    specifications: list[tuple[int, bytes]],
+    overlay: dict[str, Any] | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Return deduplicated C validators and source-hash report entries."""
+    if not specifications:
+        return "", []
+    by_hash: dict[str, tuple[int, dict[str, Any]]] = {}
+    report: list[dict[str, Any]] = []
+    protocol_to_representative: dict[int, int] = {}
+    renames = (overlay or {}).get("component_type_renames", {})
+    if not isinstance(renames, dict):
+        raise ValueError("component_type_renames must be an object")
+    applied_renames: set[str] = set()
+    for protocol, raw in sorted(specifications):
+        digest = hashlib.sha256(raw).hexdigest()
+        document = json.loads(raw)
+        mappings = document.get("types", {}).get("SlotComponentType")
+        if isinstance(mappings, list) and len(mappings) == 2 \
+                and isinstance(mappings[1], dict) \
+                and isinstance(mappings[1].get("mappings"), dict):
+            for raw_id, name in list(mappings[1]["mappings"].items()):
+                if name in renames:
+                    mappings[1]["mappings"][raw_id] = renames[name]
+                    applied_renames.add(name)
+        if digest not in by_hash:
+            by_hash[digest] = (protocol, document)
+        representative = by_hash[digest][0]
+        protocol_to_representative[protocol] = representative
+        report.append({"protocol": protocol, "source_sha256": digest})
+    missing_renames = set(renames) - applied_renames
+    if missing_renames:
+        raise ValueError(
+            "component type rename source not found: "
+            + ", ".join(sorted(missing_renames))
+        )
+
+    sections = [
+        "static bool typed_skip_nested_item_stack(McReader *reader,",
+        "    int protocol, unsigned int depth);",
+        "",
+    ]
+    for digest in sorted(by_hash):
+        representative, document = by_hash[digest]
+        sections.append(
+            ComponentValidatorCompiler(document, representative).render().rstrip()
+        )
+        sections.append("")
+    sections.extend([
+        "static bool mc_generated_skip_slot_component(McReader *reader,",
+        "    int protocol, unsigned int depth)",
+        "{",
+        "    switch (protocol) {",
+    ])
+    for protocol in sorted(protocol_to_representative):
+        representative = protocol_to_representative[protocol]
+        function = ComponentValidatorCompiler(
+            by_hash[next(
+                digest for digest, value in by_hash.items()
+                if value[0] == representative
+            )][1], representative
+        )._name("SlotComponent")
+        sections.append(
+            f"    case {protocol}: return {function}(reader, depth);"
+        )
+    sections.extend([
+        "    default:",
+        "        return reader_fail(reader, MC_ERROR_UNSUPPORTED_PROTOCOL,",
+        "            reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);",
+        "    }",
+        "}",
+        "",
+        "static bool mc_generated_skip_slot_component_type(McReader *reader,",
+        "    int protocol, unsigned int depth)",
+        "{",
+        "    switch (protocol) {",
+    ])
+    for protocol in sorted(protocol_to_representative):
+        representative = protocol_to_representative[protocol]
+        function = (
+            f"mc_generated_{representative}_component_slot_component_type"
+        )
+        sections.append(
+            f"    case {protocol}: return {function}(reader, depth);"
+        )
+    sections.extend([
+        "    default:",
+        "        return reader_fail(reader, MC_ERROR_UNSUPPORTED_PROTOCOL,",
+        "            reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);",
+        "    }",
+        "}",
+    ])
+    return "\n".join(sections).rstrip() + "\n", report
+
 
 def marked_region(text: str, begin: str, end: str) -> str:
     """Return the exact bytes between one unambiguous pair of markers."""
@@ -3106,7 +3676,8 @@ def normalize_generated_lines(lines: list[str]) -> str:
 
 
 def embedded_regions(protocol: int, header: str, source: str,
-                     source_sha: str) -> tuple[str, str]:
+                     source_sha: str,
+                     private_extension: str = "") -> tuple[str, str]:
     """Convert legacy standalone output into api.h/api.c marker contents."""
     guard = f"MC_PROTOCOL_GENERATED_{protocol}_H"
     public_skip = {
@@ -3131,17 +3702,23 @@ def embedded_regions(protocol: int, header: str, source: str,
         "",
     ]
     public = normalize_generated_lines(banner + public_lines)
-    private = normalize_generated_lines(
-        banner + (private_body.splitlines() if private_body else []))
+    private_lines = banner + (private_body.splitlines() if private_body else [])
+    if private_extension:
+        private_lines.extend(["", *private_extension.rstrip().splitlines()])
+    private = normalize_generated_lines(private_lines)
     return public + "\n", private + "\n"
 
 
 def embedded_schema_outputs(protocol: int, header: str, source: str,
                             manifest: dict[str, Any], api_header: Path,
-                            api_source: Path, report: Path) -> dict[Path, str]:
+                            api_source: Path, report: Path,
+                            private_extension: str = "",
+                            component_profiles: list[dict[str, Any]] | None = None,
+                            ) -> dict[Path, str]:
     """Build deterministic complete files while replacing marker regions only."""
     public, private = embedded_regions(
-        protocol, header, source, str(manifest["source_sha256"]))
+        protocol, header, source, str(manifest["source_sha256"]),
+        private_extension)
     header_text = replace_marked_region(
         api_header.read_text(encoding="utf-8"), PUBLIC_BEGIN, PUBLIC_END, public)
     source_text = replace_marked_region(
@@ -3156,6 +3733,8 @@ def embedded_schema_outputs(protocol: int, header: str, source: str,
             marked_region(header_text, PUBLIC_BEGIN, PUBLIC_END).encode("utf-8")
         ).hexdigest(),
     }
+    if component_profiles:
+        embedded_manifest["component_profiles"] = component_profiles
     embedded_manifest.pop("outputs", None)
     return {
         api_header: header_text,
@@ -3228,6 +3807,11 @@ def main() -> int:
     parser.add_argument("--api-source", type=Path)
     parser.add_argument("--embedded-report", type=Path)
     parser.add_argument("--verify-embedded", action="store_true")
+    parser.add_argument(
+        "--component-profile", action="append", default=[],
+        metavar="PROTOCOL:PROTOCOL_JSON",
+        help="compile a complete modern Slot component validator into api.c",
+    )
     args = parser.parse_args()
     if args.manifest is not None:
         if args.minecraft_data is None or args.output is None:
@@ -3235,7 +3819,8 @@ def main() -> int:
         if any(value is not None for value in (
             args.protocol_json, args.protocol_number, args.out_dir, args.overlay,
             args.api_header, args.api_source, args.embedded_report,
-        )) or args.packet or args.verify_existing or args.embed or args.verify_embedded:
+        )) or args.packet or args.component_profile or args.verify_existing \
+                or args.embed or args.verify_embedded:
             parser.error("manifest mode cannot be combined with single-schema options")
         outputs = expected_manifest_outputs(
             args.minecraft_data.expanduser().resolve(),
@@ -3245,7 +3830,7 @@ def main() -> int:
     if args.verify_existing:
         if args.protocol_number is None or args.out_dir is None:
             parser.error("--verify-existing requires --protocol-number and --out-dir")
-        if args.protocol_json is not None or args.packet:
+        if args.protocol_json is not None or args.packet or args.component_profile:
             parser.error("--verify-existing cannot regenerate a schema")
         verify_existing_single_schema(
             args.out_dir.expanduser().resolve(), args.protocol_number,
@@ -3263,7 +3848,8 @@ def main() -> int:
                 "--verify-embedded requires --protocol-number, --api-header, "
                 "--api-source and --embedded-report"
             )
-        if args.protocol_json is not None or args.packet or args.embed:
+        if args.protocol_json is not None or args.packet \
+                or args.component_profile or args.embed:
             parser.error("--verify-embedded cannot regenerate a schema")
         verify_existing_embedded(
             args.api_header.expanduser().resolve(),
@@ -3276,6 +3862,8 @@ def main() -> int:
         return 0
     if args.protocol_json is None or args.protocol_number is None:
         parser.error("single-schema mode requires --protocol-json and --protocol-number")
+    if args.component_profile and not args.embed:
+        parser.error("--component-profile requires --embed")
     if args.embed:
         if (
             args.api_header is None
@@ -3299,6 +3887,25 @@ def main() -> int:
         hashlib.sha256(raw).hexdigest(),
         overlay,
         hashlib.sha256(overlay_raw).hexdigest() if overlay_raw is not None else None)
+    component_specs: list[tuple[int, bytes]] = []
+    seen_component_protocols: set[int] = set()
+    for specification in args.component_profile:
+        protocol_text, separator, path_text = specification.partition(":")
+        if not separator:
+            parser.error(
+                f"invalid --component-profile {specification!r}; expected PROTOCOL:PATH"
+            )
+        try:
+            component_protocol = int(protocol_text)
+        except ValueError:
+            parser.error(f"invalid component protocol {protocol_text!r}")
+        if component_protocol in seen_component_protocols:
+            parser.error(f"duplicate component protocol {component_protocol}")
+        seen_component_protocols.add(component_protocol)
+        component_path = Path(path_text).expanduser().resolve()
+        component_specs.append((component_protocol, component_path.read_bytes()))
+    component_private, component_report = generated_component_validators(
+        component_specs, overlay)
     if args.embed:
         outputs = embedded_schema_outputs(
             args.protocol_number,
@@ -3308,6 +3915,8 @@ def main() -> int:
             args.api_header.expanduser().resolve(),
             args.api_source.expanduser().resolve(),
             args.embedded_report.expanduser().resolve(),
+            component_private,
+            component_report,
         )
         write_embedded_schema_outputs(outputs, args.check)
     else:

@@ -49,11 +49,19 @@ Questi numeri sono una fotografia locale, non ancora un gate: le soglie del
 - [x] Fase 1: error model strutturato e reader strict/exact.
 - [x] Fase 2: parser stream incrementale puro e riuso nel networking.
 - [x] Fase 3: embedding deterministico del generated code.
-- [ ] Fase 4: codec Tier A e packet-family mapping.
-- [ ] Fase 5: canonical IR lossless.
-- [ ] Fase 6: replay, differential testing e fuzzing.
-- [ ] Fase 7: Tier B e chunk envelope.
-- [ ] Fase 8: hardening prestazionale e regression gates.
+- [x] Fase 4: codec Tier A e packet-family mapping.
+- [x] Fase 5: canonical IR lossless.
+- [x] Fase 6: replay, differential testing e fuzzing.
+- [x] Fase 7: Tier B e chunk envelope.
+- [x] Fase 8: hardening prestazionale e regression gates.
+
+La vertical slice è stata estesa a tutte le 51 revisioni dichiarate. Il corpus
+golden/differential contiene 165 combinazioni packet/version, ogni decoder Tier
+A attraversa il test di troncamento a ogni byte e trailing data, e otto target
+fuzz collegano esclusivamente il target con `api.c`. La matrice generata mostra
+`PASS` per tutte le colonne Tier A; chunk resta dichiarato onestamente
+`PARTIAL` perché l'envelope è exact/bounded e le sezioni moderne sono iterabili,
+ma non viene materializzato un modello completo delle palette legacy.
 
 ## Fase 0 — Characterization e guardrail
 
@@ -215,7 +223,7 @@ heightmap, block entities e light boundaries senza materializzare un mondo 3D.
 - Aggiungere benchmark puri per VarInt, movement, position/look, attack, NBT,
   framing, compressione e canonical normalization.
 - Aggiungere replay 1/32/256 stream e corpus misto.
-- Misurare ns/op, packet/s, byte/s, allocazioni/op e peak retained buffer.
+- Misurare ns/op, packet/s, byte/s, allocazioni/op, peak retained buffer e RSS.
 - Ottimizzare riuso, lookup e copie soltanto dopo profili riproducibili.
 - Attivare gate 5% per primitive e 10% per path complessi dopo calibrazione CI.
 
@@ -237,13 +245,18 @@ La libreria è completa solo quando:
 - `make check` e il consumer `cc -O3 -std=c11 app.c api.c -lz -o app`
   passano da un checkout pulito.
 
-## Sequenza commit prevista
+## Evidenza di completamento
 
-1. `docs: add hardening implementation plan`
-2. `test: add two-file distribution guardrails`
-3. `feat: add structured decode errors and strict reader`
-4. `feat: add bounded incremental stream decoder`
-5. `test: add stream fragmentation and compression matrix`
-
-I commit successivi seguiranno le fasi 3–8; ogni commit deve essere compilabile
-e non deve dichiarare copertura non ancora dimostrata.
+- Le regioni embedded contengono il catalogo 776 e validatori Slot completi e
+  bounded per i profili 766–776; `generated/mc_protocol_776.json` contiene solo
+  hash e report, mai codice necessario alla build.
+- Il dispatcher puro copre Tier A, gli envelope Tier B e gli iterator borrowed
+  per inventory, multi-block change e sezioni chunk moderne.
+- Il differential oracle ha inoltre caratterizzato e corretto due boundary
+  moderni: `entity_velocity` usa `lpVec3` da 773 e il booleano di
+  `multi_block_change` termina a 762.
+- CI separa GCC/Clang, macOS arm64, Linux arm64, compile 32-bit,
+  generate-check, sanitizer, fuzz smoke, differential, coverage e benchmark
+  codec non dipendente dalla rete.
+- I gate finali restano i comandi riproducibili elencati nella Definition of
+  Done; nessun test o tool è necessario al consumer finale.

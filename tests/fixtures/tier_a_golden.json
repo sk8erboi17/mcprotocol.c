@@ -1,0 +1,347 @@
+{
+  "format_version": 1,
+  "cases": [
+    {"protocol": 47, "state": "play", "direction": "serverbound", "packet_id": 6, "packet_name": "position_look", "family": "player_movement", "raw_hex": "40288000000000004050200000000000c01f00000000000042b60000c1b4000001", "expected": {"kind": "movement", "x": 12.25, "y": 64.5, "z": -7.75, "yaw": 91.0, "pitch": -22.5, "on_ground": true}, "strict": true, "compat": true},
+    {"protocol": 340, "state": "play", "direction": "serverbound", "packet_id": 14, "packet_name": "position_look", "family": "player_movement", "raw_hex": "40288000000000004050200000000000c01f00000000000042b60000c1b4000001", "expected": {"kind": "movement", "x": 12.25, "y": 64.5, "z": -7.75, "yaw": 91.0, "pitch": -22.5, "on_ground": true}, "strict": true, "compat": true},
+    {"protocol": 754, "state": "play", "direction": "serverbound", "packet_id": 19, "packet_name": "position_look", "family": "player_movement", "raw_hex": "40288000000000004050200000000000c01f00000000000042b60000c1b4000001", "expected": {"kind": "movement", "x": 12.25, "y": 64.5, "z": -7.75, "yaw": 91.0, "pitch": -22.5, "on_ground": true}, "strict": true, "compat": true},
+    {"protocol": 763, "state": "play", "direction": "serverbound", "packet_id": 21, "packet_name": "position_look", "family": "player_movement", "raw_hex": "40288000000000004050200000000000c01f00000000000042b60000c1b4000001", "expected": {"kind": "movement", "x": 12.25, "y": 64.5, "z": -7.75, "yaw": 91.0, "pitch": -22.5, "on_ground": true}, "strict": true, "compat": true},
+    {"protocol": 768, "state": "play", "direction": "serverbound", "packet_id": 29, "packet_name": "position_look", "family": "player_movement", "raw_hex": "40288000000000004050200000000000c01f00000000000042b60000c1b4000001", "expected": {"kind": "movement", "x": 12.25, "y": 64.5, "z": -7.75, "yaw": 91.0, "pitch": -22.5, "on_ground": true}, "strict": true, "compat": true},
+    {"protocol": 776, "state": "play", "direction": "serverbound", "packet_id": 31, "packet_name": "position_look", "family": "player_movement", "raw_hex": "40288000000000004050200000000000c01f00000000000042b60000c1b4000001", "expected": {"kind": "movement", "x": 12.25, "y": 64.5, "z": -7.75, "yaw": 91.0, "pitch": -22.5, "on_ground": true}, "strict": true, "compat": true},
+
+    {"protocol": 47, "state": "play", "direction": "serverbound", "packet_id": 2, "packet_name": "use_entity", "family": "use_entity", "raw_hex": "1101", "expected": {"kind": "attack", "entity_id": 17, "action": 1}, "strict": true, "compat": true},
+    {"protocol": 340, "state": "play", "direction": "serverbound", "packet_id": 10, "packet_name": "use_entity", "family": "use_entity", "raw_hex": "1101", "expected": {"kind": "attack", "entity_id": 17, "action": 1}, "strict": true, "compat": true},
+    {"protocol": 754, "state": "play", "direction": "serverbound", "packet_id": 14, "packet_name": "use_entity", "family": "use_entity", "raw_hex": "110100", "expected": {"kind": "attack", "entity_id": 17, "action": 1}, "strict": true, "compat": true},
+    {"protocol": 763, "state": "play", "direction": "serverbound", "packet_id": 16, "packet_name": "use_entity", "family": "use_entity", "raw_hex": "110100", "expected": {"kind": "attack", "entity_id": 17, "action": 1}, "strict": true, "compat": true},
+    {"protocol": 768, "state": "play", "direction": "serverbound", "packet_id": 24, "packet_name": "use_entity", "family": "use_entity", "raw_hex": "110100", "expected": {"kind": "attack", "entity_id": 17, "action": 1}, "strict": true, "compat": true},
+    {"protocol": 776, "state": "play", "direction": "serverbound", "packet_id": 1, "packet_name": "attack", "family": "attack", "raw_hex": "11", "expected": {"kind": "attack", "entity_id": 17, "action": 1}, "strict": true, "compat": true},
+
+    {"protocol": 47, "state": "play", "direction": "serverbound", "packet_id": 9, "packet_name": "held_item_slot", "family": "held_item_slot", "raw_hex": "0004", "expected": {"kind": "slot", "slot": 4}, "strict": true, "compat": true},
+    {"protocol": 340, "state": "play", "direction": "serverbound", "packet_id": 26, "packet_name": "held_item_slot", "family": "held_item_slot", "raw_hex": "0004", "expected": {"kind": "slot", "slot": 4}, "strict": true, "compat": true},
+    {"protocol": 754, "state": "play", "direction": "serverbound", "packet_id": 37, "packet_name": "held_item_slot", "family": "held_item_slot", "raw_hex": "0004", "expected": {"kind": "slot", "slot": 4}, "strict": true, "compat": true},
+    {"protocol": 763, "state": "play", "direction": "serverbound", "packet_id": 40, "packet_name": "held_item_slot", "family": "held_item_slot", "raw_hex": "0004", "expected": {"kind": "slot", "slot": 4}, "strict": true, "compat": true},
+    {"protocol": 768, "state": "play", "direction": "serverbound", "packet_id": 49, "packet_name": "held_item_slot", "family": "held_item_slot", "raw_hex": "0004", "expected": {"kind": "slot", "slot": 4}, "strict": true, "compat": true},
+    {"protocol": 776, "state": "play", "direction": "serverbound", "packet_id": 53, "packet_name": "held_item_slot", "family": "held_item_slot", "raw_hex": "0004", "expected": {"kind": "slot", "slot": 4}, "strict": true, "compat": true},
+
+    {"protocol": 340, "state": "play", "direction": "serverbound", "packet_id": 0, "packet_name": "teleport_confirm", "family": "teleport_confirm", "raw_hex": "2a", "expected": {"kind": "teleport", "teleport_id": 42}, "strict": true, "compat": true},
+    {"protocol": 754, "state": "play", "direction": "serverbound", "packet_id": 0, "packet_name": "teleport_confirm", "family": "teleport_confirm", "raw_hex": "2a", "expected": {"kind": "teleport", "teleport_id": 42}, "strict": true, "compat": true},
+    {"protocol": 763, "state": "play", "direction": "serverbound", "packet_id": 0, "packet_name": "teleport_confirm", "family": "teleport_confirm", "raw_hex": "2a", "expected": {"kind": "teleport", "teleport_id": 42}, "strict": true, "compat": true},
+    {"protocol": 768, "state": "play", "direction": "serverbound", "packet_id": 0, "packet_name": "teleport_confirm", "family": "teleport_confirm", "raw_hex": "2a", "expected": {"kind": "teleport", "teleport_id": 42}, "strict": true, "compat": true},
+    {"protocol": 776, "state": "play", "direction": "serverbound", "packet_id": 0, "packet_name": "teleport_confirm", "family": "teleport_confirm", "raw_hex": "2a", "expected": {"kind": "teleport", "teleport_id": 42}, "strict": true, "compat": true}
+  ],
+  "matrix": [
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "flying",
+      "family": "player_movement",
+      "packet_id_by_protocol": {"47": 3, "340": 12, "754": 21, "763": 23, "768": 31, "776": 33},
+      "raw_hex": "01",
+      "expected": {"kind": "movement", "x": 0.0, "y": 0.0, "z": 0.0, "yaw": 0.0, "pitch": 0.0, "on_ground": true}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "look",
+      "family": "player_movement",
+      "packet_id_by_protocol": {"47": 5, "340": 15, "754": 20, "763": 22, "768": 30, "776": 32},
+      "raw_hex": "42b60000c1b4000001",
+      "expected": {"kind": "movement", "x": 0.0, "y": 0.0, "z": 0.0, "yaw": 91.0, "pitch": -22.5, "on_ground": true}
+    },
+    {
+      "protocols": [768, 776],
+      "direction": "serverbound",
+      "packet_name": "player_input",
+      "family": "player_input",
+      "packet_id_by_protocol": {"768": 40, "776": 43},
+      "raw_hex": "11",
+      "expected": {"kind": "player_input", "flags": 17, "bitset": true}
+    },
+    {
+      "protocols": [47, 340, 754, 763],
+      "direction": "serverbound",
+      "packet_name": "steer_vehicle",
+      "family": "steer_vehicle",
+      "packet_id_by_protocol": {"47": 12, "340": 22, "754": 29, "763": 31},
+      "raw_hex": "3e800000bf00000001",
+      "expected": {"kind": "steer_vehicle", "sideways": 0.25, "forward": -0.5, "flags": 1}
+    },
+    {
+      "protocols": [340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "vehicle_move",
+      "family": "vehicle_move",
+      "packet_id_by_protocol": {"340": 16, "754": 22, "763": 24, "768": 32, "776": 34},
+      "raw_hex_by_protocol": {"340": "40100000000000004050400000000000c02000000000000041f0000040a00000", "754": "40100000000000004050400000000000c02000000000000041f0000040a00000", "763": "40100000000000004050400000000000c02000000000000041f0000040a00000", "768": "40100000000000004050400000000000c02000000000000041f0000040a00000", "776": "40100000000000004050400000000000c02000000000000041f0000040a0000001"},
+      "expected_by_protocol": {
+        "340": {"kind": "vehicle_move", "x": 4.0, "y": 65.0, "z": -8.0, "yaw": 30.0, "pitch": 5.0, "on_ground": false},
+        "754": {"kind": "vehicle_move", "x": 4.0, "y": 65.0, "z": -8.0, "yaw": 30.0, "pitch": 5.0, "on_ground": false},
+        "763": {"kind": "vehicle_move", "x": 4.0, "y": 65.0, "z": -8.0, "yaw": 30.0, "pitch": 5.0, "on_ground": false},
+        "768": {"kind": "vehicle_move", "x": 4.0, "y": 65.0, "z": -8.0, "yaw": 30.0, "pitch": 5.0, "on_ground": false},
+        "776": {"kind": "vehicle_move", "x": 4.0, "y": 65.0, "z": -8.0, "yaw": 30.0, "pitch": 5.0, "on_ground": true}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "arm_animation",
+      "family": "arm_animation",
+      "packet_id_by_protocol": {"47": 10, "340": 29, "754": 44, "763": 47, "768": 56, "776": 63},
+      "raw_hex_by_protocol": {"47": "", "340": "00", "754": "00", "763": "00", "768": "00", "776": "00"},
+      "expected": {"kind": "arm_animation", "entity_id": 0, "hand": 0}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "client_command",
+      "family": "client_command",
+      "packet_id_by_protocol": {"47": 22, "340": 3, "754": 4, "763": 7, "768": 10, "776": 12},
+      "raw_hex": "00",
+      "expected": {"kind": "client_command", "action": 0}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "close_window",
+      "family": "close_window",
+      "packet_id_by_protocol": {"47": 13, "340": 8, "754": 10, "763": 12, "768": 17, "776": 19},
+      "raw_hex": "02",
+      "expected": {"kind": "close_window", "window_id": 2}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "rel_entity_move",
+      "family": "relative_entity_move",
+      "packet_id_by_protocol": {"47": 21, "340": 38, "754": 39, "763": 43, "768": 47, "776": 53},
+      "raw_hex_by_protocol": {"47": "0903fe0101", "340": "09012cff38006401", "754": "09012cff38006401", "763": "09012cff38006401", "768": "09012cff38006401", "776": "09012cff38006401"},
+      "expected_by_protocol": {
+        "47": {"kind": "entity_move", "entity_id": 9, "dx_raw": 3, "dy_raw": -2, "dz_raw": 1, "yaw_raw": 0, "pitch_raw": 0, "on_ground": true},
+        "340": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 0, "pitch_raw": 0, "on_ground": true},
+        "754": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 0, "pitch_raw": 0, "on_ground": true},
+        "763": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 0, "pitch_raw": 0, "on_ground": true},
+        "768": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 0, "pitch_raw": 0, "on_ground": true},
+        "776": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 0, "pitch_raw": 0, "on_ground": true}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "entity_move_look",
+      "family": "entity_move_look",
+      "packet_id_by_protocol": {"47": 23, "340": 39, "754": 40, "763": 44, "768": 48, "776": 54},
+      "raw_hex_by_protocol": {"47": "0903fe01402001", "340": "09012cff380064402001", "754": "09012cff380064402001", "763": "09012cff380064402001", "768": "09012cff380064402001", "776": "09012cff380064402001"},
+      "expected_by_protocol": {
+        "47": {"kind": "entity_move", "entity_id": 9, "dx_raw": 3, "dy_raw": -2, "dz_raw": 1, "yaw_raw": 64, "pitch_raw": 32, "on_ground": true},
+        "340": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 64, "pitch_raw": 32, "on_ground": true},
+        "754": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 64, "pitch_raw": 32, "on_ground": true},
+        "763": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 64, "pitch_raw": 32, "on_ground": true},
+        "768": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 64, "pitch_raw": 32, "on_ground": true},
+        "776": {"kind": "entity_move", "entity_id": 9, "dx_raw": 300, "dy_raw": -200, "dz_raw": 100, "yaw_raw": 64, "pitch_raw": 32, "on_ground": true}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "entity_teleport",
+      "family": "entity_teleport",
+      "packet_id_by_protocol": {"47": 24, "340": 76, "754": 86, "763": 104, "768": 119, "776": 125},
+      "raw_hex_by_protocol": {"47": "090000014000000820ffffffa0402001", "340": "0940240000000000004050400000000000c008000000000000402001", "754": "0940240000000000004050400000000000c008000000000000402001", "763": "0940240000000000004050400000000000c008000000000000402001", "768": "0940240000000000004050400000000000c008000000000000402001", "776": "0940240000000000004050400000000000c008000000000000402001"},
+      "expected": {"kind": "entity_teleport", "entity_id": 9, "x": 10.0, "y": 65.0, "z": -3.0, "yaw_raw": 64, "pitch_raw": 32, "on_ground": true}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "entity_head_rotation",
+      "family": "entity_head_rotation",
+      "packet_id_by_protocol": {"47": 25, "340": 54, "754": 58, "763": 66, "768": 77, "776": 83},
+      "raw_hex": "0940",
+      "expected": {"kind": "head_rotation", "entity_id": 9, "yaw_raw": 64}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "multi_block_change",
+      "family": "multi_block_change",
+      "packet_id_by_protocol": {"47": 34, "340": 16, "754": 59, "763": 67, "768": 78, "776": 84},
+      "raw_hex_by_protocol": {"47": "fffffffe0000000301124053", "340": "fffffffe0000000301124053", "754": "fffff800003000040001a3e214", "763": "fffff8000030000401a3e214", "768": "fffff8000030000401a3e214", "776": "fffff8000030000401a3e214"},
+      "expected_by_protocol": {
+        "47": {"kind": "multi_block_change", "chunk_x": -2, "chunk_z": 3, "section_y": 0, "record_count": 1},
+        "340": {"kind": "multi_block_change", "chunk_x": -2, "chunk_z": 3, "section_y": 0, "record_count": 1},
+        "754": {"kind": "multi_block_change", "chunk_x": -2, "chunk_z": 3, "section_y": 4, "record_count": 1},
+        "763": {"kind": "multi_block_change", "chunk_x": -2, "chunk_z": 3, "section_y": 4, "record_count": 1},
+        "768": {"kind": "multi_block_change", "chunk_x": -2, "chunk_z": 3, "section_y": 4, "record_count": 1},
+        "776": {"kind": "multi_block_change", "chunk_x": -2, "chunk_z": 3, "section_y": 4, "record_count": 1}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "entity_action",
+      "family": "entity_action",
+      "packet_id_by_protocol": {"47": 11, "340": 21, "754": 28, "763": 30, "768": 39, "776": 42},
+      "raw_hex_by_protocol": {"47": "070300", "340": "070300", "754": "070300", "763": "070300", "768": "070300", "776": "070100"},
+      "expected": {"kind": "entity_action", "entity_id": 7, "action": 3, "jump_boost": 0}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "abilities",
+      "family": "abilities",
+      "packet_id_by_protocol": {"47": 19, "340": 19, "754": 26, "763": 28, "768": 37, "776": 40},
+      "raw_hex_by_protocol": {"47": "023d4ccccd3dcccccd", "340": "023d4ccccd3dcccccd", "754": "02", "763": "02", "768": "02", "776": "02"},
+      "expected": {"kind": "abilities", "flags": 2}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "block_dig",
+      "family": "block_dig",
+      "packet_id_by_protocol": {"47": 7, "340": 20, "754": 27, "763": 29, "768": 38, "776": 41},
+      "raw_hex_by_protocol": {"47": "000000004103fffffe01", "340": "000000004103fffffe01", "754": "000000007fffffe04001", "763": "000000007fffffe0400109", "768": "000000007fffffe0400109", "776": "000000007fffffe0400109"},
+      "expected_by_protocol": {
+        "47": {"kind": "block_dig", "status": 0, "x": 1, "y": 64, "z": -2, "face": 1, "sequence": 0},
+        "340": {"kind": "block_dig", "status": 0, "x": 1, "y": 64, "z": -2, "face": 1, "sequence": 0},
+        "754": {"kind": "block_dig", "status": 0, "x": 1, "y": 64, "z": -2, "face": 1, "sequence": 0},
+        "763": {"kind": "block_dig", "status": 0, "x": 1, "y": 64, "z": -2, "face": 1, "sequence": 9},
+        "768": {"kind": "block_dig", "status": 0, "x": 1, "y": 64, "z": -2, "face": 1, "sequence": 9},
+        "776": {"kind": "block_dig", "status": 0, "x": 1, "y": 64, "z": -2, "face": 1, "sequence": 9}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "block_place",
+      "family": "block_place",
+      "packet_id_by_protocol": {"47": 8, "340": 31, "754": 46, "763": 49, "768": 58, "776": 66},
+      "raw_hex_by_protocol": {"47": "0000004107fffffe01ffff080808", "340": "0000004107fffffe01003f0000003f0000003f000000", "754": "000000007fffffe041013f0000003f0000003f00000000", "763": "000000007fffffe041013f0000003f0000003f000000000b", "768": "000000007fffffe041013f0000003f0000003f00000000000b", "776": "000000007fffffe041013f0000003f0000003f00000000000b"},
+      "expected_by_protocol": {
+        "47": {"kind": "block_place", "x": 1, "y": 65, "z": -2, "direction": 1, "hand": 0, "sequence": 0},
+        "340": {"kind": "block_place", "x": 1, "y": 65, "z": -2, "direction": 1, "hand": 0, "sequence": 0},
+        "754": {"kind": "block_place", "x": 1, "y": 65, "z": -2, "direction": 1, "hand": 0, "sequence": 0},
+        "763": {"kind": "block_place", "x": 1, "y": 65, "z": -2, "direction": 1, "hand": 0, "sequence": 11},
+        "768": {"kind": "block_place", "x": 1, "y": 65, "z": -2, "direction": 1, "hand": 0, "sequence": 11},
+        "776": {"kind": "block_place", "x": 1, "y": 65, "z": -2, "direction": 1, "hand": 0, "sequence": 11}
+      }
+    },
+    {
+      "protocols": [340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "use_item",
+      "family": "use_item",
+      "packet_id_by_protocol": {"340": 32, "754": 47, "763": 50, "768": 59, "776": 67},
+      "raw_hex_by_protocol": {"340": "00", "754": "00", "763": "0005", "768": "000541400000c0800000", "776": "000541400000c0800000"},
+      "expected_by_protocol": {
+        "340": {"kind": "use_item", "hand": 0, "sequence": 0, "yaw": 0.0, "pitch": 0.0},
+        "754": {"kind": "use_item", "hand": 0, "sequence": 0, "yaw": 0.0, "pitch": 0.0},
+        "763": {"kind": "use_item", "hand": 0, "sequence": 5, "yaw": 0.0, "pitch": 0.0},
+        "768": {"kind": "use_item", "hand": 0, "sequence": 5, "yaw": 12.0, "pitch": -4.0},
+        "776": {"kind": "use_item", "hand": 0, "sequence": 5, "yaw": 12.0, "pitch": -4.0}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "position",
+      "family": "server_position",
+      "packet_id_by_protocol": {"47": 8, "340": 47, "754": 52, "763": 60, "768": 66, "776": 72},
+      "raw_hex_by_protocol": {"47": "40240000000000004050400000000000c00800000000000042340000c120000001", "340": "40240000000000004050400000000000c00800000000000042340000c1200000012a", "754": "40240000000000004050400000000000c00800000000000042340000c1200000012a", "763": "40240000000000004050400000000000c00800000000000042340000c1200000012a", "768": "2a40240000000000004050400000000000c0080000000000003fd0000000000000bfe00000000000003fe800000000000042340000c120000000000101", "776": "2a40240000000000004050400000000000c0080000000000003fd0000000000000bfe00000000000003fe800000000000042340000c120000000000101"},
+      "expected_by_protocol": {
+        "47": {"kind": "server_position", "x": 10.0, "y": 65.0, "z": -3.0, "teleport_id": 0},
+        "340": {"kind": "server_position", "x": 10.0, "y": 65.0, "z": -3.0, "teleport_id": 42},
+        "754": {"kind": "server_position", "x": 10.0, "y": 65.0, "z": -3.0, "teleport_id": 42},
+        "763": {"kind": "server_position", "x": 10.0, "y": 65.0, "z": -3.0, "teleport_id": 42},
+        "768": {"kind": "server_position", "x": 10.0, "y": 65.0, "z": -3.0, "teleport_id": 42},
+        "776": {"kind": "server_position", "x": 10.0, "y": 65.0, "z": -3.0, "teleport_id": 42}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "entity_velocity",
+      "family": "entity_velocity",
+      "packet_id_by_protocol": {"47": 18, "340": 62, "754": 70, "763": 84, "768": 95, "776": 101},
+      "raw_hex_by_protocol": {"47": "09000000000000", "340": "09000000000000", "754": "09000000000000", "763": "09000000000000", "768": "09000000000000", "776": "0900"},
+      "expected": {"kind": "velocity", "entity_id": 9, "x": 0.0, "y": 0.0, "z": 0.0}
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "clientbound",
+      "packet_name": "block_change",
+      "family": "block_change",
+      "packet_id_by_protocol": {"47": 35, "340": 11, "754": 11, "763": 10, "768": 9, "776": 8},
+      "raw_hex_by_protocol": {"47": "0000010103fffffe53", "340": "0000010103fffffe53", "754": "0000013fffffe04053", "763": "0000013fffffe04053", "768": "0000013fffffe04053", "776": "0000013fffffe04053"},
+      "expected": {"kind": "block_change", "x": 4, "y": 64, "z": -2, "state_id": 83}
+    },
+    {
+      "protocols": [768, 776],
+      "direction": "clientbound",
+      "packet_name": "set_slot",
+      "family": "set_slot",
+      "packet_id_by_protocol": {"768": 21, "776": 20},
+      "raw_hex": "02070004010501000304",
+      "expected": {"kind": "set_slot", "window_id": 2, "state_id": 7, "slot": 4, "item_id": 5, "count": 1, "added": 1}
+    },
+    {
+      "protocols": [47, 340, 754, 763],
+      "direction": "clientbound",
+      "packet_name": "set_slot",
+      "family": "set_slot",
+      "packet_id_by_protocol": {"47": 47, "340": 22, "754": 21, "763": 20},
+      "raw_hex_by_protocol": {"47": "020004ffff", "340": "020004ffff", "754": "02000400", "763": "0207000400"},
+      "expected_by_protocol": {
+        "47": {"kind": "set_slot_empty", "window_id": 2, "state_id": 0, "slot": 4, "present": false},
+        "340": {"kind": "set_slot_empty", "window_id": 2, "state_id": 0, "slot": 4, "present": false},
+        "754": {"kind": "set_slot_empty", "window_id": 2, "state_id": 0, "slot": 4, "present": false},
+        "763": {"kind": "set_slot_empty", "window_id": 2, "state_id": 7, "slot": 4, "present": false}
+      }
+    },
+    {
+      "protocols": [768, 776],
+      "direction": "clientbound",
+      "packet_name": "window_items",
+      "family": "window_items",
+      "packet_id_by_protocol": {"768": 19, "776": 18},
+      "raw_hex": "02070101050100030400",
+      "expected": {"kind": "window_items", "window_id": 2, "state_id": 7, "item_count": 1}
+    },
+    {
+      "protocols": [47, 340, 754, 763],
+      "direction": "clientbound",
+      "packet_name": "window_items",
+      "family": "window_items",
+      "packet_id_by_protocol": {"47": 48, "340": 20, "754": 19, "763": 18},
+      "raw_hex_by_protocol": {"47": "020001ffff", "340": "020001ffff", "754": "02000100", "763": "0207010000"},
+      "expected_by_protocol": {
+        "47": {"kind": "window_items", "window_id": 2, "state_id": 0, "item_count": 1},
+        "340": {"kind": "window_items", "window_id": 2, "state_id": 0, "item_count": 1},
+        "754": {"kind": "window_items", "window_id": 2, "state_id": 0, "item_count": 1},
+        "763": {"kind": "window_items", "window_id": 2, "state_id": 7, "item_count": 1}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "window_click",
+      "family": "window_click",
+      "packet_id_by_protocol": {"47": 14, "340": 7, "754": 9, "763": 11, "768": 16, "776": 18},
+      "raw_hex_by_protocol": {"47": "02000400000b00ffff", "340": "02000400000b00ffff", "754": "02000400000b0000", "763": "0207000400000000", "768": "0207000400000000", "776": "0207000400000000"},
+      "expected_by_protocol": {
+        "47": {"kind": "window_click", "window_id": 2, "state_id": 0, "slot": 4, "action_number": 11, "changed_slot_count": 0, "carried_present": false},
+        "340": {"kind": "window_click", "window_id": 2, "state_id": 0, "slot": 4, "action_number": 11, "changed_slot_count": 0, "carried_present": false},
+        "754": {"kind": "window_click", "window_id": 2, "state_id": 0, "slot": 4, "action_number": 11, "changed_slot_count": 0, "carried_present": false},
+        "763": {"kind": "window_click", "window_id": 2, "state_id": 7, "slot": 4, "action_number": 0, "changed_slot_count": 0, "carried_present": false},
+        "768": {"kind": "window_click", "window_id": 2, "state_id": 7, "slot": 4, "action_number": 0, "changed_slot_count": 0, "carried_present": false},
+        "776": {"kind": "window_click", "window_id": 2, "state_id": 7, "slot": 4, "action_number": 0, "changed_slot_count": 0, "carried_present": false}
+      }
+    },
+    {
+      "protocols": [47, 340, 754, 763, 768, 776],
+      "direction": "serverbound",
+      "packet_name": "set_creative_slot",
+      "family": "set_creative_slot",
+      "packet_id_by_protocol": {"47": 16, "340": 27, "754": 40, "763": 43, "768": 52, "776": 56},
+      "raw_hex_by_protocol": {"47": "0024ffff", "340": "0024ffff", "754": "002400", "763": "002400", "768": "002400", "776": "002400"},
+      "expected": {"kind": "creative_slot", "slot": 36, "present": false}
+    }
+  ]
+}

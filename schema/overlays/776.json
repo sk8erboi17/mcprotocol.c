@@ -1,5 +1,8 @@
 {
   "base_release": "26.1",
+  "component_type_renames": {
+    "zomie_nautilus/variant": "zombie_nautilus/variant"
+  },
   "packet_renames": {
     "play:serverbound:spectate_entity": "spectator_action"
   },

@@ -1,7 +1,53 @@
 {
   "catalog_validation_count": 255,
+  "component_profiles": [
+    {
+      "protocol": 766,
+      "source_sha256": "fb17c6fedeef6ed1870b6013d7ff12da7e7829c75bc40569e909ea56822eb394"
+    },
+    {
+      "protocol": 767,
+      "source_sha256": "bc53a5f3c475c653ade20bf150a1872231c5e3b2403f2060436aea2a76cd35b4"
+    },
+    {
+      "protocol": 768,
+      "source_sha256": "313930c4755d2b43a58cdb696c99c5350b769c8dac594cea793d8609bd14ab4f"
+    },
+    {
+      "protocol": 769,
+      "source_sha256": "7494df8279f0f307c6d32feb121e204e4b6c7b583c4cbb5f8d768b3a1645075f"
+    },
+    {
+      "protocol": 770,
+      "source_sha256": "6692065de38501eff009b14a7d6e7f491199345b9823be577d2b789514541362"
+    },
+    {
+      "protocol": 771,
+      "source_sha256": "e3b83d9ca16633a07bdc5511b9076d50a0719d22a257f9b6f14d94a8e43c135a"
+    },
+    {
+      "protocol": 772,
+      "source_sha256": "e2847dfbfece1861c7dd9bcd457af7251dd8d012682f1b19d9e60df03305a781"
+    },
+    {
+      "protocol": 773,
+      "source_sha256": "7d4791896427272ee05e74a2a9da093e7c100024f71f88dac453601a605cb66b"
+    },
+    {
+      "protocol": 774,
+      "source_sha256": "4562ba6f519a698f0eddb64cae1b938570eba3a3a0c6ccf0d53e057abded7a81"
+    },
+    {
+      "protocol": 775,
+      "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"
+    },
+    {
+      "protocol": 776,
+      "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"
+    }
+  ],
   "embedded_outputs": {
-    "api.c": "343b08b3da8ba7c0c0b54e2601bc860926559502fa46bfe41105e8fa35a194ba",
+    "api.c": "b50c5c27a5be035870b74cfeb83fed5c32d16f43df301882cfa7fb7b278547cc",
     "api.h": "e0f03c3acdd1dcf164ca77a84b736d2ea602739104c03455f09d5f0f1be94aa4"
   },
   "generated_packets": [
@@ -17,7 +63,7 @@
     }
   ],
   "generator_version": 2,
-  "overlay_sha256": "552856dafa54dd03f76a437f810043fc902187784dd24f77866159b996fd2e6b",
+  "overlay_sha256": "593b71076bcc2f1cc5fca98c866971ae0e457f4caa9597c3c4898672e5d0839a",
   "packet_id_count": 257,
   "protocol": 776,
   "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"

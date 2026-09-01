@@ -6,5 +6,12 @@ tests/api_test
 tests/codec_test
 tests/generated_test
 tests/stream_test
+tests/typed_packet_test
+tests/envelope_test
+tests/canonical_test
+tests/replay_test
+tests/property_test
 __pycache__/
 *.pyc
+build/
+benchmark/node_modules/

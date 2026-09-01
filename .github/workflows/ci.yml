@@ -1,0 +1,116 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+          - os: ubuntu-latest
+            cc: clang
+          - os: macos-14
+            cc: clang
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build warnings-as-errors
+        run: make
+      - name: Public and packet-driven tests
+        run: make test test-amalgamation test-exports
+
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: PrismarineJS/minecraft-data
+          path: minecraft-data
+      - name: Deterministic embedded generation
+        run: make generate-check MINECRAFT_DATA_ROOT=./minecraft-data
+
+  sanitize:
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v4
+      - name: ASan and UBSan
+        run: make test-sanitize
+
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    env:
+      FUZZ_CC: clang
+    steps:
+      - uses: actions/checkout@v4
+      - name: Eight public-library fuzz targets
+        run: make fuzz-smoke
+
+  differential:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: benchmark/package-lock.json
+      - run: npm ci --prefix benchmark --ignore-scripts --no-audit --no-fund
+      - name: Node oracle versus C golden corpus
+        run: make test-differential
+
+  coverage:
+    runs-on: ubuntu-latest
+    env:
+      FUZZ_CC: clang
+    steps:
+      - uses: actions/checkout@v4
+      - run: make coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llvm-coverage-and-protocol-matrix
+          path: |
+            build/coverage/coverage.txt
+            build/coverage/coverage.lcov
+            build/coverage-matrix.md
+
+  codec-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allocation, retained-memory and RSS invariants
+        run: make benchmark-codec
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codec-benchmark
+          path: benchmark/codec_results.json
+
+  compile-32-bit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y gcc-multilib lib32z1-dev
+      - name: C11 32-bit compile and codec test
+        run: >-
+          gcc -m32 -std=c11 -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+          -Werror -UNDEBUG -I. tests/codec_test.c api.c -lz
+          -o /tmp/mcprotocol-codec-test-32
+          && /tmp/mcprotocol-codec-test-32
+
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test

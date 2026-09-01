@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
@@ -1209,6 +1210,86 @@ def main() -> None:
         else:
             raise AssertionError("integrity check accepted modified generated source")
 
+    component_document = {
+        "types": {
+            "SlotComponentType": [
+                "mapper",
+                {
+                    "type": "varint",
+                    "mappings": {"0": "typo", "1": "nested", "2": "holder"},
+                },
+            ],
+            "SlotComponent": [
+                "container",
+                [
+                    {"name": "type", "type": "SlotComponentType"},
+                    {
+                        "name": "data",
+                        "type": [
+                            "switch",
+                            {
+                                "compareTo": "type",
+                                "fields": {
+                                    "fixed": "varint",
+                                    "nested": [
+                                        "container",
+                                        [
+                                            {"name": "count", "type": "varint"},
+                                            {
+                                                "name": "values",
+                                                "type": [
+                                                    "array",
+                                                    {
+                                                        "count": "count",
+                                                        "type": ["option", "string"],
+                                                    },
+                                                ],
+                                            },
+                                            {"name": "child", "type": "Slot"},
+                                        ],
+                                    ],
+                                    "holder": [
+                                        "registryEntryHolder",
+                                        {"otherwise": {"type": "string"}},
+                                    ],
+                                },
+                            },
+                        ],
+                    },
+                ],
+            ],
+            "Slot": "varint",
+        }
+    }
+    component_raw = json.dumps(
+        component_document, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    component_overlay = {"component_type_renames": {"typo": "fixed"}}
+    component_source, component_report = COMPILER.generated_component_validators(
+        [(900, component_raw), (901, component_raw)], component_overlay
+    )
+    repeated_source, repeated_report = COMPILER.generated_component_validators(
+        [(900, component_raw), (901, component_raw)], component_overlay
+    )
+    assert component_source == repeated_source
+    assert component_report == repeated_report
+    assert component_source.count("Complete bounded Slot component validator") == 1
+    assert "mc_generated_900_component_slot_component" in component_source
+    assert "case 900:" in component_source
+    assert "case 901:" in component_source
+    assert "typed_skip_nested_item_stack(reader, 900, depth + 1U)" in component_source
+    assert "MC_MAX_PACKET_ARRAY_COUNT" in component_source
+    assert len(component_report) == 2
+    try:
+        COMPILER.generated_component_validators(
+            [(900, component_raw)],
+            {"component_type_renames": {"missing_typo": "fixed"}},
+        )
+    except ValueError as error:
+        assert "rename source not found" in str(error)
+    else:
+        raise AssertionError("unused component overlay rename was accepted")
+
     embedded_header = """/* Generated from minecraft-data; do not edit. */
 #ifndef MC_PROTOCOL_GENERATED_999_H
 #define MC_PROTOCOL_GENERATED_999_H
@@ -1317,7 +1398,8 @@ bool mc999_play_clientbound_sample_decode(McReader *reader, Mc999Sample *value)
 
     print(
         "PASS schema compiler manifest, overrides, minecart, NOTE particle, "
-        "scoreboard/inventory/chunk projections, embedded regions, integrity and staleness"
+        "scoreboard/inventory/chunk projections, component validators, "
+        "embedded regions, integrity and staleness"
     )
 
 

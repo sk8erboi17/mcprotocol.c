@@ -173,6 +173,87 @@ static void invalid_initialization_is_structured(void)
     assert(error.code == MC_ERROR_INVALID_ARGUMENT);
 }
 
+static void nbt_limits_are_explicit_and_structured(void)
+{
+    static const unsigned char negative_byte_array[] = {
+        MC_NBT_BYTE_ARRAY, 0xffU, 0xffU, 0xffU, 0xffU,
+    };
+    McReader reader;
+    McError error;
+    mc_reader_init_mode(&reader, negative_byte_array,
+        sizeof(negative_byte_array), MC_DECODE_STRICT, &error);
+    assert(!mc_reader_nbt(&reader, false, NULL));
+    assert(error.code == MC_ERROR_NBT_LENGTH);
+    assert(error.offset == 1U);
+
+    static const unsigned char oversized_byte_array[] = {
+        MC_NBT_BYTE_ARRAY, 0x00U, 0x10U, 0x00U, 0x01U,
+    };
+    mc_reader_init_mode(&reader, oversized_byte_array,
+        sizeof(oversized_byte_array), MC_DECODE_STRICT, &error);
+    assert(!mc_reader_nbt(&reader, false, NULL));
+    assert(error.code == MC_ERROR_NBT_LENGTH);
+    assert(error.offset == 1U);
+
+    unsigned char nested[1U + (MC_MAX_NBT_DEPTH + 1U) * 3U];
+    size_t size = 0U;
+    nested[size++] = MC_NBT_COMPOUND;
+    for (size_t depth = 0U; depth <= MC_MAX_NBT_DEPTH; ++depth) {
+        nested[size++] = MC_NBT_COMPOUND;
+        nested[size++] = 0U;
+        nested[size++] = 0U;
+    }
+    mc_reader_init_mode(&reader, nested, size, MC_DECODE_STRICT, &error);
+    assert(!mc_reader_nbt(&reader, false, NULL));
+    assert(error.code == MC_ERROR_NBT_DEPTH);
+
+    static const unsigned char empty_name[] = {0U, 0U};
+    McBytes name;
+    mc_reader_init_mode(&reader, empty_name, sizeof(empty_name),
+        MC_DECODE_STRICT, &error);
+    assert(!mc_reader_nbt_name(&reader, NULL));
+    assert(error.code == MC_ERROR_INVALID_ARGUMENT);
+    assert(!mc_reader_nbt_name(&reader, &name));
+    assert(error.code == MC_ERROR_INVALID_ARGUMENT);
+}
+
+static void cross_version_reader_errors_are_structured(void)
+{
+    static const unsigned char zeroes[32] = {0U};
+    McReader reader;
+    McError error;
+    McPosition position;
+    mc_reader_init_mode(&reader, zeroes, sizeof(zeroes), MC_DECODE_STRICT,
+        &error);
+    assert(!mc_reader_position(&reader, 9999, &position));
+    assert(error.code == MC_ERROR_UNSUPPORTED_PROTOCOL);
+    assert(error.protocol == 9999);
+    assert(error.offset == 0U);
+
+    McUuid uuid;
+    mc_reader_init_mode(&reader, zeroes, sizeof(zeroes), MC_DECODE_STRICT,
+        &error);
+    assert(!mc_reader_uuid(&reader, NULL));
+    assert(error.code == MC_ERROR_INVALID_ARGUMENT);
+    assert(!mc_reader_uuid(&reader, &uuid));
+    assert(error.code == MC_ERROR_INVALID_ARGUMENT);
+
+    int32_t item_id = 0;
+    int32_t count = 0;
+    mc_reader_init_mode(&reader, zeroes, sizeof(zeroes), MC_DECODE_STRICT,
+        &error);
+    assert(!mc_reader_plain_item(&reader, 9999, &item_id, &count));
+    assert(error.code == MC_ERROR_UNSUPPORTED_PROTOCOL);
+    assert(error.protocol == 9999);
+
+    McItemStackView item;
+    mc_reader_init_mode(&reader, zeroes, sizeof(zeroes), MC_DECODE_STRICT,
+        &error);
+    assert(!mc_reader_item_stack(&reader, 9999, MC_ITEM_WIRE_FULL, &item));
+    assert(error.code == MC_ERROR_UNSUPPORTED_PROTOCOL);
+    assert(error.protocol == 9999);
+}
+
 int main(void)
 {
     errors_have_stable_names_and_unknown_context();
@@ -181,6 +262,8 @@ int main(void)
     strict_varlongs_are_canonical();
     bounded_strings_and_exact_consumption_fail_early();
     invalid_initialization_is_structured();
+    nbt_limits_are_explicit_and_structured();
+    cross_version_reader_errors_are_structured();
     puts("PASS structured errors, strict reader and exact consumption");
     return 0;
 }

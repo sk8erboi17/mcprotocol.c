@@ -660,7 +660,7 @@ static void movement_and_hotbar_bodies_match_node(void)
     }
 
     const McPlayerPosition non_finite = {
-        NAN, 64.0, 9.5, 0.0F, 0.0F, true
+        (double)NAN, 64.0, 9.5, 0.0F, 0.0F, true
     };
     mc_packet_init(&packet, storage, sizeof(storage));
     assert(!mc_packet_player_position(&packet, 47, &non_finite));
@@ -923,6 +923,10 @@ static void untrusted_component_items_match_node(void)
     mc_packet_init(&packet, storage, sizeof(storage));
     assert(!mc_packet_untrusted_component_item(
         &packet, 765, 937, 1, &enchantment, 1U, NULL, 0U));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_untrusted_component_item(
+        &packet, 769, 937, 1, &enchantment, 1U, NULL, 0U));
     assert(packet.failed);
     const McItemComponentPatch invalid = {.type_id = -1, .data = {NULL, 0U}};
     mc_packet_init(&packet, storage, sizeof(storage));
