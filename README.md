@@ -179,6 +179,7 @@ Available symmetric field codecs are:
 | `inventory_slot_update` | Normalized container-slot or dedicated player-inventory update | observing authoritative main/off-hand inventory reconciliation |
 | `container_open` | Bounded legacy/namespaced/registry menu identity and borrowed title | observing release-aware menu creation without allocations |
 | `container_content` | Bounded metadata-free slot array with state and carried-item fields | inspecting complete Vanilla container snapshots safely |
+| `scoreboard_objective`, `scoreboard_display`, `scoreboard_score`, `scoreboard_reset` | Allocation-free normalized clientbound scoreboard views, including legacy removals and modern optional components/number formats | observing sidebar lifecycle and score updates across releases |
 | `entity_equipment` | Bounded release-aware equipment body with normalized legacy slots and modern continuation lists | observing main/off-hand, armor, body and saddle projection |
 | `entity_hand_use_metadata` | Exact one-entry shared/living flags body with historical index and terminator validation | observing active main/off-hand item-use projection |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |

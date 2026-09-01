@@ -33,7 +33,7 @@ FUZZ_FLAGS = -O1 -g -std=c11 $(WARNINGS) -UNDEBUG -fno-omit-frame-pointer \
 .PHONY: all clean shared benchmark benchmark-codec benchmark-network \
 	benchmark-baseline coverage coverage-matrix generate generate-check \
 	test test-unit test-codec test-stream test-generated test-schema test-amalgamation \
-	test-packets test-envelope test-canonical test-golden test-replay test-property \
+	test-packets test-scoreboard test-envelope test-canonical test-golden test-replay test-property \
 	test-differential test-exports test-asan test-ubsan test-sanitize \
 	fuzz-build fuzz-smoke check
 
@@ -102,7 +102,7 @@ generate-check:
 		printf '%s\n' "minecraft-data unavailable: embedded-region integrity checked; full regeneration skipped"; \
 	fi
 
-test: test-unit test-codec test-packets test-envelope test-canonical test-golden test-replay test-property test-stream test-generated test-schema
+test: test-unit test-codec test-packets test-scoreboard test-envelope test-canonical test-golden test-replay test-property test-stream test-generated test-schema
 
 test-unit: tests/api_test
 	./tests/api_test
@@ -112,6 +112,9 @@ test-codec: tests/codec_test
 
 test-packets: tests/typed_packet_test
 	./tests/typed_packet_test
+
+test-scoreboard: tests/scoreboard_test
+	./tests/scoreboard_test
 
 test-envelope: tests/envelope_test
 	./tests/envelope_test
@@ -187,6 +190,10 @@ tests/typed_packet_test: tests/typed_packet_test.c api.c api.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 $(WARNINGS) -UNDEBUG \
 		-I. tests/typed_packet_test.c api.c -lz -o $@
 
+tests/scoreboard_test: tests/scoreboard_test.c api.c api.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 $(WARNINGS) -UNDEBUG \
+		-I. tests/scoreboard_test.c api.c -lz -o $@
+
 tests/envelope_test: tests/envelope_test.c api.c api.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c11 $(WARNINGS) -UNDEBUG \
 		-I. tests/envelope_test.c api.c -lz -o $@
@@ -214,6 +221,6 @@ build/fuzz/%: tests/fuzz/%_fuzz.c tests/fuzz/fuzz_common.h api.c api.h
 clean:
 	rm -f api.o libmcprotocol.a libmcprotocol.so libmcprotocol.dylib \
 		tests/api_test tests/codec_test tests/stream_test tests/typed_packet_test \
-		tests/envelope_test tests/canonical_test tests/replay_test tests/property_test \
+		tests/scoreboard_test tests/envelope_test tests/canonical_test tests/replay_test tests/property_test \
 		tests/generated_test
 	rm -rf build

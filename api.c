@@ -4834,6 +4834,199 @@ static bool reader_entity_equipment_entry(McReader *reader, int protocol,
     return true;
 }
 
+static bool scoreboard_reader_ready(McReader *reader, int protocol,
+    const void *value)
+{
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL || !mc_protocol_supported(protocol)) {
+        return reader_fail(reader, value == NULL ? MC_ERROR_INVALID_ARGUMENT
+            : MC_ERROR_UNSUPPORTED_PROTOCOL, reader->offset);
+    }
+    return true;
+}
+
+static bool scoreboard_read_string(McReader *reader, McBytes *value)
+{
+    return mc_reader_string_bounded(reader, 32767U, value);
+}
+
+static bool scoreboard_read_number_format(McReader *reader,
+    int32_t *format, McBytes *component, bool *has_component)
+{
+    if (!mc_reader_varint(reader, format) || *format < 0 || *format > 2) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY,
+            reader->offset);
+    }
+    *has_component = *format == 1 || *format == 2;
+    return !*has_component || mc_reader_nbt(reader, false, component);
+}
+
+bool mc_reader_scoreboard_objective(McReader *reader, int protocol,
+    McScoreboardObjective *value)
+{
+    McScoreboardObjective decoded = {
+        .render_type = -1,
+        .number_format = -1,
+    };
+    if (!scoreboard_reader_ready(reader, protocol, value)
+        || !scoreboard_read_string(reader, &decoded.objective_name)) {
+        return false;
+    }
+    if (protocol <= 5) {
+        if (!scoreboard_read_string(reader, &decoded.display_name)
+            || !mc_reader_u8(reader, &decoded.action)) {
+            return false;
+        }
+        decoded.has_display_name = true;
+        if (decoded.action > 2U) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY,
+                reader->offset);
+        }
+        *value = decoded;
+        return true;
+    }
+    if (!mc_reader_u8(reader, &decoded.action) || decoded.action > 2U) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY,
+            reader->offset);
+    }
+    if (decoded.action == 1U) {
+        *value = decoded;
+        return true;
+    }
+    decoded.has_display_name = true;
+    if (protocol <= 764) {
+        if (!scoreboard_read_string(reader, &decoded.display_name)) return false;
+    } else {
+        if (!mc_reader_nbt(reader, false, &decoded.display_name)) return false;
+        decoded.display_name_is_nbt = true;
+    }
+    if (protocol <= 340) {
+        if (!scoreboard_read_string(reader, &decoded.render_type_name)) return false;
+    } else {
+        if (!mc_reader_varint(reader, &decoded.render_type)
+            || decoded.render_type < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY,
+                reader->offset);
+        }
+        decoded.render_type_is_registry_id = true;
+    }
+    if (protocol >= 765) {
+        if (!mc_reader_bool(reader, &decoded.has_number_format)) return false;
+        if (decoded.has_number_format
+            && !scoreboard_read_number_format(reader,
+                &decoded.number_format, &decoded.number_format_component,
+                &decoded.has_number_format_component)) {
+            return false;
+        }
+    }
+    *value = decoded;
+    return true;
+}
+
+bool mc_reader_scoreboard_display(McReader *reader, int protocol,
+    McScoreboardDisplay *value)
+{
+    McScoreboardDisplay decoded = {.slot = -1};
+    if (!scoreboard_reader_ready(reader, protocol, value)) return false;
+    if (protocol <= 763) {
+        uint8_t slot = 0U;
+        if (!mc_reader_u8(reader, &slot)) return false;
+        decoded.slot = (int32_t)slot;
+    } else if (!mc_reader_varint(reader, &decoded.slot)
+        || decoded.slot < 0) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY,
+            reader->offset);
+    }
+    if (!scoreboard_read_string(reader, &decoded.objective_name)) return false;
+    *value = decoded;
+    return true;
+}
+
+bool mc_reader_scoreboard_score(McReader *reader, int protocol,
+    McScoreboardScore *value)
+{
+    McScoreboardScore decoded = {
+        .value = 0,
+        .number_format = -1,
+    };
+    if (!scoreboard_reader_ready(reader, protocol, value)
+        || !scoreboard_read_string(reader, &decoded.entry_name)) {
+        return false;
+    }
+    if (protocol <= 5) {
+        if (!mc_reader_u8(reader, &decoded.action) || decoded.action > 1U) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY,
+                reader->offset);
+        }
+        if (decoded.action == 0U) {
+            if (!scoreboard_read_string(reader, &decoded.objective_name)
+                || !mc_reader_i32(reader, &decoded.value)) {
+                return false;
+            }
+            decoded.has_objective_name = true;
+            decoded.has_value = true;
+        }
+        *value = decoded;
+        return true;
+    }
+    if (protocol <= 764) {
+        int32_t action = -1;
+        if (!mc_reader_varint(reader, &action) || action < 0 || action > 1
+            || !scoreboard_read_string(reader, &decoded.objective_name)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY,
+                reader->offset);
+        }
+        decoded.action = (uint8_t)action;
+        decoded.has_objective_name = true;
+        if (decoded.action == 0U) {
+            if (!mc_reader_varint(reader, &decoded.value)) return false;
+            decoded.has_value = true;
+        }
+        *value = decoded;
+        return true;
+    }
+    if (!scoreboard_read_string(reader, &decoded.objective_name)
+        || !mc_reader_varint(reader, &decoded.value)) {
+        return false;
+    }
+    decoded.has_objective_name = true;
+    decoded.has_value = true;
+    if (!mc_reader_bool(reader, &decoded.has_display_name)) return false;
+    if (decoded.has_display_name
+        && !mc_reader_nbt(reader, false, &decoded.display_name)) {
+        return false;
+    }
+    if (!mc_reader_bool(reader, &decoded.has_number_format)) return false;
+    if (decoded.has_number_format
+        && !scoreboard_read_number_format(reader,
+            &decoded.number_format, &decoded.number_format_component,
+            &decoded.has_number_format_component)) {
+        return false;
+    }
+    *value = decoded;
+    return true;
+}
+
+bool mc_reader_scoreboard_reset(McReader *reader, int protocol,
+    McScoreboardReset *value)
+{
+    McScoreboardReset decoded = {0};
+    if (!scoreboard_reader_ready(reader, protocol, value)) return false;
+    if (protocol < 765) {
+        return reader_fail(reader, MC_ERROR_UNSUPPORTED_PROTOCOL,
+            reader->offset);
+    }
+    if (!scoreboard_read_string(reader, &decoded.entry_name)
+        || !mc_reader_bool(reader, &decoded.has_objective_name)
+        || (decoded.has_objective_name
+            && !scoreboard_read_string(reader, &decoded.objective_name))) {
+        return false;
+    }
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_entity_equipment(McReader *reader, int protocol,
     McEntityEquipment *value)
 {

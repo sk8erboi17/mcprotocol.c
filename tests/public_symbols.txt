@@ -147,6 +147,10 @@ mc_reader_nbt_value
 mc_reader_plain_item
 mc_reader_position
 mc_reader_remaining
+mc_reader_scoreboard_display
+mc_reader_scoreboard_objective
+mc_reader_scoreboard_reset
+mc_reader_scoreboard_score
 mc_reader_skip
 mc_reader_string
 mc_reader_string_bounded

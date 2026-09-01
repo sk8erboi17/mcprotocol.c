@@ -624,6 +624,51 @@ typedef struct {
     bool uses_living_flags;
 } McEntityHandUseMetadata;
 
+/* Borrowed, allocation-free views of the four clientbound scoreboard packet
+ * families. String and component slices point into the packet body and remain
+ * valid only while that storage lives. action is 0=set/add, 1=remove and 2=
+ * update where the selected release supports it. */
+typedef struct {
+    McBytes objective_name;
+    McBytes display_name;
+    McBytes render_type_name;
+    McBytes number_format_component;
+    int32_t render_type;
+    int32_t number_format;
+    uint8_t action;
+    bool has_display_name;
+    bool display_name_is_nbt;
+    bool render_type_is_registry_id;
+    bool has_number_format;
+    bool has_number_format_component;
+} McScoreboardObjective;
+
+typedef struct {
+    McBytes objective_name;
+    int32_t slot;
+} McScoreboardDisplay;
+
+typedef struct {
+    McBytes entry_name;
+    McBytes objective_name;
+    McBytes display_name;
+    McBytes number_format_component;
+    int32_t value;
+    int32_t number_format;
+    uint8_t action;
+    bool has_objective_name;
+    bool has_value;
+    bool has_display_name;
+    bool has_number_format;
+    bool has_number_format_component;
+} McScoreboardScore;
+
+typedef struct {
+    McBytes entry_name;
+    McBytes objective_name;
+    bool has_objective_name;
+} McScoreboardReset;
+
 /* ============================================================
  * TYPED PACKET FAMILIES
  * ============================================================ */
@@ -1541,6 +1586,17 @@ bool mc_reader_entity_equipment(McReader *reader, int protocol,
  * bytes following the complete metadata list. */
 bool mc_reader_entity_hand_use_metadata(McReader *reader, int protocol,
     McEntityHandUseMetadata *value);
+/* Decodes the complete release-aware bodies of the clientbound scoreboard
+ * packets, excluding their packet IDs. Legacy score removals are represented
+ * by McScoreboardScore.action=1; 1.20.3+ uses McScoreboardReset instead. */
+bool mc_reader_scoreboard_objective(McReader *reader, int protocol,
+    McScoreboardObjective *value);
+bool mc_reader_scoreboard_display(McReader *reader, int protocol,
+    McScoreboardDisplay *value);
+bool mc_reader_scoreboard_score(McReader *reader, int protocol,
+    McScoreboardScore *value);
+bool mc_reader_scoreboard_reset(McReader *reader, int protocol,
+    McScoreboardReset *value);
 
 /* NBT functions validate the complete encoded value and optionally return a
  * borrowed slice (encoded may be NULL when only validation/skipping matters).
