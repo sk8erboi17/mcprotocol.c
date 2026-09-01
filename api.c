@@ -3971,6 +3971,152 @@ bool mc_reader_inventory_slot_update(McReader *reader, int protocol,
     return true;
 }
 
+static bool bytes_equal_literal(McBytes value, const char *literal)
+{
+    size_t size = literal != NULL ? strlen(literal) : 0U;
+    return value.size == size
+        && (size == 0U || memcmp(value.data, literal, size) == 0);
+}
+
+bool mc_reader_container_open(McReader *reader, int protocol,
+    McContainerOpen *value)
+{
+    McContainerOpen decoded = {
+        .window_id = -1,
+        .menu_type = -1,
+        .slot_count = -1,
+        .entity_id = -1,
+    };
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+
+    if (protocol <= 5) {
+        uint8_t window_id = 0U;
+        uint8_t menu_type = 0U;
+        uint8_t slot_count = 0U;
+        uint8_t supplied_title = 0U;
+        if (!mc_reader_u8(reader, &window_id)
+            || !mc_reader_u8(reader, &menu_type)
+            || !mc_reader_string(reader, &decoded.encoded_title)
+            || !mc_reader_u8(reader, &slot_count)
+            || !mc_reader_u8(reader, &supplied_title)
+            || supplied_title > 1U) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.window_id = window_id;
+        decoded.menu_type = menu_type;
+        decoded.slot_count = slot_count;
+        if (menu_type == 11U) {
+            if (!mc_reader_i32(reader, &decoded.entity_id)) return false;
+            decoded.has_entity_id = true;
+        }
+        *value = decoded;
+        return true;
+    }
+
+    if (protocol <= 404) {
+        uint8_t window_id = 0U;
+        uint8_t slot_count = 0U;
+        if (!mc_reader_u8(reader, &window_id)
+            || !mc_reader_string(reader, &decoded.named_menu_type)
+            || !mc_reader_string(reader, &decoded.encoded_title)
+            || !mc_reader_u8(reader, &slot_count)) {
+            return false;
+        }
+        decoded.window_id = window_id;
+        decoded.slot_count = slot_count;
+        if (bytes_equal_literal(decoded.named_menu_type, "EntityHorse")
+            || bytes_equal_literal(decoded.named_menu_type, "minecraft:horse")) {
+            if (!mc_reader_i32(reader, &decoded.entity_id)) return false;
+            decoded.has_entity_id = true;
+        }
+        *value = decoded;
+        return true;
+    }
+
+    if (!mc_reader_varint(reader, &decoded.window_id)
+        || decoded.window_id < 0
+        || !mc_reader_varint(reader, &decoded.menu_type)
+        || decoded.menu_type < 0) {
+        reader->failed = true;
+        return false;
+    }
+    decoded.registry_menu_type = true;
+    if (protocol >= 765) {
+        if (!mc_reader_nbt(reader, false, &decoded.encoded_title)) return false;
+        decoded.title_is_nbt = true;
+    } else if (!mc_reader_string(reader, &decoded.encoded_title)) {
+        return false;
+    }
+    *value = decoded;
+    return true;
+}
+
+bool mc_reader_container_content(McReader *reader, int protocol,
+    McContainerContent *value)
+{
+    McContainerContent decoded = {
+        .window_id = -1,
+        .state_id = -1,
+    };
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+
+    if (protocol >= 768) {
+        if (!mc_reader_varint(reader, &decoded.window_id)
+            || decoded.window_id < 0) {
+            reader->failed = true;
+            return false;
+        }
+    } else {
+        uint8_t window_id = 0U;
+        if (!mc_reader_u8(reader, &window_id)) return false;
+        decoded.window_id = window_id;
+    }
+
+    int32_t encoded_count = 0;
+    if (protocol >= 756) {
+        if (!mc_reader_varint(reader, &decoded.state_id)
+            || decoded.state_id < 0
+            || !mc_reader_varint(reader, &encoded_count)
+            || encoded_count < 0) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_state_id = true;
+    } else {
+        uint16_t count = 0U;
+        if (!mc_reader_u16(reader, &count)) return false;
+        encoded_count = count;
+    }
+    if ((uint32_t)encoded_count > MC_CONTAINER_CONTENT_MAX_SLOTS) {
+        reader->failed = true;
+        return false;
+    }
+    decoded.slot_count = (size_t)encoded_count;
+    for (size_t index = 0U; index < decoded.slot_count; ++index) {
+        if (!mc_reader_plain_item(reader, protocol,
+                &decoded.slots[index].item_id,
+                &decoded.slots[index].count)) {
+            return false;
+        }
+    }
+    if (protocol >= 755) {
+        if (!mc_reader_plain_item(reader, protocol,
+                &decoded.carried.item_id, &decoded.carried.count)) {
+            return false;
+        }
+        decoded.has_carried = true;
+    }
+    *value = decoded;
+    return true;
+}
+
 bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot)
 {
     if (!mc_protocol_supported(protocol) || slot < MC_EQUIPMENT_MAIN_HAND

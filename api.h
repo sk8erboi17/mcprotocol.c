@@ -429,6 +429,44 @@ typedef struct {
     bool direct_player_inventory;
 } McInventorySlotUpdate;
 
+/* A bounded, normalized view of clientbound open_window/open_screen. Legacy
+ * protocols expose either a numeric or namespaced menu type plus an explicit
+ * top-inventory size; registry-era protocols expose a numeric menu type. The
+ * title is returned as a borrowed encoded string/NBT slice so callers do not
+ * need to duplicate release-specific framing merely to identify the menu. */
+typedef struct {
+    int32_t window_id;
+    int32_t menu_type;
+    int32_t slot_count;
+    int32_t entity_id;
+    McBytes named_menu_type;
+    McBytes encoded_title;
+    bool registry_menu_type;
+    bool title_is_nbt;
+    bool has_entity_id;
+} McContainerOpen;
+
+#define MC_CONTAINER_CONTENT_MAX_SLOTS 128U
+
+typedef struct {
+    int32_t item_id;
+    int32_t count;
+} McContainerItem;
+
+/* Normalized clientbound window_items/container_set_content. The fixed bound
+ * covers every Vanilla menu while keeping parsing allocation-free and safe for
+ * packet callbacks. Items with metadata/components intentionally fail the
+ * plain-item decoder instead of being accepted lossily. */
+typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    size_t slot_count;
+    McContainerItem slots[MC_CONTAINER_CONTENT_MAX_SLOTS];
+    McContainerItem carried;
+    bool has_state_id;
+    bool has_carried;
+} McContainerContent;
+
 /* Normalized result of the one-entry metadata projection used to publish
  * player hand-use state. Pre-1.9 stores active use in shared entity flag 0x10
  * and cannot represent the off hand; newer releases use LivingEntity bits
@@ -589,6 +627,14 @@ bool mc_reader_plain_item(McReader *reader, int protocol,
  * set_player_inventory body used from 1.21.2. Packet IDs are excluded. */
 bool mc_reader_inventory_slot_update(McReader *reader, int protocol,
     bool direct_player_inventory, McInventorySlotUpdate *value);
+/* Decodes a complete release-aware open_window/open_screen body. The packet ID
+ * is excluded. encoded_title and named_menu_type borrow from reader storage. */
+bool mc_reader_container_open(McReader *reader, int protocol,
+    McContainerOpen *value);
+/* Decodes one bounded release-aware window_items/container_set_content body.
+ * The packet ID is excluded; callers may require zero bytes remaining. */
+bool mc_reader_container_content(McReader *reader, int protocol,
+    McContainerContent *value);
 /* Reports whether the canonical equipment slot exists in the selected
  * release. Off hand starts in 1.9, body armor in 1.20.5 and saddle in 1.21.5. */
 bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot);

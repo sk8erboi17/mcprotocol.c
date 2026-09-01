@@ -1543,6 +1543,96 @@ static void inventory_slot_updates_are_versioned(void)
     assert(reader.failed);
 }
 
+static void container_open_and_content_are_versioned(void)
+{
+    static const unsigned char open_legacy[] = {
+        0x02U, 0x00U, 0x05U, 'C', 'h', 'e', 's', 't', 0x1bU, 0x01U,
+    };
+    static const unsigned char open_named[] = {
+        0x03U, 0x13U,
+        'm','i','n','e','c','r','a','f','t',':','c','o','n','t','a','i','n','e','r',
+        0x02U, '{', '}', 0x1bU,
+    };
+    static const unsigned char open_modern[] = {
+        0x04U, 0x05U, 0x0aU, 0x00U,
+    };
+    static const struct {
+        int protocol;
+        const unsigned char *body;
+        size_t body_size;
+        int32_t window_id;
+        int32_t menu_type;
+        int32_t slot_count;
+        bool registry;
+        bool nbt_title;
+    } open_cases[] = {
+        {4, open_legacy, sizeof(open_legacy), 2, 0, 27, false, false},
+        {47, open_named, sizeof(open_named), 3, -1, 27, false, false},
+        {776, open_modern, sizeof(open_modern), 4, 5, -1, true, true},
+    };
+    for (size_t index = 0U;
+            index < sizeof(open_cases) / sizeof(open_cases[0]); ++index) {
+        McReader reader;
+        McContainerOpen decoded = {0};
+        mc_reader_init(&reader, open_cases[index].body, open_cases[index].body_size);
+        assert(mc_reader_container_open(&reader, open_cases[index].protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.window_id == open_cases[index].window_id);
+        assert(decoded.menu_type == open_cases[index].menu_type);
+        assert(decoded.slot_count == open_cases[index].slot_count);
+        assert(decoded.registry_menu_type == open_cases[index].registry);
+        assert(decoded.title_is_nbt == open_cases[index].nbt_title);
+    }
+
+    static const unsigned char content_legacy[] = {
+        0x02U, 0x00U, 0x02U,
+        0xffU, 0xffU,
+        0x00U, 0x01U, 0x20U, 0x00U, 0x00U, 0xffU, 0xffU,
+    };
+    static const unsigned char content_modern[] = {
+        0x04U, 0x07U, 0x02U,
+        0x00U,
+        0x20U, 0x01U, 0x00U, 0x00U,
+        0x00U,
+    };
+    static const struct {
+        int protocol;
+        const unsigned char *body;
+        size_t body_size;
+        int32_t window_id;
+        int32_t state_id;
+        bool has_state;
+        bool has_carried;
+    } content_cases[] = {
+        {4, content_legacy, sizeof(content_legacy), 2, -1, false, false},
+        {776, content_modern, sizeof(content_modern), 4, 7, true, true},
+    };
+    for (size_t index = 0U;
+            index < sizeof(content_cases) / sizeof(content_cases[0]); ++index) {
+        McReader reader;
+        McContainerContent decoded = {0};
+        mc_reader_init(&reader, content_cases[index].body, content_cases[index].body_size);
+        assert(mc_reader_container_content(
+            &reader, content_cases[index].protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.window_id == content_cases[index].window_id);
+        assert(decoded.state_id == content_cases[index].state_id);
+        assert(decoded.has_state_id == content_cases[index].has_state);
+        assert(decoded.has_carried == content_cases[index].has_carried);
+        assert(decoded.slot_count == 2U);
+        assert(decoded.slots[0].count == 0);
+        assert(decoded.slots[1].item_id == 1 && decoded.slots[1].count == 32);
+        assert(decoded.carried.count == 0);
+    }
+
+    unsigned char oversized[] = {0x00U, 0x00U, 0x81U, 0x01U};
+    McReader reader;
+    McContainerContent decoded = {0};
+    mc_reader_init(&reader, oversized, sizeof(oversized));
+    assert(!mc_reader_container_content(&reader, 776, &decoded));
+    assert(reader.failed);
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -1624,6 +1714,7 @@ int main(int argc, char **argv)
     close_windows_and_container_ids_are_versioned();
     creative_slots_match_node_release_boundaries();
     inventory_slot_updates_are_versioned();
+    container_open_and_content_are_versioned();
     puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }
