@@ -536,6 +536,32 @@ typedef struct {
     bool low_precision_velocity;
 } McClientboundObjectSpawn;
 
+/* Normalized world-particle projection. Legacy 1.7 uses a borrowed particle
+ * name and float coordinates; subsequent layouts expose a numeric registry
+ * ID, add long-distance/always-show flags, promote coordinates to doubles and
+ * eventually move the particle value after the common fields. particle_data
+ * borrows the validated particle-specific suffix, excluding its ID/name. */
+typedef struct {
+    McBytes particle_name;
+    McBytes particle_data;
+    int32_t particle_id;
+    double x;
+    double y;
+    double z;
+    float offset_x;
+    float offset_y;
+    float offset_z;
+    float speed;
+    int32_t count;
+    bool long_distance;
+    bool always_show;
+    bool named_particle;
+    bool has_long_distance;
+    bool has_always_show;
+    bool double_precision_position;
+    bool particle_after_common_fields;
+} McClientboundWorldParticles;
+
 /* Borrowed encoded entity-ID list from entity_destroy. The decoder validates
  * every ID and count before publishing this view; use the iterator to consume
  * the release-specific fixed-i32 or VarInt representation without allocation. */
@@ -1666,6 +1692,10 @@ bool mc_reader_clientbound_entity_spawn(McReader *reader, int protocol,
  * named-player packet used by historical releases. Packet IDs are excluded. */
 bool mc_reader_clientbound_object_spawn(McReader *reader, int protocol,
     McClientboundObjectSpawn *value);
+/* Decodes one complete world_particles body across every supported release.
+ * Particle-specific payload is validated and returned as a borrowed slice. */
+bool mc_reader_clientbound_world_particles(McReader *reader, int protocol,
+    McClientboundWorldParticles *value);
 /* Decodes one complete entity_destroy body and validates its bounded ID list.
  * Protocol 755 carries one uncounted ID; all layouts normalize to a count. */
 bool mc_reader_clientbound_remove_entities(McReader *reader, int protocol,

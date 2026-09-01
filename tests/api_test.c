@@ -851,6 +851,37 @@ static void build_clientbound_object_spawn_body(McPacket *packet,
     }
 }
 
+static void build_clientbound_world_particles_body(McPacket *packet,
+    int protocol)
+{
+    if (protocol <= 5) {
+        assert(mc_packet_string(packet, "note"));
+    } else if (protocol < 766) {
+        if (protocol >= 759) {
+            assert(mc_packet_varint(packet, 0));
+        } else {
+            assert(mc_packet_i32(packet, 0));
+        }
+    }
+    if (protocol > 5) assert(mc_packet_bool(packet, false));
+    if (protocol >= 769) assert(mc_packet_bool(packet, true));
+    if (protocol >= 573) {
+        assert(mc_packet_double(packet, 12.5));
+        assert(mc_packet_double(packet, 64.0));
+        assert(mc_packet_double(packet, -3.25));
+    } else {
+        assert(mc_packet_float(packet, 12.5F));
+        assert(mc_packet_float(packet, 64.0F));
+        assert(mc_packet_float(packet, -3.25F));
+    }
+    assert(mc_packet_float(packet, 0.125F));
+    assert(mc_packet_float(packet, 0.25F));
+    assert(mc_packet_float(packet, 0.5F));
+    assert(mc_packet_float(packet, 1.0F));
+    assert(mc_packet_i32(packet, 0));
+    if (protocol >= 766) assert(mc_packet_varint(packet, 0));
+}
+
 static void clientbound_entity_lifecycle_is_versioned(void)
 {
     size_t protocol_count = 0U;
@@ -948,6 +979,46 @@ static void clientbound_entity_lifecycle_is_versioned(void)
             assert(fabsf(decoded_object.head_yaw - 135.0F) < 1.0e-6F);
         }
 
+        unsigned char particle_storage[96] = {0};
+        McPacket particle;
+        mc_packet_init(&particle, particle_storage,
+            sizeof(particle_storage));
+        build_clientbound_world_particles_body(&particle, protocol);
+        assert(!particle.failed);
+        McClientboundWorldParticles decoded_particle = {0};
+        mc_reader_init_mode(&reader, particle.data, particle.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_world_particles(
+            &reader, protocol, &decoded_particle));
+        assert(mc_reader_finish(&reader));
+        assert(decoded_particle.named_particle == (protocol <= 5));
+        assert(decoded_particle.has_long_distance == (protocol > 5));
+        assert(decoded_particle.has_always_show == (protocol >= 769));
+        assert(decoded_particle.double_precision_position
+            == (protocol >= 573));
+        assert(decoded_particle.particle_after_common_fields
+            == (protocol >= 766));
+        assert(!decoded_particle.long_distance);
+        assert(decoded_particle.always_show == (protocol >= 769));
+        assert(fabs(decoded_particle.x - 12.5) < 1.0e-12);
+        assert(fabs(decoded_particle.y - 64.0) < 1.0e-12);
+        assert(fabs(decoded_particle.z + 3.25) < 1.0e-12);
+        assert(decoded_particle.offset_x == 0.125F);
+        assert(decoded_particle.offset_y == 0.25F);
+        assert(decoded_particle.offset_z == 0.5F);
+        assert(decoded_particle.speed == 1.0F);
+        assert(decoded_particle.count == 0);
+        assert(decoded_particle.particle_data.size == 0U);
+        if (protocol <= 5) {
+            assert(decoded_particle.particle_id == -1);
+            assert(decoded_particle.particle_name.size == 4U);
+            assert(memcmp(decoded_particle.particle_name.data,
+                "note", 4U) == 0);
+        } else {
+            assert(decoded_particle.particle_id == 0);
+            assert(decoded_particle.particle_name.size == 0U);
+        }
+
         unsigned char remove_storage[32] = {0};
         McPacket remove;
         mc_packet_init(&remove, remove_storage, sizeof(remove_storage));
@@ -1031,6 +1102,16 @@ static void clientbound_entity_lifecycle_is_versioned(void)
     mc_reader_init(&reader, NULL, 0U);
     assert(!mc_reader_clientbound_object_spawn(&reader, 999,
         &decoded_object));
+    McClientboundWorldParticles decoded_particle = {0};
+    mc_reader_init(&reader, negative_remove, 1U);
+    assert(!mc_reader_clientbound_world_particles(
+        &reader, 776, &decoded_particle));
+    assert(reader.failed);
+    assert(!mc_reader_clientbound_world_particles(
+        NULL, 47, &decoded_particle));
+    mc_reader_init(&reader, NULL, 0U);
+    assert(!mc_reader_clientbound_world_particles(
+        &reader, 999, &decoded_particle));
 }
 
 static void append_join_world_names(McPacket *packet)

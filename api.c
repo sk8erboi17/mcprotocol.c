@@ -21004,10 +21004,10 @@ static bool typed_skip_registry_holder_painting(McReader *reader,
     return true;
 }
 
-static bool typed_skip_old_particle(McReader *reader, int protocol)
+static bool typed_skip_old_particle_value(McReader *reader, int protocol,
+    int32_t particle)
 {
-    int32_t particle = -1;
-    if (!mc_reader_varint(reader, &particle) || particle < 0) {
+    if (particle < 0) {
         return typed_invalid(reader);
     }
     int32_t block_a = -1;
@@ -21103,6 +21103,13 @@ static bool typed_skip_old_particle(McReader *reader, int protocol)
     return true;
 }
 
+static bool typed_skip_old_particle(McReader *reader, int protocol)
+{
+    int32_t particle = -1;
+    return mc_reader_varint(reader, &particle)
+        && typed_skip_old_particle_value(reader, protocol, particle);
+}
+
 typedef struct {
     int32_t maximum;
     int32_t block;
@@ -21141,12 +21148,11 @@ static McParticleProfile typed_particle_profile(int protocol)
         47, 38, 105, 48, 49, 36, 8, 16, 46, 42};
 }
 
-static bool typed_skip_modern_particle(McReader *reader, int protocol)
+static bool typed_skip_modern_particle_value(McReader *reader, int protocol,
+    int32_t particle)
 {
     const McParticleProfile profile = typed_particle_profile(protocol);
-    int32_t particle = -1;
-    if (!mc_reader_varint(reader, &particle) || particle < 0
-        || particle > profile.maximum) {
+    if (particle < 0 || particle > profile.maximum) {
         return typed_invalid(reader);
     }
     if (particle == profile.block || particle == profile.block_marker
@@ -21209,6 +21215,13 @@ static bool typed_skip_modern_particle(McReader *reader, int protocol)
         return mc_reader_u8(reader, &color);
     }
     return true;
+}
+
+static bool typed_skip_modern_particle(McReader *reader, int protocol)
+{
+    int32_t particle = -1;
+    return mc_reader_varint(reader, &particle)
+        && typed_skip_modern_particle_value(reader, protocol, particle);
 }
 
 static bool typed_skip_metadata_value(McReader *reader, int protocol,
@@ -21864,6 +21877,115 @@ bool mc_reader_clientbound_object_spawn(McReader *reader, int protocol,
     decoded.yaw = (float)decoded.yaw_raw * (360.0F / 256.0F);
     decoded.pitch = (float)decoded.pitch_raw * (360.0F / 256.0F);
     decoded.head_yaw = (float)decoded.head_yaw_raw * (360.0F / 256.0F);
+    *value = decoded;
+    return true;
+}
+
+static bool typed_skip_legacy_world_particle_data(McReader *reader,
+    int32_t particle)
+{
+    uint32_t count = 0U;
+    if (particle == 36) {
+        count = 2U;
+    } else if (particle == 37 || particle == 38) {
+        count = 1U;
+    }
+    for (uint32_t index = 0U; index < count; ++index) {
+        int32_t value = 0;
+        if (!mc_reader_varint(reader, &value)) return false;
+    }
+    return true;
+}
+
+bool mc_reader_clientbound_world_particles(McReader *reader, int protocol,
+    McClientboundWorldParticles *value)
+{
+    McClientboundWorldParticles decoded = {.particle_id = -1};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+
+    decoded.named_particle = protocol <= 5;
+    decoded.has_long_distance = protocol > 5;
+    decoded.has_always_show = protocol >= 769;
+    decoded.double_precision_position = protocol >= 573;
+    decoded.particle_after_common_fields = protocol >= 766;
+    if (decoded.named_particle) {
+        if (!mc_reader_string_bounded(reader, 256U,
+                &decoded.particle_name)) {
+            return false;
+        }
+    } else if (!decoded.particle_after_common_fields) {
+        if (protocol >= 759) {
+            if (!mc_reader_varint(reader, &decoded.particle_id)) return false;
+        } else if (!mc_reader_i32(reader, &decoded.particle_id)) {
+            return false;
+        }
+        if (decoded.particle_id < 0) return typed_invalid(reader);
+    }
+
+    if (decoded.has_long_distance
+        && !mc_reader_bool(reader, &decoded.long_distance)) {
+        return false;
+    }
+    if (decoded.has_always_show
+        && !mc_reader_bool(reader, &decoded.always_show)) {
+        return false;
+    }
+    if (decoded.double_precision_position) {
+        if (!mc_reader_double(reader, &decoded.x)
+            || !mc_reader_double(reader, &decoded.y)
+            || !mc_reader_double(reader, &decoded.z)) {
+            return false;
+        }
+    } else {
+        float x = 0.0F;
+        float y = 0.0F;
+        float z = 0.0F;
+        if (!mc_reader_float(reader, &x) || !mc_reader_float(reader, &y)
+            || !mc_reader_float(reader, &z)) {
+            return false;
+        }
+        decoded.x = (double)x;
+        decoded.y = (double)y;
+        decoded.z = (double)z;
+    }
+    if (!mc_reader_float(reader, &decoded.offset_x)
+        || !mc_reader_float(reader, &decoded.offset_y)
+        || !mc_reader_float(reader, &decoded.offset_z)
+        || !mc_reader_float(reader, &decoded.speed)
+        || !mc_reader_i32(reader, &decoded.count)) {
+        return false;
+    }
+    if (!isfinite(decoded.x) || !isfinite(decoded.y)
+        || !isfinite(decoded.z) || !isfinite(decoded.offset_x)
+        || !isfinite(decoded.offset_y) || !isfinite(decoded.offset_z)
+        || !isfinite(decoded.speed)) {
+        return typed_invalid(reader);
+    }
+
+    if (!decoded.named_particle) {
+        if (decoded.particle_after_common_fields
+            && (!mc_reader_varint(reader, &decoded.particle_id)
+                || decoded.particle_id < 0)) {
+            return typed_invalid(reader);
+        }
+        const size_t particle_data_start = reader->offset;
+        const bool valid = protocol <= 340
+            ? typed_skip_legacy_world_particle_data(
+                  reader, decoded.particle_id)
+            : (protocol >= 766
+                   ? typed_skip_modern_particle_value(
+                         reader, protocol, decoded.particle_id)
+                   : typed_skip_old_particle_value(
+                         reader, protocol, decoded.particle_id));
+        if (!valid) return false;
+        decoded.particle_data = (McBytes){
+            reader->data + particle_data_start,
+            reader->offset - particle_data_start,
+        };
+    }
     *value = decoded;
     return true;
 }
