@@ -23,7 +23,7 @@ jobs:
     env:
       CC: ${{ matrix.cc }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build warnings-as-errors
         run: make
       - name: Public and packet-driven tests
@@ -32,8 +32,8 @@ jobs:
   generated:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           repository: PrismarineJS/minecraft-data
           path: minecraft-data
@@ -45,7 +45,7 @@ jobs:
     env:
       CC: clang
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: ASan and UBSan
         run: make test-sanitize
 
@@ -54,15 +54,15 @@ jobs:
     env:
       FUZZ_CC: clang
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Eight public-library fuzz targets
         run: make fuzz-smoke
 
   differential:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -78,11 +78,11 @@ jobs:
       LLVM_PROFDATA: llvm-profdata-18
       LLVM_COV: llvm-cov-18
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install LLVM coverage tools
         run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18
       - run: make coverage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: llvm-coverage-and-protocol-matrix
           path: |
@@ -93,10 +93,10 @@ jobs:
   codec-benchmark:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Allocation, retained-memory and RSS invariants
         run: make benchmark-codec
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: codec-benchmark
           path: benchmark/codec_results.json
@@ -104,7 +104,7 @@ jobs:
   compile-32-bit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y gcc-multilib lib32z1-dev
       - name: C11 32-bit compile and codec test
         run: >-
@@ -116,5 +116,5 @@ jobs:
   linux-arm64:
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: make test
