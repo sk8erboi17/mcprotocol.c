@@ -116,6 +116,7 @@ mc_reader_bool
 mc_reader_buffer_i32
 mc_reader_buffer_varint
 mc_reader_bytes
+mc_reader_clientbound_join_game
 mc_reader_clientbound_player_position
 mc_reader_clientbound_respawn
 mc_reader_container_content

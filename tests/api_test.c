@@ -754,6 +754,166 @@ static void clientbound_respawns_are_versioned(void)
     assert(reader.failed);
 }
 
+static void append_join_world_names(McPacket *packet)
+{
+    assert(mc_packet_varint(packet, 1));
+    assert(mc_packet_string(packet, "minecraft:overworld"));
+}
+
+static void build_clientbound_join_game_body(McPacket *packet, int protocol)
+{
+    static const unsigned char empty_named_compound[] = {
+        UINT8_C(0x0a), 0U, 0U, 0U
+    };
+    const McBytes empty_nbt = {
+        empty_named_compound, sizeof(empty_named_compound)
+    };
+    assert(mc_packet_i32(packet, 42));
+    if (protocol < 735) {
+        assert(mc_packet_u8(packet, protocol <= 5 ? 9U : 1U));
+        if (protocol <= 47 || protocol == 107) {
+            assert(mc_packet_i8(packet, -1));
+        } else {
+            assert(mc_packet_i32(packet, -1));
+        }
+        if (protocol <= 404) assert(mc_packet_u8(packet, 2U));
+        if (protocol >= 573) assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 1U));
+        assert(mc_packet_string(packet, "flat"));
+        if (protocol >= 477) assert(mc_packet_varint(packet, 2));
+        if (protocol >= 47) assert(mc_packet_bool(packet, false));
+        if (protocol >= 573) assert(mc_packet_bool(packet, true));
+        return;
+    }
+    if (protocol >= 764) {
+        assert(mc_packet_bool(packet, true));
+        append_join_world_names(packet);
+        assert(mc_packet_varint(packet, 1));
+        assert(mc_packet_varint(packet, 2));
+        assert(mc_packet_varint(packet, 2));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, false));
+        if (protocol >= 766) {
+            assert(mc_packet_varint(packet, 0));
+        } else {
+            assert(mc_packet_string(packet, "minecraft:overworld"));
+        }
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 1U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_varint(packet, 7));
+        if (protocol >= 768) assert(mc_packet_varint(packet, -63));
+        if (protocol >= 766) assert(mc_packet_bool(packet, false));
+        return;
+    }
+    if (protocol >= 751) {
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_u8(packet, 1U));
+    } else {
+        assert(mc_packet_u8(packet, 9U));
+    }
+    assert(mc_packet_i8(packet, -1));
+    append_join_world_names(packet);
+    assert(mc_packet_nbt(packet, true, &empty_nbt));
+    if (protocol <= 736 || protocol >= 759) {
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+    } else {
+        assert(mc_packet_nbt(packet, true, &empty_nbt));
+    }
+    assert(mc_packet_string(packet, "minecraft:overworld"));
+    assert(mc_packet_i64(packet, INT64_C(123456789)));
+    if (protocol <= 736) {
+        assert(mc_packet_u8(packet, 1U));
+    } else {
+        assert(mc_packet_varint(packet, 1));
+    }
+    assert(mc_packet_varint(packet, 2));
+    if (protocol >= 757) assert(mc_packet_varint(packet, 2));
+    assert(mc_packet_bool(packet, false));
+    assert(mc_packet_bool(packet, true));
+    assert(mc_packet_bool(packet, false));
+    assert(mc_packet_bool(packet, true));
+    if (protocol >= 759) assert(mc_packet_bool(packet, false));
+    if (protocol == 763) assert(mc_packet_varint(packet, 7));
+}
+
+static void clientbound_join_games_are_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count != 0U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        unsigned char storage[512] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        build_clientbound_join_game_body(&packet, protocol);
+        assert(!packet.failed);
+
+        McReader reader;
+        McJoinGamePacket decoded = {0};
+        mc_reader_init_mode(&reader, packet.data, packet.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_join_game(&reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.entity_id == 42);
+        assert(decoded.game_mode == 1U);
+        assert(decoded.hardcore == (protocol <= 5 || protocol >= 735));
+        assert(decoded.maximum_players == 1);
+        if (protocol < 735) {
+            assert(decoded.has_dimension_id && decoded.dimension_id == -1);
+            assert(decoded.has_level_type);
+            assert(decoded.has_registry_codec == false);
+            assert(decoded.has_previous_game_mode == false);
+            assert(decoded.has_hashed_seed == (protocol >= 573));
+            assert(decoded.has_view_distance == (protocol >= 477));
+        } else {
+            assert(decoded.world_count == 1U);
+            assert(decoded.has_world_name && decoded.has_hashed_seed);
+            assert(decoded.has_previous_game_mode);
+            assert(decoded.previous_game_mode == -1);
+            assert(decoded.has_view_distance);
+            assert(decoded.view_distance == 2);
+            assert(decoded.has_simulation_distance == (protocol >= 757));
+            assert(decoded.has_registry_codec == (protocol <= 763));
+            assert(decoded.has_dimension_id == (protocol >= 766));
+            assert(decoded.has_portal_cooldown == (protocol >= 763));
+            assert(decoded.has_sea_level == (protocol >= 768));
+            if (decoded.has_sea_level) assert(decoded.sea_level == -63);
+        }
+
+        const int32_t packet_id = mc_packet_id(protocol, MC_STATE_PLAY,
+            MC_PACKET_CLIENTBOUND, "login");
+        assert(packet_id >= 0);
+        McJoinGamePacket dispatched = {0};
+        McPacketFamily family = MC_FAMILY_UNKNOWN;
+        McError error;
+        assert(mc_decode_packet(protocol, MC_STATE_PLAY,
+            MC_PACKET_CLIENTBOUND, packet_id, packet.data, packet.length,
+            MC_DECODE_STRICT, &dispatched, sizeof(dispatched), &family,
+            &error) == 0);
+        assert(error.code == MC_ERROR_NONE);
+        assert(family == MC_FAMILY_JOIN_GAME);
+        assert(dispatched.entity_id == decoded.entity_id);
+        assert(dispatched.game_mode == decoded.game_mode);
+    }
+
+    unsigned char truncated[] = {0U, 0U, 0U};
+    McReader reader;
+    McJoinGamePacket decoded = {0};
+    mc_reader_init(&reader, truncated, sizeof(truncated));
+    assert(!mc_reader_clientbound_join_game(&reader, 776, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, truncated, sizeof(truncated));
+    assert(!mc_reader_clientbound_join_game(&reader, 999, &decoded));
+    assert(!mc_reader_clientbound_join_game(NULL, 776, &decoded));
+}
+
 static int32_t equipment_wire_slot(int protocol, McEquipmentSlot slot)
 {
     if (protocol > 47) return (int32_t)slot;
@@ -1705,6 +1865,7 @@ int main(int argc, char **argv)
     player_action_bodies_match_node();
     player_positions_are_versioned();
     clientbound_player_positions_are_versioned();
+    clientbound_join_games_are_versioned();
     clientbound_respawns_are_versioned();
     entity_equipment_bodies_are_versioned();
     entity_hand_use_metadata_is_versioned();

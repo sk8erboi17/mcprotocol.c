@@ -2560,6 +2560,7 @@ McPacketFamily mc_packet_family(int protocol, McState state,
         {"close_window", MC_FAMILY_CLOSE_WINDOW},
     };
     static const McPacketFamilyName clientbound[] = {
+        {"login", MC_FAMILY_JOIN_GAME},
         {"position", MC_FAMILY_SERVER_POSITION},
         {"entity_velocity", MC_FAMILY_ENTITY_VELOCITY},
         {"explosion", MC_FAMILY_EXPLOSION},
@@ -2610,7 +2611,7 @@ const char *mc_packet_family_name(McPacketFamily family)
         "entity_move_look", "entity_teleport", "entity_head_rotation",
         "entity_metadata", "attach_entity", "set_passengers", "block_change",
         "multi_block_change", "map_chunk", "unload_chunk", "set_slot",
-        "window_items", "respawn", "game_state_change"
+        "window_items", "respawn", "game_state_change", "join_game"
     };
     const size_t count = sizeof(names) / sizeof(names[0]);
     return (int)family >= 0 && (size_t)family < count ? names[family] : "unknown";
@@ -2659,6 +2660,7 @@ size_t mc_packet_decoded_size(McPacketFamily family)
     case MC_FAMILY_UNLOAD_CHUNK: return sizeof(McUnloadChunkPacket);
     case MC_FAMILY_RESPAWN: return sizeof(McRespawnPacket);
     case MC_FAMILY_GAME_STATE_CHANGE: return sizeof(McGameStateChangePacket);
+    case MC_FAMILY_JOIN_GAME: return sizeof(McJoinGamePacket);
     default: return 0U;
     }
 }
@@ -3977,6 +3979,291 @@ static bool mc_reader_respawn_bool(McReader *reader, bool *value)
         return false;
     }
     *value = encoded != 0U;
+    return true;
+}
+
+static bool mc_reader_join_game_mode(McReader *reader, bool embedded_hardcore,
+    uint8_t *game_mode, bool *hardcore)
+{
+    uint8_t encoded = 0U;
+    if (game_mode == NULL || hardcore == NULL
+        || !mc_reader_u8(reader, &encoded)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    const uint8_t normalized = embedded_hardcore
+        ? (uint8_t)(encoded & UINT8_C(0x07)) : encoded;
+    if (normalized > 3U
+        || (embedded_hardcore && (encoded & ~UINT8_C(0x0f)) != 0U)) {
+        reader->failed = true;
+        return false;
+    }
+    *game_mode = normalized;
+    if (embedded_hardcore) *hardcore = (encoded & UINT8_C(0x08)) != 0U;
+    return true;
+}
+
+static bool mc_reader_join_worlds(McReader *reader,
+    McJoinGamePacket *decoded)
+{
+    int32_t count = -1;
+    if (!mc_reader_varint(reader, &count) || count < 0 || count > 16) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    const size_t start = reader->offset;
+    for (int32_t index = 0; index < count; ++index) {
+        McBytes name = {0};
+        if (!mc_reader_string_bounded(reader, 32767U, &name)
+            || name.size == 0U) {
+            if (reader != NULL) reader->failed = true;
+            return false;
+        }
+    }
+    decoded->world_count = (uint32_t)count;
+    decoded->world_names = (McBytes){reader->data + start,
+        reader->offset - start};
+    return true;
+}
+
+static bool mc_reader_join_nonnegative_varint(McReader *reader,
+    int32_t *value)
+{
+    return mc_reader_varint(reader, value) && *value >= 0
+        && *value <= (int32_t)MC_MAX_PACKET_ARRAY_COUNT;
+}
+
+static bool mc_reader_join_death_location(McReader *reader, int protocol,
+    McJoinGamePacket *decoded)
+{
+    bool present = false;
+    if (!mc_reader_bool(reader, &present)) return false;
+    if (!present) return true;
+    const size_t start = reader->offset;
+    McBytes dimension = {0};
+    McPosition position = {0};
+    if (!mc_reader_string_bounded(reader, 32767U, &dimension)
+        || dimension.size == 0U
+        || !mc_reader_position(reader, protocol, &position)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    decoded->has_death_location = true;
+    decoded->death_location = (McBytes){reader->data + start,
+        reader->offset - start};
+    return true;
+}
+
+bool mc_reader_clientbound_join_game(McReader *reader, int protocol,
+    McJoinGamePacket *value)
+{
+    McJoinGamePacket decoded = {.previous_game_mode = -1};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (!mc_reader_i32(reader, &decoded.entity_id)) return false;
+
+    if (protocol < 735) {
+        if (!mc_reader_join_game_mode(reader, protocol <= 5,
+                &decoded.game_mode, &decoded.hardcore)) {
+            return false;
+        }
+        if (protocol <= 47 || protocol == 107) {
+            int8_t dimension = 0;
+            if (!mc_reader_i8(reader, &dimension)) return false;
+            decoded.dimension_id = dimension;
+        } else if (!mc_reader_i32(reader, &decoded.dimension_id)) {
+            return false;
+        }
+        decoded.has_dimension_id = true;
+        if (protocol <= 404) {
+            if (!mc_reader_u8(reader, &decoded.difficulty)
+                || decoded.difficulty > 3U) {
+                reader->failed = true;
+                return false;
+            }
+        }
+        if (protocol >= 573) {
+            if (!mc_reader_i64(reader, &decoded.hashed_seed)) return false;
+            decoded.has_hashed_seed = true;
+        }
+        uint8_t maximum = 0U;
+        if (!mc_reader_u8(reader, &maximum)
+            || !mc_reader_string_bounded(reader, 64U, &decoded.level_type)
+            || decoded.level_type.size == 0U) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.maximum_players = maximum;
+        decoded.has_level_type = true;
+        if (protocol >= 477) {
+            if (!mc_reader_join_nonnegative_varint(reader,
+                    &decoded.view_distance)) {
+                reader->failed = true;
+                return false;
+            }
+            decoded.has_view_distance = true;
+        }
+        if (protocol >= 47
+            && !mc_reader_bool(reader, &decoded.reduced_debug)) {
+            return false;
+        }
+        if (protocol >= 573
+            && !mc_reader_bool(reader, &decoded.show_respawn_screen)) {
+            return false;
+        }
+        *value = decoded;
+        return true;
+    }
+
+    if (protocol >= 764) {
+        if (!mc_reader_bool(reader, &decoded.hardcore)
+            || !mc_reader_join_worlds(reader, &decoded)
+            || !mc_reader_join_nonnegative_varint(reader,
+                &decoded.maximum_players)
+            || !mc_reader_join_nonnegative_varint(reader,
+                &decoded.view_distance)
+            || !mc_reader_join_nonnegative_varint(reader,
+                &decoded.simulation_distance)
+            || !mc_reader_bool(reader, &decoded.reduced_debug)
+            || !mc_reader_bool(reader, &decoded.show_respawn_screen)
+            || !mc_reader_bool(reader, &decoded.limited_crafting)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_view_distance = true;
+        decoded.has_simulation_distance = true;
+        if (protocol >= 766) {
+            if (!mc_reader_join_nonnegative_varint(reader,
+                    &decoded.dimension_id)) {
+                reader->failed = true;
+                return false;
+            }
+            decoded.has_dimension_id = true;
+        } else {
+            if (!mc_reader_string_bounded(reader, 32767U,
+                    &decoded.dimension)
+                || decoded.dimension.size == 0U) {
+                reader->failed = true;
+                return false;
+            }
+            decoded.has_dimension_data = true;
+        }
+        if (!mc_reader_string_bounded(reader, 32767U, &decoded.world_name)
+            || decoded.world_name.size == 0U
+            || !mc_reader_i64(reader, &decoded.hashed_seed)
+            || !mc_reader_join_game_mode(reader, false, &decoded.game_mode,
+                &decoded.hardcore)
+            || !mc_reader_i8(reader, &decoded.previous_game_mode)
+            || decoded.previous_game_mode < -1
+            || decoded.previous_game_mode > 3
+            || !mc_reader_bool(reader, &decoded.debug)
+            || !mc_reader_bool(reader, &decoded.flat)
+            || !mc_reader_join_death_location(reader, protocol, &decoded)
+            || !mc_reader_join_nonnegative_varint(reader,
+                &decoded.portal_cooldown)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_world_name = true;
+        decoded.has_hashed_seed = true;
+        decoded.has_previous_game_mode = true;
+        decoded.has_portal_cooldown = true;
+        if (protocol >= 768) {
+            if (!mc_reader_varint(reader, &decoded.sea_level)) return false;
+            decoded.has_sea_level = true;
+        }
+        if (protocol >= 766) {
+            if (!mc_reader_bool(reader, &decoded.enforces_secure_chat)) {
+                return false;
+            }
+            decoded.has_enforces_secure_chat = true;
+        }
+        *value = decoded;
+        return true;
+    }
+
+    if (protocol >= 751) {
+        if (!mc_reader_bool(reader, &decoded.hardcore)
+            || !mc_reader_join_game_mode(reader, false, &decoded.game_mode,
+                &decoded.hardcore)) {
+            return false;
+        }
+    } else if (!mc_reader_join_game_mode(reader, true, &decoded.game_mode,
+            &decoded.hardcore)) {
+        return false;
+    }
+    if (!mc_reader_i8(reader, &decoded.previous_game_mode)
+        || decoded.previous_game_mode < -1
+        || decoded.previous_game_mode > 3
+        || !mc_reader_join_worlds(reader, &decoded)
+        || !mc_reader_nbt(reader, true, &decoded.registry_codec)) {
+        reader->failed = true;
+        return false;
+    }
+    decoded.has_previous_game_mode = true;
+    decoded.has_registry_codec = true;
+    if (protocol <= 736 || protocol >= 759) {
+        if (!mc_reader_string_bounded(reader, 32767U, &decoded.dimension)
+            || decoded.dimension.size == 0U) {
+            reader->failed = true;
+            return false;
+        }
+    } else {
+        if (!mc_reader_nbt(reader, true, &decoded.dimension)) return false;
+        decoded.dimension_is_nbt = true;
+    }
+    decoded.has_dimension_data = true;
+    if (!mc_reader_string_bounded(reader, 32767U, &decoded.world_name)
+        || decoded.world_name.size == 0U
+        || !mc_reader_i64(reader, &decoded.hashed_seed)) {
+        reader->failed = true;
+        return false;
+    }
+    decoded.has_world_name = true;
+    decoded.has_hashed_seed = true;
+    if (protocol <= 736) {
+        uint8_t maximum = 0U;
+        if (!mc_reader_u8(reader, &maximum)) return false;
+        decoded.maximum_players = maximum;
+    } else if (!mc_reader_join_nonnegative_varint(reader,
+            &decoded.maximum_players)) {
+        reader->failed = true;
+        return false;
+    }
+    if (!mc_reader_join_nonnegative_varint(reader, &decoded.view_distance)) {
+        reader->failed = true;
+        return false;
+    }
+    decoded.has_view_distance = true;
+    if (protocol >= 757) {
+        if (!mc_reader_join_nonnegative_varint(reader,
+                &decoded.simulation_distance)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_simulation_distance = true;
+    }
+    if (!mc_reader_bool(reader, &decoded.reduced_debug)
+        || !mc_reader_bool(reader, &decoded.show_respawn_screen)
+        || !mc_reader_bool(reader, &decoded.debug)
+        || !mc_reader_bool(reader, &decoded.flat)) {
+        return false;
+    }
+    if (protocol >= 759
+        && !mc_reader_join_death_location(reader, protocol, &decoded)) {
+        return false;
+    }
+    if (protocol == 763) {
+        if (!mc_reader_join_nonnegative_varint(reader,
+                &decoded.portal_cooldown)) {
+            reader->failed = true;
+            return false;
+        }
+        decoded.has_portal_cooldown = true;
+    }
+    *value = decoded;
     return true;
 }
 
@@ -21654,6 +21941,7 @@ typedef union {
     McUnloadChunkPacket unload_chunk;
     McRespawnPacket respawn;
     McGameStateChangePacket game_state;
+    McJoinGamePacket join_game;
     McChunkEnvelope chunk;
 } McTypedPacketStorage;
 
@@ -21738,6 +22026,8 @@ static bool typed_decode_dispatch(McReader *reader, int protocol,
         return typed_decode_respawn(reader, protocol, output);
     case MC_FAMILY_GAME_STATE_CHANGE:
         return typed_decode_game_state(reader, output);
+    case MC_FAMILY_JOIN_GAME:
+        return mc_reader_clientbound_join_game(reader, protocol, output);
     case MC_FAMILY_MAP_CHUNK:
         return typed_decode_chunk(reader, protocol, output);
     default:

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define MC_PROTOCOL_API_VERSION 3
+#define MC_PROTOCOL_API_VERSION 4
 #define MC_DEFAULT_PORT 25565U
 #define MC_UUID_STRING_SIZE 37U
 #define MC_HANDSHAKE_HOST_SIZE 256U
@@ -610,7 +610,9 @@ typedef enum {
     MC_FAMILY_SET_SLOT,
     MC_FAMILY_WINDOW_ITEMS,
     MC_FAMILY_RESPAWN,
-    MC_FAMILY_GAME_STATE_CHANGE
+    MC_FAMILY_GAME_STATE_CHANGE,
+    /* Appended to preserve the stable numeric values of existing families. */
+    MC_FAMILY_JOIN_GAME
 } McPacketFamily;
 
 enum {
@@ -916,6 +918,52 @@ typedef struct {
     int32_t chunk_x;
     int32_t chunk_z;
 } McUnloadChunkPacket;
+
+/* Normalized clientbound Join Game/Login body. Borrowed byte views point into
+ * the packet payload. world_names contains the encoded string entries after
+ * the bounded count; registry_codec and dimension retain the complete NBT or
+ * string representation selected by that release. */
+typedef struct {
+    int32_t entity_id;
+    int32_t dimension_id;
+    int32_t maximum_players;
+    int32_t view_distance;
+    int32_t simulation_distance;
+    int32_t portal_cooldown;
+    int32_t sea_level;
+    int64_t hashed_seed;
+    int8_t previous_game_mode;
+    uint8_t game_mode;
+    uint8_t difficulty;
+    uint32_t world_count;
+    McBytes world_names;
+    McBytes registry_codec;
+    McBytes dimension;
+    McBytes world_name;
+    McBytes level_type;
+    McBytes death_location;
+    bool hardcore;
+    bool reduced_debug;
+    bool show_respawn_screen;
+    bool limited_crafting;
+    bool debug;
+    bool flat;
+    bool enforces_secure_chat;
+    bool has_dimension_id;
+    bool has_registry_codec;
+    bool has_dimension_data;
+    bool dimension_is_nbt;
+    bool has_world_name;
+    bool has_level_type;
+    bool has_hashed_seed;
+    bool has_previous_game_mode;
+    bool has_view_distance;
+    bool has_simulation_distance;
+    bool has_death_location;
+    bool has_portal_cooldown;
+    bool has_sea_level;
+    bool has_enforces_secure_chat;
+} McJoinGamePacket;
 
 typedef struct {
     int32_t dimension_id;
@@ -1326,6 +1374,11 @@ bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
  * body with trailing fields. */
 bool mc_reader_clientbound_player_position(McReader *reader, int protocol,
     McClientboundPlayerPosition *value);
+/* Decodes and validates one complete release-aware Join Game/Login body
+ * (without its packet ID). All arrays and NBT values are bounded by the public
+ * reader limits and the caller may require mc_reader_remaining(reader) == 0. */
+bool mc_reader_clientbound_join_game(McReader *reader, int protocol,
+    McJoinGamePacket *value);
 /* Decodes and validates one complete release-aware Respawn body (without its
  * packet ID). The caller may require mc_reader_remaining(reader) == 0. */
 bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
