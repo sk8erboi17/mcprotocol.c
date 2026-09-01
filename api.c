@@ -4030,6 +4030,75 @@ bool mc_reader_entity_equipment(McReader *reader, int protocol,
     return true;
 }
 
+static uint8_t entity_hand_use_metadata_index(int protocol)
+{
+    if (protocol < 107) return 0U;
+    if (protocol <= 110) return 5U;
+    if (protocol <= 404) return 6U;
+    if (protocol <= 754) return 7U;
+    return 8U;
+}
+
+bool mc_reader_entity_hand_use_metadata(McReader *reader, int protocol,
+    McEntityHandUseMetadata *value)
+{
+    McEntityHandUseMetadata decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (protocol <= 5) {
+        if (!mc_reader_i32(reader, &decoded.entity_id)) return false;
+    } else if (!mc_reader_varint(reader, &decoded.entity_id)) {
+        return false;
+    }
+    if (decoded.entity_id < 0) {
+        reader->failed = true;
+        return false;
+    }
+
+    decoded.metadata_index = entity_hand_use_metadata_index(protocol);
+    if (protocol <= 47) {
+        uint8_t packed_header = UINT8_MAX;
+        if (!mc_reader_u8(reader, &packed_header)
+            || packed_header != decoded.metadata_index) {
+            reader->failed = true;
+            return false;
+        }
+    } else {
+        uint8_t index = UINT8_MAX;
+        int32_t serializer = -1;
+        uint8_t legacy_serializer = UINT8_MAX;
+        if (!mc_reader_u8(reader, &index) || index != decoded.metadata_index) {
+            reader->failed = true;
+            return false;
+        }
+        const bool serializer_ok =
+            protocol <= 340
+                ? (mc_reader_u8(reader, &legacy_serializer)
+                    && legacy_serializer == 0U)
+                : (mc_reader_varint(reader, &serializer) && serializer == 0);
+        if (!serializer_ok) {
+            reader->failed = true;
+            return false;
+        }
+    }
+    uint8_t terminator = 0U;
+    if (!mc_reader_u8(reader, &decoded.raw_flags)
+        || !mc_reader_u8(reader, &terminator)
+        || terminator != (protocol <= 47 ? UINT8_C(0x7f) : UINT8_C(0xff))) {
+        reader->failed = true;
+        return false;
+    }
+    decoded.uses_living_flags = protocol >= 107;
+    decoded.active = (decoded.raw_flags
+        & (decoded.uses_living_flags ? UINT8_C(0x01) : UINT8_C(0x10))) != 0U;
+    decoded.off_hand = decoded.uses_living_flags && decoded.active
+        && (decoded.raw_flags & UINT8_C(0x02)) != 0U;
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_nbt_name(McReader *reader, McBytes *name)
 {
     uint16_t size = 0U;

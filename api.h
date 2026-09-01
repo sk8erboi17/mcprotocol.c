@@ -417,6 +417,19 @@ typedef struct {
     McEntityEquipmentEntry entries[MC_ENTITY_EQUIPMENT_MAX_ENTRIES];
 } McEntityEquipment;
 
+/* Normalized result of the one-entry metadata projection used to publish
+ * player hand-use state. Pre-1.9 stores active use in shared entity flag 0x10
+ * and cannot represent the off hand; newer releases use LivingEntity bits
+ * 0x01/0x02 at a release-specific metadata index. */
+typedef struct {
+    int32_t entity_id;
+    uint8_t metadata_index;
+    uint8_t raw_flags;
+    bool active;
+    bool off_hand;
+    bool uses_living_flags;
+} McEntityHandUseMetadata;
+
 void mc_packet_init(McPacket *packet, void *storage, size_t capacity);
 bool mc_packet_bytes(McPacket *packet, const void *data, size_t size);
 bool mc_packet_bool(McPacket *packet, bool value);
@@ -569,6 +582,13 @@ bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot);
  * richer item components deliberately remain visible as a decode failure. */
 bool mc_reader_entity_equipment(McReader *reader, int protocol,
     McEntityEquipment *value);
+/* Decodes the one-entry clientbound entity_metadata body used for player
+ * hand-use projection. The packet ID is excluded; unexpected index,
+ * serializer, missing terminator or a second entry before the terminator is
+ * rejected. The caller may require mc_reader_remaining(reader) == 0 to reject
+ * bytes following the complete metadata list. */
+bool mc_reader_entity_hand_use_metadata(McReader *reader, int protocol,
+    McEntityHandUseMetadata *value);
 
 /* NBT functions validate the complete encoded value and optionally return a
  * borrowed slice (encoded may be NULL when only validation/skipping matters).

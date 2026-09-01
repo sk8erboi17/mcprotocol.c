@@ -885,6 +885,69 @@ static void entity_equipment_bodies_are_versioned(void)
     assert(!mc_reader_entity_equipment(NULL, 776, &decoded));
 }
 
+static uint8_t expected_hand_use_metadata_index(int protocol)
+{
+    if (protocol < 107) return 0U;
+    if (protocol <= 110) return 5U;
+    if (protocol <= 404) return 6U;
+    if (protocol <= 754) return 7U;
+    return 8U;
+}
+
+static void entity_hand_use_metadata_is_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count == 51U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        unsigned char storage[32] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(protocol <= 5
+            ? mc_packet_i32(&packet, 123)
+            : mc_packet_varint(&packet, 123));
+        const uint8_t metadata_index = expected_hand_use_metadata_index(protocol);
+        if (protocol <= 47) {
+            assert(mc_packet_u8(&packet, metadata_index));
+        } else {
+            assert(mc_packet_u8(&packet, metadata_index));
+            assert(protocol <= 340
+                ? mc_packet_u8(&packet, 0U)
+                : mc_packet_varint(&packet, 0));
+        }
+        assert(mc_packet_u8(&packet, protocol < 107 ? 0x12U : 0x03U));
+        assert(mc_packet_u8(&packet, protocol <= 47 ? 0x7fU : 0xffU));
+
+        McReader reader;
+        McEntityHandUseMetadata decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_entity_hand_use_metadata(&reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.entity_id == 123);
+        assert(decoded.metadata_index == metadata_index);
+        assert(decoded.raw_flags == (protocol < 107 ? 0x12U : 0x03U));
+        assert(decoded.active);
+        assert(decoded.off_hand == (protocol >= 107));
+        assert(decoded.uses_living_flags == (protocol >= 107));
+    }
+
+    static const unsigned char wrong_index[] = {1U, 7U, 0U, 1U, 0xffU};
+    McReader reader;
+    McEntityHandUseMetadata decoded = {0};
+    mc_reader_init(&reader, wrong_index, sizeof(wrong_index));
+    assert(!mc_reader_entity_hand_use_metadata(&reader, 776, &decoded));
+    assert(reader.failed);
+    static const unsigned char wrong_terminator[] = {1U, 8U, 0U, 1U, 0U};
+    mc_reader_init(&reader, wrong_terminator, sizeof(wrong_terminator));
+    assert(!mc_reader_entity_hand_use_metadata(&reader, 776, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, wrong_index, sizeof(wrong_index));
+    assert(!mc_reader_entity_hand_use_metadata(&reader, 999, &decoded));
+    assert(reader.failed);
+    assert(!mc_reader_entity_hand_use_metadata(NULL, 776, &decoded));
+}
+
 static void movement_and_hotbar_bodies_match_node(void)
 {
     /* Bodies excluding ID. The 1.7 position pair follows the canonical
@@ -1495,6 +1558,7 @@ int main(int argc, char **argv)
     clientbound_player_positions_are_versioned();
     clientbound_respawns_are_versioned();
     entity_equipment_bodies_are_versioned();
+    entity_hand_use_metadata_is_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
     use_item_bodies_match_node();
