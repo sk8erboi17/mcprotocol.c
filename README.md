@@ -165,6 +165,7 @@ Available symmetric field codecs are:
 | `clientbound_player_position` | Release-aware correction body with normalized 1.7 feet Y, teleport/dismount boundaries and modern velocity deltas | observing authoritative movement and teleport responses |
 | `clientbound_respawn` | Release-aware dimension identity, world, spawn info, last-death location, portal/sea-level and keep-data fields | observing authoritative respawn and dimension-change projections |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
+| `entity_equipment` | Bounded release-aware equipment body with normalized legacy slots and modern continuation lists | observing main/off-hand, armor, body and saddle projection |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `held_item_slot` | Validated hotbar index as a big-endian short | selected-slot changes in every release |
 | `client_information` | Release-aware locale, view, chat, skin and preference fields | PLAY settings through 1.20.1 and CONFIGURATION settings afterward |

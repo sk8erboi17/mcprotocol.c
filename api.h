@@ -388,6 +388,35 @@ typedef struct {
     McBytes data;
 } McItemComponentPatch;
 
+/* Canonical equipment slots. Legacy wire slots are normalized into this
+ * ordering: their slot 1 (boots) becomes MC_EQUIPMENT_FEET rather than being
+ * confused with the off hand introduced in 1.9. */
+typedef enum {
+    MC_EQUIPMENT_MAIN_HAND = 0,
+    MC_EQUIPMENT_OFF_HAND,
+    MC_EQUIPMENT_FEET,
+    MC_EQUIPMENT_LEGS,
+    MC_EQUIPMENT_CHEST,
+    MC_EQUIPMENT_HEAD,
+    MC_EQUIPMENT_BODY,
+    MC_EQUIPMENT_SADDLE,
+    MC_EQUIPMENT_SLOT_COUNT
+} McEquipmentSlot;
+
+#define MC_ENTITY_EQUIPMENT_MAX_ENTRIES 8U
+
+typedef struct {
+    McEquipmentSlot slot;
+    int32_t item_id;
+    int32_t count;
+} McEntityEquipmentEntry;
+
+typedef struct {
+    int32_t entity_id;
+    size_t entry_count;
+    McEntityEquipmentEntry entries[MC_ENTITY_EQUIPMENT_MAX_ENTRIES];
+} McEntityEquipment;
+
 void mc_packet_init(McPacket *packet, void *storage, size_t capacity);
 bool mc_packet_bytes(McPacket *packet, const void *data, size_t size);
 bool mc_packet_bool(McPacket *packet, bool value);
@@ -531,6 +560,15 @@ bool mc_reader_block_change(McReader *reader, int protocol,
 bool mc_reader_uuid(McReader *reader, McUuid *value);
 bool mc_reader_plain_item(McReader *reader, int protocol,
     int32_t *item_id, int32_t *count);
+/* Reports whether the canonical equipment slot exists in the selected
+ * release. Off hand starts in 1.9, body armor in 1.20.5 and saddle in 1.21.5. */
+bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot);
+/* Decodes one clientbound entity_equipment/set_equipment body without packet
+ * ID. The 1.16+ continuation-bit list is bounded, rejects duplicate slots and
+ * is normalized to the canonical slot enum above. Items must be metadata-free;
+ * richer item components deliberately remain visible as a decode failure. */
+bool mc_reader_entity_equipment(McReader *reader, int protocol,
+    McEntityEquipment *value);
 
 /* NBT functions validate the complete encoded value and optionally return a
  * borrowed slice (encoded may be NULL when only validation/skipping matters).

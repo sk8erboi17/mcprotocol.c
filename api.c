@@ -3930,6 +3930,106 @@ bool mc_reader_plain_item(McReader *reader, int protocol,
     return true;
 }
 
+bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot)
+{
+    if (!mc_protocol_supported(protocol) || slot < MC_EQUIPMENT_MAIN_HAND
+        || slot >= MC_EQUIPMENT_SLOT_COUNT) {
+        return false;
+    }
+    if (slot == MC_EQUIPMENT_OFF_HAND) return protocol >= 107;
+    if (slot == MC_EQUIPMENT_BODY) return protocol >= 766;
+    if (slot == MC_EQUIPMENT_SADDLE) return protocol >= 770;
+    return true;
+}
+
+static bool equipment_slot_normalize(int protocol, int32_t wire_slot,
+    McEquipmentSlot *slot)
+{
+    if (slot == NULL || wire_slot < 0) return false;
+    if (protocol <= 47) {
+        switch (wire_slot) {
+        case 0: *slot = MC_EQUIPMENT_MAIN_HAND; return true;
+        case 1: *slot = MC_EQUIPMENT_FEET; return true;
+        case 2: *slot = MC_EQUIPMENT_LEGS; return true;
+        case 3: *slot = MC_EQUIPMENT_CHEST; return true;
+        case 4: *slot = MC_EQUIPMENT_HEAD; return true;
+        default: return false;
+        }
+    }
+    if (wire_slot >= (int32_t)MC_EQUIPMENT_SLOT_COUNT) return false;
+    *slot = (McEquipmentSlot)wire_slot;
+    return mc_entity_equipment_slot_supported(protocol, *slot);
+}
+
+static bool reader_entity_equipment_entry(McReader *reader, int protocol,
+    int32_t wire_slot, McEntityEquipment *decoded, uint32_t *seen)
+{
+    McEquipmentSlot slot = MC_EQUIPMENT_MAIN_HAND;
+    McEntityEquipmentEntry entry = {0};
+    if (!equipment_slot_normalize(protocol, wire_slot, &slot)
+        || decoded->entry_count >= MC_ENTITY_EQUIPMENT_MAX_ENTRIES
+        || (*seen & (UINT32_C(1) << (uint32_t)slot)) != 0U
+        || !mc_reader_plain_item(reader, protocol,
+            &entry.item_id, &entry.count)) {
+        reader->failed = true;
+        return false;
+    }
+    entry.slot = slot;
+    *seen |= UINT32_C(1) << (uint32_t)slot;
+    decoded->entries[decoded->entry_count++] = entry;
+    return true;
+}
+
+bool mc_reader_entity_equipment(McReader *reader, int protocol,
+    McEntityEquipment *value)
+{
+    McEntityEquipment decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (protocol <= 5) {
+        if (!mc_reader_i32(reader, &decoded.entity_id)) return false;
+    } else if (!mc_reader_varint(reader, &decoded.entity_id)) {
+        return false;
+    }
+    if (decoded.entity_id < 0) {
+        reader->failed = true;
+        return false;
+    }
+
+    uint32_t seen = 0U;
+    if (protocol <= 47) {
+        uint16_t wire_slot = 0U;
+        if (!mc_reader_u16(reader, &wire_slot)
+            || !reader_entity_equipment_entry(reader, protocol,
+                (int32_t)wire_slot, &decoded, &seen)) {
+            return false;
+        }
+    } else if (protocol < 735) {
+        int32_t wire_slot = -1;
+        if (!mc_reader_varint(reader, &wire_slot)
+            || !reader_entity_equipment_entry(reader, protocol,
+                wire_slot, &decoded, &seen)) {
+            return false;
+        }
+    } else {
+        bool more = false;
+        do {
+            uint8_t encoded_slot = 0U;
+            if (!mc_reader_u8(reader, &encoded_slot)
+                || !reader_entity_equipment_entry(reader, protocol,
+                    (int32_t)(encoded_slot & UINT8_C(0x7f)),
+                    &decoded, &seen)) {
+                return false;
+            }
+            more = (encoded_slot & UINT8_C(0x80)) != 0U;
+        } while (more);
+    }
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_nbt_name(McReader *reader, McBytes *name)
 {
     uint16_t size = 0U;

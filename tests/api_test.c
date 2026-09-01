@@ -754,6 +754,137 @@ static void clientbound_respawns_are_versioned(void)
     assert(reader.failed);
 }
 
+static int32_t equipment_wire_slot(int protocol, McEquipmentSlot slot)
+{
+    if (protocol > 47) return (int32_t)slot;
+    switch (slot) {
+    case MC_EQUIPMENT_MAIN_HAND: return 0;
+    case MC_EQUIPMENT_FEET: return 1;
+    case MC_EQUIPMENT_LEGS: return 2;
+    case MC_EQUIPMENT_CHEST: return 3;
+    case MC_EQUIPMENT_HEAD: return 4;
+    default: return -1;
+    }
+}
+
+static void append_equipment_entry(McPacket *packet, int protocol,
+    McEquipmentSlot slot, bool more, int32_t item_id, int32_t count)
+{
+    const int32_t wire_slot = equipment_wire_slot(protocol, slot);
+    assert(wire_slot >= 0);
+    if (protocol <= 47) {
+        assert(!more);
+        assert(mc_packet_u16(packet, (uint16_t)wire_slot));
+    } else if (protocol < 735) {
+        assert(!more);
+        assert(mc_packet_varint(packet, wire_slot));
+    } else {
+        assert(mc_packet_u8(packet, (uint8_t)wire_slot
+            | (more ? UINT8_C(0x80) : UINT8_C(0))));
+    }
+    assert(mc_packet_plain_item(packet, protocol, item_id, count));
+}
+
+static void entity_equipment_bodies_are_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count == 51U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_MAIN_HAND));
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_OFF_HAND) == (protocol >= 107));
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_BODY) == (protocol >= 766));
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_SADDLE) == (protocol >= 770));
+
+        unsigned char storage[128] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        if (protocol <= 5) {
+            assert(mc_packet_i32(&packet, 123));
+        } else {
+            assert(mc_packet_varint(&packet, 123));
+        }
+        const McEquipmentSlot first_slot = protocol <= 47
+            ? MC_EQUIPMENT_FEET : MC_EQUIPMENT_MAIN_HAND;
+        append_equipment_entry(&packet, protocol, first_slot,
+            protocol >= 735, 3, 7);
+        if (protocol >= 735) {
+            append_equipment_entry(&packet, protocol,
+                MC_EQUIPMENT_OFF_HAND, false, 0, 0);
+        }
+
+        McReader reader;
+        McEntityEquipment decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_entity_equipment(&reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.entity_id == 123);
+        assert(decoded.entry_count == (protocol >= 735 ? 2U : 1U));
+        assert(decoded.entries[0].slot == first_slot);
+        assert(decoded.entries[0].item_id == 3);
+        assert(decoded.entries[0].count == 7);
+        if (protocol >= 735) {
+            assert(decoded.entries[1].slot == MC_EQUIPMENT_OFF_HAND);
+            assert(decoded.entries[1].item_id == 0);
+            assert(decoded.entries[1].count == 0);
+        }
+    }
+
+    static const struct {
+        int protocol;
+        McEquipmentSlot slot;
+    } new_slot_boundaries[] = {
+        {766, MC_EQUIPMENT_BODY},
+        {770, MC_EQUIPMENT_SADDLE},
+    };
+    for (size_t index = 0U;
+            index < sizeof(new_slot_boundaries) / sizeof(new_slot_boundaries[0]);
+            ++index) {
+        unsigned char storage[32] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_varint(&packet, 9));
+        append_equipment_entry(&packet, new_slot_boundaries[index].protocol,
+            new_slot_boundaries[index].slot, false, 3, 1);
+        McReader reader;
+        McEntityEquipment decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_entity_equipment(&reader,
+            new_slot_boundaries[index].protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.entry_count == 1U);
+        assert(decoded.entries[0].slot == new_slot_boundaries[index].slot);
+    }
+
+    unsigned char duplicate_storage[32] = {0};
+    McPacket duplicate;
+    mc_packet_init(&duplicate, duplicate_storage, sizeof(duplicate_storage));
+    assert(mc_packet_varint(&duplicate, 4));
+    append_equipment_entry(&duplicate, 776,
+        MC_EQUIPMENT_MAIN_HAND, true, 3, 1);
+    append_equipment_entry(&duplicate, 776,
+        MC_EQUIPMENT_MAIN_HAND, false, 3, 1);
+    McReader reader;
+    McEntityEquipment decoded = {0};
+    mc_reader_init(&reader, duplicate.data, duplicate.length);
+    assert(!mc_reader_entity_equipment(&reader, 776, &decoded));
+    assert(reader.failed);
+
+    static const unsigned char truncated[] = {1U, 0x80U};
+    mc_reader_init(&reader, truncated, sizeof(truncated));
+    assert(!mc_reader_entity_equipment(&reader, 776, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, truncated, sizeof(truncated));
+    assert(!mc_reader_entity_equipment(&reader, 999, &decoded));
+    assert(reader.failed);
+    assert(!mc_reader_entity_equipment(NULL, 776, &decoded));
+}
+
 static void movement_and_hotbar_bodies_match_node(void)
 {
     /* Bodies excluding ID. The 1.7 position pair follows the canonical
@@ -1363,6 +1494,7 @@ int main(int argc, char **argv)
     player_positions_are_versioned();
     clientbound_player_positions_are_versioned();
     clientbound_respawns_are_versioned();
+    entity_equipment_bodies_are_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
     use_item_bodies_match_node();
