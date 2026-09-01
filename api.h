@@ -527,6 +527,96 @@ typedef struct {
     uint8_t status;
 } McClientboundEntityStatus;
 
+/* Normalized Player Info fields. The wire action is a single enum through
+ * 1.19.2 and a release-dependent bit set from 1.19.3 onward; these flags keep
+ * callers independent of both representations. */
+typedef enum {
+    MC_PLAYER_INFO_ADD_PLAYER = UINT32_C(1) << 0U,
+    MC_PLAYER_INFO_INITIALIZE_CHAT = UINT32_C(1) << 1U,
+    MC_PLAYER_INFO_UPDATE_GAME_MODE = UINT32_C(1) << 2U,
+    MC_PLAYER_INFO_UPDATE_LISTED = UINT32_C(1) << 3U,
+    MC_PLAYER_INFO_UPDATE_LATENCY = UINT32_C(1) << 4U,
+    MC_PLAYER_INFO_UPDATE_DISPLAY_NAME = UINT32_C(1) << 5U,
+    MC_PLAYER_INFO_UPDATE_LIST_ORDER = UINT32_C(1) << 6U,
+    MC_PLAYER_INFO_UPDATE_HAT = UINT32_C(1) << 7U,
+    MC_PLAYER_INFO_REMOVE_PLAYER = UINT32_C(1) << 8U,
+} McPlayerInfoField;
+
+/* Borrowed, already-validated Player Info entry sequence. Protocols 4 and 5
+ * carry one name-based entry; 47-760 carry one action plus UUID entries;
+ * 761+ carry a field mask plus UUID entries. */
+typedef struct {
+    uint32_t entry_count;
+    uint32_t fields;
+    int32_t legacy_action;
+    McBytes entries;
+    bool legacy_name_layout;
+    bool field_mask_layout;
+} McClientboundPlayerInfo;
+
+typedef struct {
+    McReader reader;
+    int protocol;
+    uint32_t remaining;
+    uint32_t fields;
+    int32_t legacy_action;
+    bool legacy_name_layout;
+    bool field_mask_layout;
+} McPlayerInfoIterator;
+
+/* Views borrow strings and encoded substructures from the packet body. */
+typedef struct {
+    McUuid profile_id;
+    McBytes player_name;
+    McBytes properties;
+    McBytes chat_session;
+    McBytes display_name;
+    uint32_t fields;
+    uint32_t property_count;
+    int32_t game_mode;
+    int32_t latency;
+    int32_t list_order;
+    bool listed;
+    bool show_hat;
+    bool has_profile_id;
+    bool has_player_name;
+    bool has_chat_session;
+    bool has_display_name;
+    bool display_name_is_nbt;
+} McPlayerInfoEntry;
+
+/* Dedicated UUID removal packet introduced with the field-mask Player Info
+ * layout. The validated UUID sequence remains allocation-free. */
+typedef struct {
+    uint32_t profile_count;
+    McBytes profile_ids;
+} McClientboundPlayerRemove;
+
+typedef struct {
+    McReader reader;
+    uint32_t remaining;
+} McUuidIterator;
+
+/* Normalized relative entity movement. Deltas are exposed both exactly as
+ * signed wire integers and in block units (1/32 through 1.8, 1/4096 later). */
+typedef struct {
+    int32_t entity_id;
+    int32_t delta_x_raw;
+    int32_t delta_y_raw;
+    int32_t delta_z_raw;
+    double delta_x;
+    double delta_y;
+    double delta_z;
+    uint8_t yaw_raw;
+    uint8_t pitch_raw;
+    float yaw;
+    float pitch;
+    bool on_ground;
+    bool has_position;
+    bool has_rotation;
+    bool has_on_ground;
+} McClientboundEntityMovement;
+
 typedef struct {
     int32_t type_id;
     McBytes data;
@@ -1550,6 +1640,27 @@ bool mc_entity_id_iterator_next(McEntityIdIterator *iterator,
 /* Entity status is stable as i32 entity ID plus one unsigned status byte. */
 bool mc_reader_clientbound_entity_status(McReader *reader, int protocol,
     McClientboundEntityStatus *value);
+/* Decodes and validates Player Info/Update bodies. Use the iterator to obtain
+ * names and normalized fields without allocating. */
+bool mc_reader_clientbound_player_info(McReader *reader, int protocol,
+    McClientboundPlayerInfo *value);
+bool mc_player_info_iterator(const McClientboundPlayerInfo *packet,
+    int protocol, McPlayerInfoIterator *iterator);
+bool mc_player_info_iterator_next(McPlayerInfoIterator *iterator,
+    McPlayerInfoEntry *entry);
+/* Decodes the dedicated 1.19.3+ player_remove UUID list. */
+bool mc_reader_clientbound_player_remove(McReader *reader, int protocol,
+    McClientboundPlayerRemove *value);
+bool mc_player_remove_iterator(const McClientboundPlayerRemove *packet,
+    McUuidIterator *iterator);
+bool mc_uuid_iterator_next(McUuidIterator *iterator, McUuid *profile_id);
+/* Decodes the three clientbound relative movement body variants. */
+bool mc_reader_clientbound_entity_move(McReader *reader, int protocol,
+    McClientboundEntityMovement *value);
+bool mc_reader_clientbound_entity_move_look(McReader *reader, int protocol,
+    McClientboundEntityMovement *value);
+bool mc_reader_clientbound_entity_look(McReader *reader, int protocol,
+    McClientboundEntityMovement *value);
 /* Decodes one complete clientbound block_change body. Protocols 1.7.x use
  * x:i32/y:u8/z:i32 plus separate block-id/metadata fields; their returned
  * state_id is (block_id << 4) | metadata. 1.8+ returns the wire state ID. */

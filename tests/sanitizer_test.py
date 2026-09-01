@@ -18,6 +18,7 @@ TESTS = (
     "stream_test",
     "typed_packet_test",
     "scoreboard_test",
+    "player_projection_test",
     "envelope_test",
     "canonical_test",
     "replay_test",
