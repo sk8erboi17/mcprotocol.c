@@ -174,7 +174,13 @@ Available symmetric field codecs are:
 | `position` | Release-aware packed block position | block use, digging and block updates |
 | `block_change` | Complete release-aware block-change body | authoritative block-state observations from 1.7 through current |
 | `clientbound_player_position` | Release-aware correction body with normalized 1.7 feet Y, teleport/dismount boundaries and modern velocity deltas | observing authoritative movement and teleport responses |
+| `clientbound_respawn` | Release-aware dimension identity, world, spawn info, last-death location, portal/sea-level and keep-data fields | observing authoritative respawn and dimension-change projections |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
+| `inventory_slot_update` | Normalized container-slot or dedicated player-inventory update | observing authoritative main/off-hand inventory reconciliation |
+| `container_open` | Bounded legacy/namespaced/registry menu identity and borrowed title | observing release-aware menu creation without allocations |
+| `container_content` | Bounded metadata-free slot array with state and carried-item fields | inspecting complete Vanilla container snapshots safely |
+| `entity_equipment` | Bounded release-aware equipment body with normalized legacy slots and modern continuation lists | observing main/off-hand, armor, body and saddle projection |
+| `entity_hand_use_metadata` | Exact one-entry shared/living flags body with historical index and terminator validation | observing active main/off-hand item-use projection |
 | `set_creative_slot` | Release-aware slot plus metadata-free ItemStack | creative player-inventory mutations |
 | `held_item_slot` | Validated hotbar index as a big-endian short | selected-slot changes in every release |
 | `client_information` | Release-aware locale, view, chat, skin and preference fields | PLAY settings through 1.20.1 and CONFIGURATION settings afterward |
@@ -239,7 +245,7 @@ manifest may use source-validated field overrides, integer constants, and the
 `scoreboard_reset`, `plain_item_slot`, `plain_item_contents`,
 `plain_window_items`, `empty_window_click`, `source_validated_minecart_steps`,
 `source_validated_minecart_metadata`, `source_validated_primed_tnt_metadata`,
-and `chunk_envelope` projections for
+`direct_sound_event`, and `chunk_envelope` projections for
 schema-checked conditional packets. Both minecart projections require a
 non-empty `source_validation` explanation. The step projection checks the known
 `minecraft-data` envelope while following Vanilla's actual
@@ -252,7 +258,10 @@ requires an explicit `metadata_layout` of `block_state_and_flag` or
 primed-TNT projection derives the fuse accessor boundary (5, 6, 7 or 8)
 from the selected protocol, requires `fuse` through 1.20.2 and
 `fuse_and_block_state` from 1.20.3 onward, and rejects unrelated or duplicate
-metadata entries. The chunk
+metadata entries. The direct-sound projection validates the modern
+`Holder<SoundEvent>` envelope, emits the self-contained direct-holder branch,
+and rejects registered holder IDs because resolving those requires the
+recipient's registry map. The chunk
 projection covers 1.13 through the current schema while exposing section data,
 heightmaps and validated light data without interpreting release-specific block
 palettes, and deliberately accepts only an empty block-entity array. Plain-item
@@ -636,9 +645,9 @@ multi-client test traffic. It contains no Perry source or fixture.
 
 | Workload | Work per run | mcprotocol.c | minecraft-protocol | Speedup |
 | --- | ---: | ---: | ---: | ---: |
-| Sequential offline login | 32 sessions | 15.064 ms | 619.477 ms | 41.12× |
-| Keep-alive stream | 10,000 echoes | 243.425 ms | 495.815 ms | 2.04× |
-| 32 concurrent streams | 8,192 echoes | 120.796 ms | 893.234 ms | 7.39× |
+| Sequential offline login | 32 sessions | 19.570 ms | 624.771 ms | 31.92× |
+| Keep-alive stream | 10,000 echoes | 259.883 ms | 498.470 ms | 1.92× |
+| 32 concurrent streams | 8,192 echoes | 129.716 ms | 871.216 ms | 6.72× |
 
 The checked-in run uses two discarded warm-ups and seven measured repetitions.
 The chart reports median operations per second with interquartile-range error

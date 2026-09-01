@@ -612,6 +612,342 @@ static void clientbound_player_positions_are_versioned(void)
     assert(!mc_reader_clientbound_player_position(NULL, 47, &decoded));
 }
 
+static void build_clientbound_respawn_body(McPacket *packet, int protocol,
+    uint8_t keep_data_mask)
+{
+    static const unsigned char empty_named_compound[] = {10U, 0U, 0U, 0U};
+    static const McBytes dimension_nbt = {
+        empty_named_compound, sizeof(empty_named_compound)
+    };
+    if (protocol <= 404) {
+        assert(mc_packet_i32(packet, 0));
+        assert(mc_packet_u8(packet, 1U));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_string(packet, "flat"));
+    } else if (protocol <= 498) {
+        assert(mc_packet_i32(packet, 0));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_string(packet, "flat"));
+    } else if (protocol <= 578) {
+        assert(mc_packet_i32(packet, 0));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_string(packet, "flat"));
+    } else if (protocol <= 736) {
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, keep_data_mask != 0U));
+    } else if (protocol <= 758) {
+        assert(mc_packet_nbt(packet, true, &dimension_nbt));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, keep_data_mask != 0U));
+    } else if (protocol <= 765) {
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        if (protocol <= 760) {
+            assert(mc_packet_bool(packet, keep_data_mask != 0U));
+        } else if (protocol <= 763) {
+            assert(mc_packet_u8(packet, keep_data_mask));
+        }
+        assert(mc_packet_bool(packet, false));
+        if (protocol >= 763) assert(mc_packet_varint(packet, 7));
+        if (protocol >= 764) assert(mc_packet_u8(packet, keep_data_mask));
+    } else {
+        assert(mc_packet_varint(packet, 0));
+        assert(mc_packet_string(packet, "minecraft:overworld"));
+        assert(mc_packet_i64(packet, INT64_C(123456789)));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_varint(packet, 7));
+        if (protocol >= 768) assert(mc_packet_varint(packet, 63));
+        assert(mc_packet_u8(packet, keep_data_mask));
+    }
+}
+
+static void clientbound_respawns_are_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count != 0U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        unsigned char storage[256] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        build_clientbound_respawn_body(&packet, protocol, 3U);
+        assert(!packet.failed);
+
+        McReader reader;
+        McClientboundRespawn decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_clientbound_respawn(&reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.game_mode == 0U);
+        if (protocol <= 578) {
+            assert(decoded.has_legacy_dimension);
+            assert(decoded.legacy_dimension == 0);
+            assert(decoded.has_level_type);
+            assert(decoded.level_type.size == 4U);
+            assert(memcmp(decoded.level_type.data, "flat", 4U) == 0);
+            assert(decoded.has_difficulty == (protocol <= 404));
+            assert(decoded.has_hashed_seed == (protocol >= 573));
+        } else {
+            assert(decoded.has_world_name);
+            assert(decoded.world_name.size == strlen("minecraft:overworld"));
+            assert(memcmp(decoded.world_name.data, "minecraft:overworld",
+                decoded.world_name.size) == 0);
+            assert(decoded.has_hashed_seed);
+            assert(decoded.has_previous_game_mode);
+            assert(decoded.previous_game_mode == -1);
+            assert(decoded.flat);
+            assert(decoded.keep_data_mask == 3U);
+        }
+        assert(decoded.has_dimension_identifier
+            == ((protocol >= 735 && protocol <= 736)
+                || (protocol >= 759 && protocol <= 765)));
+        assert(decoded.has_dimension_nbt
+            == (protocol >= 751 && protocol <= 758));
+        assert(decoded.has_dimension_type_id == (protocol >= 766));
+        assert(decoded.has_portal_cooldown == (protocol >= 763));
+        assert(decoded.has_sea_level == (protocol >= 768));
+        if (decoded.has_portal_cooldown) assert(decoded.portal_cooldown == 7);
+        if (decoded.has_sea_level) assert(decoded.sea_level == 63);
+    }
+
+    unsigned char malformed[] = {0U, 0U, 0U, 0U, 1U, 4U,
+        'f', 'l', 'a', 't'};
+    McReader reader;
+    McClientboundRespawn decoded = {0};
+    mc_reader_init(&reader, malformed, sizeof(malformed));
+    assert(!mc_reader_clientbound_respawn(&reader, 4, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, malformed, sizeof(malformed));
+    assert(!mc_reader_clientbound_respawn(&reader, 999, &decoded));
+    assert(!mc_reader_clientbound_respawn(NULL, 47, &decoded));
+
+    unsigned char invalid_mask_storage[256] = {0};
+    McPacket invalid_mask;
+    mc_packet_init(&invalid_mask, invalid_mask_storage,
+        sizeof(invalid_mask_storage));
+    build_clientbound_respawn_body(&invalid_mask, 761, 4U);
+    assert(!invalid_mask.failed);
+    mc_reader_init(&reader, invalid_mask.data, invalid_mask.length);
+    assert(!mc_reader_clientbound_respawn(&reader, 761, &decoded));
+    assert(reader.failed);
+}
+
+static int32_t equipment_wire_slot(int protocol, McEquipmentSlot slot)
+{
+    if (protocol > 47) return (int32_t)slot;
+    switch (slot) {
+    case MC_EQUIPMENT_MAIN_HAND: return 0;
+    case MC_EQUIPMENT_FEET: return 1;
+    case MC_EQUIPMENT_LEGS: return 2;
+    case MC_EQUIPMENT_CHEST: return 3;
+    case MC_EQUIPMENT_HEAD: return 4;
+    default: return -1;
+    }
+}
+
+static void append_equipment_entry(McPacket *packet, int protocol,
+    McEquipmentSlot slot, bool more, int32_t item_id, int32_t count)
+{
+    const int32_t wire_slot = equipment_wire_slot(protocol, slot);
+    assert(wire_slot >= 0);
+    if (protocol <= 47) {
+        assert(!more);
+        assert(mc_packet_u16(packet, (uint16_t)wire_slot));
+    } else if (protocol < 735) {
+        assert(!more);
+        assert(mc_packet_varint(packet, wire_slot));
+    } else {
+        assert(mc_packet_u8(packet, (uint8_t)wire_slot
+            | (more ? UINT8_C(0x80) : UINT8_C(0))));
+    }
+    assert(mc_packet_plain_item(packet, protocol, item_id, count));
+}
+
+static void entity_equipment_bodies_are_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count == 51U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_MAIN_HAND));
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_OFF_HAND) == (protocol >= 107));
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_BODY) == (protocol >= 766));
+        assert(mc_entity_equipment_slot_supported(
+            protocol, MC_EQUIPMENT_SADDLE) == (protocol >= 770));
+
+        unsigned char storage[128] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        if (protocol <= 5) {
+            assert(mc_packet_i32(&packet, 123));
+        } else {
+            assert(mc_packet_varint(&packet, 123));
+        }
+        const McEquipmentSlot first_slot = protocol <= 47
+            ? MC_EQUIPMENT_FEET : MC_EQUIPMENT_MAIN_HAND;
+        append_equipment_entry(&packet, protocol, first_slot,
+            protocol >= 735, 3, 7);
+        if (protocol >= 735) {
+            append_equipment_entry(&packet, protocol,
+                MC_EQUIPMENT_OFF_HAND, false, 0, 0);
+        }
+
+        McReader reader;
+        McEntityEquipment decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_entity_equipment(&reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.entity_id == 123);
+        assert(decoded.entry_count == (protocol >= 735 ? 2U : 1U));
+        assert(decoded.entries[0].slot == first_slot);
+        assert(decoded.entries[0].item_id == 3);
+        assert(decoded.entries[0].count == 7);
+        if (protocol >= 735) {
+            assert(decoded.entries[1].slot == MC_EQUIPMENT_OFF_HAND);
+            assert(decoded.entries[1].item_id == 0);
+            assert(decoded.entries[1].count == 0);
+        }
+    }
+
+    static const struct {
+        int protocol;
+        McEquipmentSlot slot;
+    } new_slot_boundaries[] = {
+        {766, MC_EQUIPMENT_BODY},
+        {770, MC_EQUIPMENT_SADDLE},
+    };
+    for (size_t index = 0U;
+            index < sizeof(new_slot_boundaries) / sizeof(new_slot_boundaries[0]);
+            ++index) {
+        unsigned char storage[32] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(mc_packet_varint(&packet, 9));
+        append_equipment_entry(&packet, new_slot_boundaries[index].protocol,
+            new_slot_boundaries[index].slot, false, 3, 1);
+        McReader reader;
+        McEntityEquipment decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_entity_equipment(&reader,
+            new_slot_boundaries[index].protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.entry_count == 1U);
+        assert(decoded.entries[0].slot == new_slot_boundaries[index].slot);
+    }
+
+    unsigned char duplicate_storage[32] = {0};
+    McPacket duplicate;
+    mc_packet_init(&duplicate, duplicate_storage, sizeof(duplicate_storage));
+    assert(mc_packet_varint(&duplicate, 4));
+    append_equipment_entry(&duplicate, 776,
+        MC_EQUIPMENT_MAIN_HAND, true, 3, 1);
+    append_equipment_entry(&duplicate, 776,
+        MC_EQUIPMENT_MAIN_HAND, false, 3, 1);
+    McReader reader;
+    McEntityEquipment decoded = {0};
+    mc_reader_init(&reader, duplicate.data, duplicate.length);
+    assert(!mc_reader_entity_equipment(&reader, 776, &decoded));
+    assert(reader.failed);
+
+    static const unsigned char truncated[] = {1U, 0x80U};
+    mc_reader_init(&reader, truncated, sizeof(truncated));
+    assert(!mc_reader_entity_equipment(&reader, 776, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, truncated, sizeof(truncated));
+    assert(!mc_reader_entity_equipment(&reader, 999, &decoded));
+    assert(reader.failed);
+    assert(!mc_reader_entity_equipment(NULL, 776, &decoded));
+}
+
+static uint8_t expected_hand_use_metadata_index(int protocol)
+{
+    if (protocol < 107) return 0U;
+    if (protocol <= 110) return 5U;
+    if (protocol <= 404) return 6U;
+    if (protocol <= 754) return 7U;
+    return 8U;
+}
+
+static void entity_hand_use_metadata_is_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count == 51U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        unsigned char storage[32] = {0};
+        McPacket packet;
+        mc_packet_init(&packet, storage, sizeof(storage));
+        assert(protocol <= 5
+            ? mc_packet_i32(&packet, 123)
+            : mc_packet_varint(&packet, 123));
+        const uint8_t metadata_index = expected_hand_use_metadata_index(protocol);
+        if (protocol <= 47) {
+            assert(mc_packet_u8(&packet, metadata_index));
+        } else {
+            assert(mc_packet_u8(&packet, metadata_index));
+            assert(protocol <= 340
+                ? mc_packet_u8(&packet, 0U)
+                : mc_packet_varint(&packet, 0));
+        }
+        assert(mc_packet_u8(&packet, protocol < 107 ? 0x12U : 0x03U));
+        assert(mc_packet_u8(&packet, protocol <= 47 ? 0x7fU : 0xffU));
+
+        McReader reader;
+        McEntityHandUseMetadata decoded = {0};
+        mc_reader_init(&reader, packet.data, packet.length);
+        assert(mc_reader_entity_hand_use_metadata(&reader, protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.entity_id == 123);
+        assert(decoded.metadata_index == metadata_index);
+        assert(decoded.raw_flags == (protocol < 107 ? 0x12U : 0x03U));
+        assert(decoded.active);
+        assert(decoded.off_hand == (protocol >= 107));
+        assert(decoded.uses_living_flags == (protocol >= 107));
+    }
+
+    static const unsigned char wrong_index[] = {1U, 7U, 0U, 1U, 0xffU};
+    McReader reader;
+    McEntityHandUseMetadata decoded = {0};
+    mc_reader_init(&reader, wrong_index, sizeof(wrong_index));
+    assert(!mc_reader_entity_hand_use_metadata(&reader, 776, &decoded));
+    assert(reader.failed);
+    static const unsigned char wrong_terminator[] = {1U, 8U, 0U, 1U, 0U};
+    mc_reader_init(&reader, wrong_terminator, sizeof(wrong_terminator));
+    assert(!mc_reader_entity_hand_use_metadata(&reader, 776, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, wrong_index, sizeof(wrong_index));
+    assert(!mc_reader_entity_hand_use_metadata(&reader, 999, &decoded));
+    assert(reader.failed);
+    assert(!mc_reader_entity_hand_use_metadata(NULL, 776, &decoded));
+}
+
 static void movement_and_hotbar_bodies_match_node(void)
 {
     /* Bodies excluding ID. The 1.7 position pair follows the canonical
@@ -1156,6 +1492,151 @@ static void creative_slots_match_node_release_boundaries(void)
     assert(!mc_packet_set_creative_slot(NULL, 776, 37, 3, 7));
 }
 
+static void inventory_slot_updates_are_versioned(void)
+{
+    static const unsigned char legacy[] = {
+        0x00U, 0x00U, 0x24U, 0x00U, 0x01U, 0x40U, 0x00U, 0x00U, 0x00U,
+    };
+    static const unsigned char stateful_empty[] = {
+        0x00U, 0x07U, 0x00U, 0x2dU, 0x00U,
+    };
+    static const unsigned char component_item[] = {
+        0x00U, 0x09U, 0x00U, 0x24U, 0x40U, 0x01U, 0x00U, 0x00U,
+    };
+    static const unsigned char direct_item[] = {
+        0x28U, 0x40U, 0x01U, 0x00U, 0x00U,
+    };
+    static const struct {
+        int protocol;
+        bool direct;
+        const unsigned char *body;
+        size_t body_size;
+        int32_t window_id;
+        int32_t state_id;
+        int32_t slot;
+        int32_t item_id;
+        int32_t count;
+    } cases[] = {
+        {107, false, legacy, sizeof(legacy), 0, -1, 36, 1, 64},
+        {756, false, stateful_empty, sizeof(stateful_empty), 0, 7, 45, 0, 0},
+        {767, false, component_item, sizeof(component_item), 0, 9, 36, 1, 64},
+        {768, true, direct_item, sizeof(direct_item), -1, -1, 40, 1, 64},
+    };
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        McReader reader;
+        McInventorySlotUpdate decoded = {0};
+        mc_reader_init(&reader, cases[index].body, cases[index].body_size);
+        assert(mc_reader_inventory_slot_update(
+            &reader, cases[index].protocol, cases[index].direct, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.direct_player_inventory == cases[index].direct);
+        assert(decoded.window_id == cases[index].window_id);
+        assert(decoded.state_id == cases[index].state_id);
+        assert(decoded.slot == cases[index].slot);
+        assert(decoded.item_id == cases[index].item_id);
+        assert(decoded.count == cases[index].count);
+    }
+
+    McReader reader;
+    McInventorySlotUpdate decoded = {0};
+    mc_reader_init(&reader, direct_item, sizeof(direct_item));
+    assert(!mc_reader_inventory_slot_update(&reader, 767, true, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, stateful_empty, sizeof(stateful_empty) - 1U);
+    assert(!mc_reader_inventory_slot_update(&reader, 756, false, &decoded));
+    assert(reader.failed);
+}
+
+static void container_open_and_content_are_versioned(void)
+{
+    static const unsigned char open_legacy[] = {
+        0x02U, 0x00U, 0x05U, 'C', 'h', 'e', 's', 't', 0x1bU, 0x01U,
+    };
+    static const unsigned char open_named[] = {
+        0x03U, 0x13U,
+        'm','i','n','e','c','r','a','f','t',':','c','o','n','t','a','i','n','e','r',
+        0x02U, '{', '}', 0x1bU,
+    };
+    static const unsigned char open_modern[] = {
+        0x04U, 0x05U, 0x0aU, 0x00U,
+    };
+    static const struct {
+        int protocol;
+        const unsigned char *body;
+        size_t body_size;
+        int32_t window_id;
+        int32_t menu_type;
+        int32_t slot_count;
+        bool registry;
+        bool nbt_title;
+    } open_cases[] = {
+        {4, open_legacy, sizeof(open_legacy), 2, 0, 27, false, false},
+        {47, open_named, sizeof(open_named), 3, -1, 27, false, false},
+        {776, open_modern, sizeof(open_modern), 4, 5, -1, true, true},
+    };
+    for (size_t index = 0U;
+            index < sizeof(open_cases) / sizeof(open_cases[0]); ++index) {
+        McReader reader;
+        McContainerOpen decoded = {0};
+        mc_reader_init(&reader, open_cases[index].body, open_cases[index].body_size);
+        assert(mc_reader_container_open(&reader, open_cases[index].protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.window_id == open_cases[index].window_id);
+        assert(decoded.menu_type == open_cases[index].menu_type);
+        assert(decoded.slot_count == open_cases[index].slot_count);
+        assert(decoded.registry_menu_type == open_cases[index].registry);
+        assert(decoded.title_is_nbt == open_cases[index].nbt_title);
+    }
+
+    static const unsigned char content_legacy[] = {
+        0x02U, 0x00U, 0x02U,
+        0xffU, 0xffU,
+        0x00U, 0x01U, 0x20U, 0x00U, 0x00U, 0xffU, 0xffU,
+    };
+    static const unsigned char content_modern[] = {
+        0x04U, 0x07U, 0x02U,
+        0x00U,
+        0x20U, 0x01U, 0x00U, 0x00U,
+        0x00U,
+    };
+    static const struct {
+        int protocol;
+        const unsigned char *body;
+        size_t body_size;
+        int32_t window_id;
+        int32_t state_id;
+        bool has_state;
+        bool has_carried;
+    } content_cases[] = {
+        {4, content_legacy, sizeof(content_legacy), 2, -1, false, false},
+        {776, content_modern, sizeof(content_modern), 4, 7, true, true},
+    };
+    for (size_t index = 0U;
+            index < sizeof(content_cases) / sizeof(content_cases[0]); ++index) {
+        McReader reader;
+        McContainerContent decoded = {0};
+        mc_reader_init(&reader, content_cases[index].body, content_cases[index].body_size);
+        assert(mc_reader_container_content(
+            &reader, content_cases[index].protocol, &decoded));
+        assert(mc_reader_remaining(&reader) == 0U);
+        assert(decoded.window_id == content_cases[index].window_id);
+        assert(decoded.state_id == content_cases[index].state_id);
+        assert(decoded.has_state_id == content_cases[index].has_state);
+        assert(decoded.has_carried == content_cases[index].has_carried);
+        assert(decoded.slot_count == 2U);
+        assert(decoded.slots[0].count == 0);
+        assert(decoded.slots[1].item_id == 1 && decoded.slots[1].count == 32);
+        assert(decoded.carried.count == 0);
+    }
+
+    unsigned char oversized[] = {0x00U, 0x00U, 0x81U, 0x01U};
+    McReader reader;
+    McContainerContent decoded = {0};
+    mc_reader_init(&reader, oversized, sizeof(oversized));
+    assert(!mc_reader_container_content(&reader, 776, &decoded));
+    assert(reader.failed);
+}
+
 static void dump_command(int protocol)
 {
     unsigned char storage[384];
@@ -1224,6 +1705,9 @@ int main(int argc, char **argv)
     player_action_bodies_match_node();
     player_positions_are_versioned();
     clientbound_player_positions_are_versioned();
+    clientbound_respawns_are_versioned();
+    entity_equipment_bodies_are_versioned();
+    entity_hand_use_metadata_is_versioned();
     movement_and_hotbar_bodies_match_node();
     block_place_bodies_are_versioned();
     use_item_bodies_match_node();
@@ -1233,6 +1717,8 @@ int main(int argc, char **argv)
     container_buttons_match_node_and_source();
     close_windows_and_container_ids_are_versioned();
     creative_slots_match_node_release_boundaries();
+    inventory_slot_updates_are_versioned();
+    container_open_and_content_are_versioned();
     puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
     return 0;
 }

@@ -103,6 +103,24 @@ DOCUMENT = {
                 },
             ],
         ],
+        "ItemSoundEvent": [
+            "container",
+            [
+                {"name": "soundName", "type": "string"},
+                {"name": "fixedRange", "type": ["option", "f32"]},
+            ],
+        ],
+        "ItemSoundHolder": [
+            "registryEntryHolder",
+            {
+                "baseName": "soundId",
+                "otherwise": {"name": "data", "type": "ItemSoundEvent"},
+            },
+        ],
+        "soundSource": [
+            "mapper",
+            {"type": "varint", "mappings": {"4": "block"}},
+        ],
     },
     "play": {
         "toClient": {
@@ -133,6 +151,7 @@ DOCUMENT = {
                                         "0xe": "move_minecart",
                                         "0xf": "entity_metadata",
                                         "0x10": "world_particles",
+                                        "0x11": "sound_effect",
                                     },
                                 },
                             ],
@@ -160,6 +179,7 @@ DOCUMENT = {
                                         "move_minecart": "packet_move_minecart",
                                         "entity_metadata": "packet_entity_metadata",
                                         "world_particles": "packet_world_particles",
+                                        "sound_effect": "packet_sound_effect",
                                     },
                                 },
                             ],
@@ -245,6 +265,19 @@ DOCUMENT = {
                         {"name": "velocityOffset", "type": "f32"},
                         {"name": "amount", "type": "i32"},
                         {"name": "particle", "type": "Particle"},
+                    ],
+                ],
+                "packet_sound_effect": [
+                    "container",
+                    [
+                        {"name": "sound", "type": "ItemSoundHolder"},
+                        {"name": "soundCategory", "type": "soundSource"},
+                        {"name": "x", "type": "i32"},
+                        {"name": "y", "type": "i32"},
+                        {"name": "z", "type": "i32"},
+                        {"name": "volume", "type": "f32"},
+                        {"name": "pitch", "type": "f32"},
+                        {"name": "seed", "type": "i64"},
                     ],
                 ],
                 "packet_attributes": [
@@ -973,6 +1006,32 @@ def main() -> None:
     else:
         raise AssertionError("NOTE particle projection accepted no source validation")
 
+    sound_event_spec = {
+        "state": "play",
+        "direction": "toClient",
+        "name": "sound_effect",
+        "expected_id": 17,
+        "projection": "direct_sound_event",
+        "source_validation": (
+            "Vanilla SoundEvent STREAM_CODEC direct holder and packet scalar layout"
+        ),
+    }
+    sound_event = COMPILER.compile_manifest_packet(compiler, sound_event_spec)
+    assert sound_event.projection == "sound_event:direct_holder"
+    assert [field.wire.suffix for field in sound_event.fields] == [
+        "string", "varint", "i32", "i32", "i32", "float", "float", "i64"
+    ]
+    try:
+        COMPILER.compile_manifest_packet(
+            compiler,
+            {key: value for key, value in sound_event_spec.items()
+             if key != "source_validation"},
+        )
+    except ValueError as error:
+        assert "requires source_validation" in str(error)
+    else:
+        raise AssertionError("direct sound projection accepted no source validation")
+
     profile = COMPILER.ManifestProfile(
         "test",
         "test",
@@ -992,6 +1051,7 @@ def main() -> None:
             minecart,
             minecart_metadata,
             note_particle,
+            sound_event,
         ),
     )
     header = COMPILER.render_manifest_header(profile, "0" * 40)
@@ -1148,6 +1208,12 @@ def main() -> None:
     assert "mc_packet_varint(packet, INT32_C(65))" in note_outputs[
         "protocol_override_note_test.c"
     ]
+    assert "McBytes sound_name" in header
+    assert "holder_id != 0" in source
+    assert "decoded.sound_name.size == 0U" in source
+    assert "!isfinite(decoded.fixed_range)" in source
+    assert "mc_packet_varint(packet, 0)" in source
+    assert "mc_packet_bool(packet, value->has_fixed_range)" in source
 
     outputs = {
         "protocol_test.h": header,
@@ -1398,7 +1464,7 @@ bool mc999_play_clientbound_sample_decode(McReader *reader, Mc999Sample *value)
 
     print(
         "PASS schema compiler manifest, overrides, minecart, NOTE particle, "
-        "scoreboard/inventory/chunk projections, component validators, "
+        "direct sound, scoreboard/inventory/chunk projections, component validators, "
         "embedded regions, integrity and staleness"
     )
 

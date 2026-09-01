@@ -1431,6 +1431,82 @@ def manifest_note_particle_projection(
     )
 
 
+def manifest_direct_sound_event_projection(
+    compiler: Compiler,
+    packet_name: str,
+    raw_fields: list[dict[str, Any]],
+    types: dict[str, Any],
+) -> tuple[tuple[ManifestField, ...], str]:
+    names = [field.get("name") for field in raw_fields]
+    if names != [
+        "sound", "soundCategory", "x", "y", "z", "volume", "pitch", "seed"
+    ]:
+        raise ValueError(
+            f"packet {packet_name} no longer matches direct_sound_event"
+        )
+    holder = compiler.resolve(raw_fields[0].get("type"), types)
+    if (
+        not isinstance(holder, list)
+        or len(holder) != 2
+        or holder[0] != "registryEntryHolder"
+        or not isinstance(holder[1], dict)
+        or holder[1].get("baseName") != "soundId"
+    ):
+        raise ValueError(f"packet {packet_name} sound is not a registry holder")
+    direct_branch = holder[1].get("otherwise")
+    if (
+        not isinstance(direct_branch, dict)
+        or direct_branch.get("name") != "data"
+        or "type" not in direct_branch
+    ):
+        raise ValueError(f"packet {packet_name} direct holder branch changed")
+    direct = manifest_container(
+        compiler,
+        direct_branch["type"],
+        types,
+        f"packet {packet_name} direct sound event",
+    )
+    if [field.get("name") for field in direct] != ["soundName", "fixedRange"]:
+        raise ValueError(f"packet {packet_name} direct sound event changed")
+    name_wire = required_manifest_wire(
+        compiler, direct[0].get("type"), types, "direct sound name"
+    )
+    fixed_range = compiler.resolve(direct[1].get("type"), types)
+    if (
+        not isinstance(fixed_range, list)
+        or len(fixed_range) != 2
+        or fixed_range[0] != "option"
+        or compiler.resolve(fixed_range[1], types) != "f32"
+    ):
+        raise ValueError(f"packet {packet_name} fixed sound range changed")
+    candidates = (
+        ("sound.soundName", "sound_name", name_wire),
+        ("soundCategory", "sound_category", required_manifest_wire(
+            compiler, raw_fields[1].get("type"), types, "sound category")),
+        ("x", "x", required_manifest_wire(
+            compiler, raw_fields[2].get("type"), types, "sound x")),
+        ("y", "y", required_manifest_wire(
+            compiler, raw_fields[3].get("type"), types, "sound y")),
+        ("z", "z", required_manifest_wire(
+            compiler, raw_fields[4].get("type"), types, "sound z")),
+        ("volume", "volume", required_manifest_wire(
+            compiler, raw_fields[5].get("type"), types, "sound volume")),
+        ("pitch", "pitch", required_manifest_wire(
+            compiler, raw_fields[6].get("type"), types, "sound pitch")),
+        ("seed", "seed", required_manifest_wire(
+            compiler, raw_fields[7].get("type"), types, "sound seed")),
+    )
+    expected_suffixes = (
+        "string", "varint", "i32", "i32", "i32", "float", "float", "i64"
+    )
+    if tuple(candidate[2].suffix for candidate in candidates) != expected_suffixes:
+        raise ValueError(f"packet {packet_name} direct sound scalar layout changed")
+    return (
+        tuple(ManifestField(source, field, wire) for source, field, wire in candidates),
+        "sound_event:direct_holder",
+    )
+
+
 def required_manifest_wire(compiler: Compiler, schema: Any,
                            types: dict[str, Any], description: str) -> ManifestWire:
     wire = manifest_wire(compiler, schema, types)
@@ -2038,6 +2114,22 @@ def compile_manifest_packet(compiler: Compiler, spec: dict[str, Any]) -> Manifes
                 fields,
                 variant,
             )
+        if projection == "direct_sound_event":
+            source_validation = spec.get("source_validation")
+            if not isinstance(source_validation, str) or not source_validation.strip():
+                raise ValueError("direct_sound_event requires source_validation")
+            fields, variant = manifest_direct_sound_event_projection(
+                compiler, name, raw_fields, types
+            )
+            return ManifestPacket(
+                name,
+                manifest_c_name(name),
+                packet_id,
+                state,
+                str(raw_direction),
+                fields,
+                variant,
+            )
         if projection in {
             "scoreboard_objective", "scoreboard_score", "scoreboard_reset"
         }:
@@ -2307,6 +2399,19 @@ def render_manifest_header(profile: ManifestProfile, revision: str) -> str:
                 "    int32_t fuse;",
                 "    int32_t block_state;",
                 "    uint32_t fields;",
+            ])
+        elif packet.projection == "sound_event:direct_holder":
+            lines.extend([
+                "    McBytes sound_name;",
+                "    int32_t sound_category;",
+                "    int32_t x;",
+                "    int32_t y;",
+                "    int32_t z;",
+                "    float volume;",
+                "    float pitch;",
+                "    int64_t seed;",
+                "    float fixed_range;",
+                "    bool has_fixed_range;",
             ])
         elif packet.projection == "inventory:plain_window_items":
             lines.extend([
@@ -2765,6 +2870,71 @@ def render_primed_tnt_metadata_projection(
         "",
     ])
     return lines
+
+
+def render_direct_sound_event_projection(
+    profile: ManifestProfile,
+    packet: ManifestPacket,
+    type_name: str,
+) -> list[str]:
+    if packet.projection != "sound_event:direct_holder":
+        raise ValueError(f"unknown sound projection {packet.projection}")
+    decode_function = f"perry_mc_{profile.c_profile}_decode_{packet.c_packet}"
+    encode_function = f"perry_mc_{profile.c_profile}_encode_{packet.c_packet}"
+    return [
+        f"bool {decode_function}(",
+        f"    const void *payload, size_t payload_size, {type_name} *value) {{",
+        "    if ((payload == NULL && payload_size != 0U) || value == NULL) return false;",
+        "    McReader reader;",
+        f"    {type_name} decoded = {{0}};",
+        "    int32_t holder_id = -1;",
+        "    mc_reader_init(&reader, payload, payload_size);",
+        "    if (!mc_reader_varint(&reader, &holder_id) || holder_id != 0 ||",
+        "        !mc_reader_string(&reader, &decoded.sound_name) ||",
+        "        decoded.sound_name.size == 0U ||",
+        "        !mc_reader_bool(&reader, &decoded.has_fixed_range) ||",
+        "        (decoded.has_fixed_range &&",
+        "         (!mc_reader_float(&reader, &decoded.fixed_range) ||",
+        "          !isfinite(decoded.fixed_range) || decoded.fixed_range < 0.0F)) ||",
+        "        !mc_reader_varint(&reader, &decoded.sound_category) ||",
+        "        decoded.sound_category < 0 ||",
+        "        !mc_reader_i32(&reader, &decoded.x) ||",
+        "        !mc_reader_i32(&reader, &decoded.y) ||",
+        "        !mc_reader_i32(&reader, &decoded.z) ||",
+        "        !mc_reader_float(&reader, &decoded.volume) ||",
+        "        !mc_reader_float(&reader, &decoded.pitch) ||",
+        "        !mc_reader_i64(&reader, &decoded.seed) ||",
+        "        !isfinite(decoded.volume) || decoded.volume < 0.0F ||",
+        "        !isfinite(decoded.pitch) || decoded.pitch < 0.0F ||",
+        "        mc_reader_remaining(&reader) != 0U) return false;",
+        "    *value = decoded;",
+        "    return true;",
+        "}",
+        "",
+        f"bool {encode_function}(",
+        f"    McPacket *packet, const {type_name} *value) {{",
+        "    if (packet == NULL || value == NULL || value->sound_name.data == NULL ||",
+        "        value->sound_name.size == 0U || value->sound_category < 0 ||",
+        "        !isfinite(value->volume) || value->volume < 0.0F ||",
+        "        !isfinite(value->pitch) || value->pitch < 0.0F ||",
+        "        (value->has_fixed_range &&",
+        "         (!isfinite(value->fixed_range) || value->fixed_range < 0.0F)) ||",
+        "        !mc_packet_varint(packet, 0) ||",
+        "        !mc_packet_string_n(packet, (const char *)value->sound_name.data,",
+        "                            value->sound_name.size) ||",
+        "        !mc_packet_bool(packet, value->has_fixed_range)) return false;",
+        "    if (value->has_fixed_range &&",
+        "        !mc_packet_float(packet, value->fixed_range)) return false;",
+        "    return mc_packet_varint(packet, value->sound_category) &&",
+        "           mc_packet_i32(packet, value->x) &&",
+        "           mc_packet_i32(packet, value->y) &&",
+        "           mc_packet_i32(packet, value->z) &&",
+        "           mc_packet_float(packet, value->volume) &&",
+        "           mc_packet_float(packet, value->pitch) &&",
+        "           mc_packet_i64(packet, value->seed);",
+        "}",
+        "",
+    ]
 
 
 def render_note_particle_projection(
@@ -3476,7 +3646,8 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
     ]
     if any(
         packet.projection is not None
-        and packet.projection.startswith("minecart_metadata:")
+        and (packet.projection.startswith("minecart_metadata:")
+             or packet.projection == "sound_event:direct_holder")
         for packet in profile.packets
     ):
         lines.extend(["#include <math.h>", ""])
@@ -3494,6 +3665,8 @@ def render_manifest_source(profile: ManifestProfile, revision: str) -> str:
                 renderer = render_minecart_metadata_projection
             elif packet.projection.startswith("primed_tnt_metadata:"):
                 renderer = render_primed_tnt_metadata_projection
+            elif packet.projection == "sound_event:direct_holder":
+                renderer = render_direct_sound_event_projection
             elif packet.projection.startswith("note_particle:"):
                 renderer = render_note_particle_projection
             elif packet.projection.startswith("inventory:"):

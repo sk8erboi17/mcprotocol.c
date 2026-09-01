@@ -310,6 +310,44 @@ typedef struct {
     bool dismount_vehicle;
 } McClientboundPlayerPosition;
 
+/* Normalized clientbound Respawn body. String/NBT fields are borrowed from
+ * the reader input and become invalid with that packet buffer. Legacy
+ * dimensions expose legacy_dimension; 1.16--1.18 expose dimension_nbt;
+ * registry-based modern layouts expose dimension_type_id. */
+typedef struct {
+    int32_t legacy_dimension;
+    int32_t dimension_type_id;
+    McBytes dimension_identifier;
+    McBytes dimension_nbt;
+    McBytes world_name;
+    McBytes level_type;
+    McBytes last_death_dimension;
+    McPosition last_death_position;
+    int64_t hashed_seed;
+    int32_t portal_cooldown;
+    int32_t sea_level;
+    uint8_t difficulty;
+    uint8_t game_mode;
+    int8_t previous_game_mode;
+    /* 1.19.3+ exposes the two KEEP_* bits directly. Older copy-data
+     * booleans are normalized to either zero or both bits set. */
+    uint8_t keep_data_mask;
+    bool has_legacy_dimension;
+    bool has_dimension_type_id;
+    bool has_dimension_identifier;
+    bool has_dimension_nbt;
+    bool has_world_name;
+    bool has_level_type;
+    bool has_hashed_seed;
+    bool has_difficulty;
+    bool has_previous_game_mode;
+    bool debug;
+    bool flat;
+    bool has_last_death_location;
+    bool has_portal_cooldown;
+    bool has_sea_level;
+} McClientboundRespawn;
+
 typedef struct {
     const char *locale;
     int8_t view_distance;
@@ -434,6 +472,97 @@ typedef struct {
     McBytes data;
 } McItemComponentPatch;
 
+/* Canonical equipment slots. Legacy wire slots are normalized into this
+ * ordering: their slot 1 (boots) becomes MC_EQUIPMENT_FEET rather than being
+ * confused with the off hand introduced in 1.9. */
+typedef enum {
+    MC_EQUIPMENT_MAIN_HAND = 0,
+    MC_EQUIPMENT_OFF_HAND,
+    MC_EQUIPMENT_FEET,
+    MC_EQUIPMENT_LEGS,
+    MC_EQUIPMENT_CHEST,
+    MC_EQUIPMENT_HEAD,
+    MC_EQUIPMENT_BODY,
+    MC_EQUIPMENT_SADDLE,
+    MC_EQUIPMENT_SLOT_COUNT
+} McEquipmentSlot;
+
+#define MC_ENTITY_EQUIPMENT_MAX_ENTRIES 8U
+
+typedef struct {
+    McEquipmentSlot slot;
+    int32_t item_id;
+    int32_t count;
+} McEntityEquipmentEntry;
+
+typedef struct {
+    int32_t entity_id;
+    size_t entry_count;
+    McEntityEquipmentEntry entries[MC_ENTITY_EQUIPMENT_MAX_ENTRIES];
+} McEntityEquipment;
+
+/* Normalized clientbound inventory-slot update. Releases through 1.21.1 use
+ * ContainerSetSlot (window/state/menu slot); 1.21.2+ may instead address the
+ * player's logical inventory directly. */
+typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    int32_t slot;
+    int32_t item_id;
+    int32_t count;
+    bool direct_player_inventory;
+} McInventorySlotUpdate;
+
+/* A bounded, normalized view of clientbound open_window/open_screen. Legacy
+ * protocols expose either a numeric or namespaced menu type plus an explicit
+ * top-inventory size; registry-era protocols expose a numeric menu type. The
+ * title is returned as a borrowed encoded string/NBT slice so callers do not
+ * need to duplicate release-specific framing merely to identify the menu. */
+typedef struct {
+    int32_t window_id;
+    int32_t menu_type;
+    int32_t slot_count;
+    int32_t entity_id;
+    McBytes named_menu_type;
+    McBytes encoded_title;
+    bool registry_menu_type;
+    bool title_is_nbt;
+    bool has_entity_id;
+} McContainerOpen;
+
+#define MC_CONTAINER_CONTENT_MAX_SLOTS 128U
+
+typedef struct {
+    int32_t item_id;
+    int32_t count;
+} McContainerItem;
+
+/* Normalized clientbound window_items/container_set_content. The fixed bound
+ * covers every Vanilla menu while keeping parsing allocation-free and safe for
+ * packet callbacks. Items with metadata/components intentionally fail the
+ * plain-item decoder instead of being accepted lossily. */
+typedef struct {
+    int32_t window_id;
+    int32_t state_id;
+    size_t slot_count;
+    McContainerItem slots[MC_CONTAINER_CONTENT_MAX_SLOTS];
+    McContainerItem carried;
+    bool has_state_id;
+    bool has_carried;
+} McContainerContent;
+
+/* Normalized result of the one-entry metadata projection used to publish
+ * player hand-use state. Pre-1.9 stores active use in shared entity flag 0x10
+ * and cannot represent the off hand; newer releases use LivingEntity bits
+ * 0x01/0x02 at a release-specific metadata index. */
+typedef struct {
+    int32_t entity_id;
+    uint8_t metadata_index;
+    uint8_t raw_flags;
+    bool active;
+    bool off_hand;
+    bool uses_living_flags;
+} McEntityHandUseMetadata;
 
 /* ============================================================
  * TYPED PACKET FAMILIES
@@ -1197,6 +1326,10 @@ bool mc_reader_position(McReader *reader, int protocol, McPosition *value);
  * body with trailing fields. */
 bool mc_reader_clientbound_player_position(McReader *reader, int protocol,
     McClientboundPlayerPosition *value);
+/* Decodes and validates one complete release-aware Respawn body (without its
+ * packet ID). The caller may require mc_reader_remaining(reader) == 0. */
+bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
+    McClientboundRespawn *value);
 /* Decodes one complete clientbound block_change body. Protocols 1.7.x use
  * x:i32/y:u8/z:i32 plus separate block-id/metadata fields; their returned
  * state_id is (block_id << 4) | metadata. 1.8+ returns the wire state ID. */
@@ -1205,6 +1338,34 @@ bool mc_reader_block_change(McReader *reader, int protocol,
 bool mc_reader_uuid(McReader *reader, McUuid *value);
 bool mc_reader_plain_item(McReader *reader, int protocol,
     int32_t *item_id, int32_t *count);
+/* Decodes either clientbound set_slot/container_set_slot or the dedicated
+ * set_player_inventory body used from 1.21.2. Packet IDs are excluded. */
+bool mc_reader_inventory_slot_update(McReader *reader, int protocol,
+    bool direct_player_inventory, McInventorySlotUpdate *value);
+/* Decodes a complete release-aware open_window/open_screen body. The packet ID
+ * is excluded. encoded_title and named_menu_type borrow from reader storage. */
+bool mc_reader_container_open(McReader *reader, int protocol,
+    McContainerOpen *value);
+/* Decodes one bounded release-aware window_items/container_set_content body.
+ * The packet ID is excluded; callers may require zero bytes remaining. */
+bool mc_reader_container_content(McReader *reader, int protocol,
+    McContainerContent *value);
+/* Reports whether the canonical equipment slot exists in the selected
+ * release. Off hand starts in 1.9, body armor in 1.20.5 and saddle in 1.21.5. */
+bool mc_entity_equipment_slot_supported(int protocol, McEquipmentSlot slot);
+/* Decodes one clientbound entity_equipment/set_equipment body without packet
+ * ID. The 1.16+ continuation-bit list is bounded, rejects duplicate slots and
+ * is normalized to the canonical slot enum above. Items must be metadata-free;
+ * richer item components deliberately remain visible as a decode failure. */
+bool mc_reader_entity_equipment(McReader *reader, int protocol,
+    McEntityEquipment *value);
+/* Decodes the one-entry clientbound entity_metadata body used for player
+ * hand-use projection. The packet ID is excluded; unexpected index,
+ * serializer, missing terminator or a second entry before the terminator is
+ * rejected. The caller may require mc_reader_remaining(reader) == 0 to reject
+ * bytes following the complete metadata list. */
+bool mc_reader_entity_hand_use_metadata(McReader *reader, int protocol,
+    McEntityHandUseMetadata *value);
 
 /* NBT functions validate the complete encoded value and optionally return a
  * borrowed slice (encoded may be NULL when only validation/skipping matters).

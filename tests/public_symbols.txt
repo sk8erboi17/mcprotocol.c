@@ -52,6 +52,7 @@ mc_decode_canonical_block_change
 mc_decode_canonical_inventory
 mc_decode_canonical_movement
 mc_decode_packet
+mc_entity_equipment_slot_supported
 mc_error_clear
 mc_error_name
 mc_item_iterator_next
@@ -116,7 +117,12 @@ mc_reader_buffer_i32
 mc_reader_buffer_varint
 mc_reader_bytes
 mc_reader_clientbound_player_position
+mc_reader_clientbound_respawn
+mc_reader_container_content
+mc_reader_container_open
 mc_reader_double
+mc_reader_entity_equipment
+mc_reader_entity_hand_use_metadata
 mc_reader_finish
 mc_reader_float
 mc_reader_i16
@@ -125,6 +131,7 @@ mc_reader_i64
 mc_reader_i8
 mc_reader_init
 mc_reader_init_mode
+mc_reader_inventory_slot_update
 mc_reader_item_stack
 mc_reader_nbt
 mc_reader_nbt_name
