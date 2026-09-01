@@ -21333,6 +21333,78 @@ static bool typed_decode_metadata(McReader *reader, int protocol,
     return true;
 }
 
+bool mc_entity_metadata_iterator(const McEntityMetadataPacket *packet,
+    int protocol, McEntityMetadataIterator *iterator)
+{
+    if (packet == NULL || iterator == NULL || !mc_protocol_supported(protocol)
+        || !packet->terminated
+        || packet->entry_count > MC_MAX_ENTITY_METADATA_ENTRIES
+        || packet->entries.data == NULL || packet->entries.size == 0U) {
+        return false;
+    }
+    *iterator = (McEntityMetadataIterator){
+        .protocol = protocol,
+        .remaining = packet->entry_count,
+    };
+    mc_reader_init_mode(&iterator->reader, packet->entries.data,
+        packet->entries.size, MC_DECODE_STRICT, NULL);
+    if (iterator->remaining == 0U) {
+        uint8_t terminator = 0U;
+        const uint8_t expected = protocol <= 47 ? UINT8_C(0x7f) : UINT8_MAX;
+        return mc_reader_u8(&iterator->reader, &terminator)
+            && terminator == expected
+            && mc_reader_remaining(&iterator->reader) == 0U;
+    }
+    return true;
+}
+
+bool mc_entity_metadata_iterator_next(McEntityMetadataIterator *iterator,
+    McEntityMetadataEntry *entry)
+{
+    if (iterator == NULL || entry == NULL || iterator->remaining == 0U) {
+        return false;
+    }
+    McEntityMetadataEntry decoded = {0};
+    uint8_t header = 0U;
+    if (!mc_reader_u8(&iterator->reader, &header)) return false;
+    const uint8_t terminator = iterator->protocol <= 47
+        ? UINT8_C(0x7f) : UINT8_MAX;
+    if (header == terminator) return typed_invalid(&iterator->reader);
+    if (iterator->protocol <= 47) {
+        decoded.index = header & UINT8_C(0x1f);
+        decoded.serializer = (int32_t)(header >> 5U);
+    } else {
+        decoded.index = header;
+        if (!mc_reader_varint(&iterator->reader, &decoded.serializer)
+            || decoded.serializer < 0) {
+            return typed_invalid(&iterator->reader);
+        }
+    }
+    const size_t value_start = iterator->reader.offset;
+    if (!(iterator->protocol >= 762
+            ? typed_skip_named_metadata_value(&iterator->reader,
+                iterator->protocol, decoded.serializer)
+            : typed_skip_metadata_value(&iterator->reader,
+                iterator->protocol, decoded.serializer))) {
+        return false;
+    }
+    decoded.value = (McBytes){
+        iterator->reader.data + value_start,
+        iterator->reader.offset - value_start,
+    };
+    --iterator->remaining;
+    if (iterator->remaining == 0U) {
+        uint8_t actual_terminator = 0U;
+        if (!mc_reader_u8(&iterator->reader, &actual_terminator)
+            || actual_terminator != terminator
+            || mc_reader_remaining(&iterator->reader) != 0U) {
+            return typed_invalid(&iterator->reader);
+        }
+    }
+    *entry = decoded;
+    return true;
+}
+
 static bool reader_profile_properties(McReader *reader,
     McClientboundEntitySpawn *decoded)
 {

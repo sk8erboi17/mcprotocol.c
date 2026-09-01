@@ -31,6 +31,7 @@ typedef union {
     McSetSlotPacket set_slot;
     McWindowItemsPacket window_items;
     McMultiBlockChangePacket multi_block;
+    McEntityMetadataPacket metadata;
 } TestDecoded;
 
 static int32_t packet_id(int protocol, McPacketDirection direction,
@@ -48,9 +49,17 @@ static McPacketFamily decode(int protocol, McPacketDirection direction,
     McPacketFamily family = MC_FAMILY_UNKNOWN;
     McError error;
     memset(decoded, 0, sizeof(*decoded));
-    assert(mc_decode_packet(protocol, MC_STATE_PLAY, direction, id,
+    const int result = mc_decode_packet(protocol, MC_STATE_PLAY, direction, id,
         payload, payload_size, MC_DECODE_STRICT, decoded, sizeof(*decoded),
-        &family, &error) == 0);
+        &family, &error);
+    if (result != 0) {
+        fprintf(stderr,
+            "decode failed: protocol=%d direction=%d packet=%s id=%d "
+            "error=%d offset=%zu\n",
+            protocol, (int)direction, name, id, (int)error.code,
+            error.offset);
+    }
+    assert(result == 0);
     assert(error.code == MC_ERROR_NONE);
     return family;
 }
@@ -646,6 +655,23 @@ static void encode_multi_block_change(McPacket *body, int protocol)
     else assert(mc_packet_varint(body, (int32_t)packed));
 }
 
+static void encode_entity_metadata(McPacket *body, int protocol)
+{
+    if (protocol <= 47) {
+        if (protocol <= 5) assert(mc_packet_i32(body, 7));
+        else assert(mc_packet_varint(body, 7));
+        assert(mc_packet_u8(body, 1U));
+        assert(mc_packet_u8(body, 42U));
+        assert(mc_packet_u8(body, UINT8_C(0x7f)));
+        return;
+    }
+    assert(mc_packet_varint(body, 7));
+    assert(mc_packet_u8(body, 1U));
+    assert(mc_packet_varint(body, 1));
+    assert(mc_packet_varint(body, 300));
+    assert(mc_packet_u8(body, UINT8_MAX));
+}
+
 static void test_inventory_and_multi_block(void)
 {
     size_t protocol_count = 0U;
@@ -734,6 +760,37 @@ static void test_inventory_and_multi_block(void)
         assert(!mc_block_change_iterator_next(&changes, &change));
         assert_exact_rejections(protocol, MC_PACKET_CLIENTBOUND,
             "multi_block_change", body.data, body.length);
+
+        mc_packet_init(&body, storage, sizeof(storage));
+        encode_entity_metadata(&body, protocol);
+        assert(decode(protocol, MC_PACKET_CLIENTBOUND, "entity_metadata",
+            body.data, body.length, &decoded) == MC_FAMILY_ENTITY_METADATA);
+        assert(decoded.metadata.entity_id == 7);
+        assert(decoded.metadata.entry_count == 1U);
+        McEntityMetadataIterator metadata;
+        McEntityMetadataEntry metadata_entry;
+        assert(mc_entity_metadata_iterator(
+            &decoded.metadata, protocol, &metadata));
+        assert(mc_entity_metadata_iterator_next(&metadata, &metadata_entry));
+        assert(metadata_entry.index == 1U);
+        assert(metadata_entry.serializer == (protocol <= 47 ? 0 : 1));
+        McReader metadata_value;
+        mc_reader_init(&metadata_value, metadata_entry.value.data,
+            metadata_entry.value.size);
+        if (protocol <= 47) {
+            uint8_t value = 0U;
+            assert(mc_reader_u8(&metadata_value, &value));
+            assert(value == 42U);
+        } else {
+            int32_t value = 0;
+            assert(mc_reader_varint(&metadata_value, &value));
+            assert(value == 300);
+        }
+        assert(mc_reader_remaining(&metadata_value) == 0U);
+        assert(!mc_entity_metadata_iterator_next(
+            &metadata, &metadata_entry));
+        assert_exact_rejections(protocol, MC_PACKET_CLIENTBOUND,
+            "entity_metadata", body.data, body.length);
     }
 }
 

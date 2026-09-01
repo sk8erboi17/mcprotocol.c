@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define MC_PROTOCOL_API_VERSION 7
+#define MC_PROTOCOL_API_VERSION 8
 #define MC_DEFAULT_PORT 25565U
 #define MC_UUID_STRING_SIZE 37U
 #define MC_HANDSHAKE_HOST_SIZE 256U
@@ -978,6 +978,18 @@ typedef struct {
 } McEntityMetadataPacket;
 
 typedef struct {
+    uint8_t index;
+    int32_t serializer;
+    McBytes value;
+} McEntityMetadataEntry;
+
+typedef struct {
+    McReader reader;
+    int protocol;
+    uint32_t remaining;
+} McEntityMetadataIterator;
+
+typedef struct {
     int32_t entity_id;
     int32_t vehicle_id;
     bool leash;
@@ -1287,6 +1299,14 @@ bool mc_update_attributes_iterator(const McUpdateAttributesPacket *packet,
     int protocol, McAttributeIterator *iterator);
 bool mc_attribute_iterator_next(McAttributeIterator *iterator,
     McAttributeView *attribute);
+/* Iterates the already-validated borrowed entity-metadata envelope. Each value
+ * is returned as its exact encoded byte view so callers can select the public
+ * primitive/item/NBT reader matching the exposed serializer without copying.
+ * Legacy packed headers are normalized to separate index and serializer. */
+bool mc_entity_metadata_iterator(const McEntityMetadataPacket *packet,
+    int protocol, McEntityMetadataIterator *iterator);
+bool mc_entity_metadata_iterator_next(McEntityMetadataIterator *iterator,
+    McEntityMetadataEntry *entry);
 bool mc_multi_block_change_iterator(const McMultiBlockChangePacket *packet,
     McBlockChangeIterator *iterator);
 bool mc_block_change_iterator_next(McBlockChangeIterator *iterator,
