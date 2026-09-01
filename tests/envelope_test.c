@@ -136,12 +136,48 @@ static void test_simple_tier_b_envelopes(void)
             mc_packet_init(&packet, bytes, sizeof(bytes));
             assert(protocol <= 5 ? mc_packet_i32(&packet, 4)
                                  : mc_packet_varint(&packet, 4));
-            assert(protocol >= 755 ? mc_packet_varint(&packet, 0)
-                                   : mc_packet_i32(&packet, 0));
+            assert(protocol >= 755 ? mc_packet_varint(&packet, 1)
+                                   : mc_packet_i32(&packet, 1));
+            if (protocol >= 766) {
+                assert(mc_packet_varint(&packet, 17));
+            } else {
+                assert(mc_packet_string(&packet, "generic.movementSpeed"));
+            }
+            assert(mc_packet_double(&packet, 0.1));
+            assert(protocol <= 5 ? mc_packet_i16(&packet, 1)
+                                 : mc_packet_varint(&packet, 1));
+            if (protocol >= 767) {
+                assert(mc_packet_string(&packet, "minecraft:test"));
+            } else {
+                const McUuid modifier_id = {{
+                    0U, 1U, 2U, 3U, 4U, 5U, 6U, 7U,
+                    8U, 9U, 10U, 11U, 12U, 13U, 14U, 15U,
+                }};
+                assert(mc_packet_uuid(&packet, &modifier_id));
+            }
+            assert(mc_packet_double(&packet, 0.25));
+            assert(mc_packet_i8(&packet, 2));
             assert(decode(protocol, "update_attributes", packet.data,
                 packet.length, &decoded) == MC_FAMILY_UPDATE_ATTRIBUTES);
             assert(decoded.attributes.entity_id == 4);
-            assert(decoded.attributes.attribute_count == 0U);
+            assert(decoded.attributes.attribute_count == 1U);
+            assert(decoded.attributes.modifier_count == 1U);
+            McAttributeIterator iterator;
+            McAttributeView attribute = {0};
+            assert(mc_update_attributes_iterator(
+                &decoded.attributes, protocol, &iterator));
+            assert(mc_attribute_iterator_next(&iterator, &attribute));
+            assert(attribute.registry_keyed == (protocol >= 766));
+            assert(attribute.registry_key == (protocol >= 766 ? 17 : 0));
+            assert(attribute.base_value == 0.1);
+            assert(attribute.modifier_count == 1U);
+            assert(attribute.modifiers.size != 0U);
+            if (protocol < 766) {
+                assert(attribute.key.size == strlen("generic.movementSpeed"));
+                assert(memcmp(attribute.key.data, "generic.movementSpeed",
+                    attribute.key.size) == 0);
+            }
+            assert(!mc_attribute_iterator_next(&iterator, &attribute));
             assert_exact(protocol, "update_attributes", packet.data,
                 packet.length);
         }

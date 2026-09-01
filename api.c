@@ -20656,6 +20656,93 @@ static bool typed_decode_attributes(McReader *reader, int protocol,
     return true;
 }
 
+bool mc_update_attributes_iterator(const McUpdateAttributesPacket *packet,
+    int protocol, McAttributeIterator *iterator)
+{
+    if (packet == NULL || iterator == NULL || !mc_protocol_supported(protocol)
+        || packet->attribute_count > MC_MAX_ATTRIBUTE_COUNT
+        || packet->modifier_count > MC_MAX_ATTRIBUTE_MODIFIER_COUNT
+        || (packet->attribute_count == 0U
+            && (packet->modifier_count != 0U
+                || packet->attributes.size != 0U))
+        || (packet->attribute_count != 0U
+            && (packet->attributes.data == NULL
+                || packet->attributes.size == 0U))) {
+        return false;
+    }
+    *iterator = (McAttributeIterator){
+        .protocol = protocol,
+        .remaining = packet->attribute_count,
+        .remaining_modifiers = packet->modifier_count,
+    };
+    mc_reader_init_mode(&iterator->reader, packet->attributes.data,
+        packet->attributes.size, MC_DECODE_STRICT, NULL);
+    return true;
+}
+
+bool mc_attribute_iterator_next(McAttributeIterator *iterator,
+    McAttributeView *attribute)
+{
+    if (iterator == NULL || attribute == NULL || iterator->remaining == 0U) {
+        return false;
+    }
+    McAttributeView decoded = {0};
+    if (iterator->protocol >= 766) {
+        if (!mc_reader_varint(&iterator->reader, &decoded.registry_key)
+            || decoded.registry_key < 0) {
+            return typed_invalid(&iterator->reader);
+        }
+        decoded.registry_keyed = true;
+    } else if (!mc_reader_string_bounded(&iterator->reader, 256U,
+            &decoded.key) || decoded.key.size == 0U) {
+        return typed_invalid(&iterator->reader);
+    }
+    int32_t modifier_count = -1;
+    if (!mc_reader_double(&iterator->reader, &decoded.base_value)
+        || !isfinite(decoded.base_value)
+        || !typed_modifier_count(&iterator->reader, iterator->protocol,
+            &modifier_count)
+        || !typed_count(&iterator->reader, modifier_count,
+            MC_MAX_ATTRIBUTE_MODIFIER_COUNT)
+        || (uint32_t)modifier_count > iterator->remaining_modifiers) {
+        return typed_invalid(&iterator->reader);
+    }
+    const size_t modifiers_start = iterator->reader.offset;
+    for (int32_t index = 0; index < modifier_count; ++index) {
+        if (iterator->protocol >= 767) {
+            McBytes identifier;
+            if (!mc_reader_string_bounded(&iterator->reader, 256U,
+                    &identifier) || identifier.size == 0U) {
+                return typed_invalid(&iterator->reader);
+            }
+        } else {
+            McUuid uuid;
+            if (!mc_reader_uuid(&iterator->reader, &uuid)) return false;
+        }
+        double amount = 0.0;
+        int8_t operation = -1;
+        if (!mc_reader_double(&iterator->reader, &amount) || !isfinite(amount)
+            || !mc_reader_i8(&iterator->reader, &operation)
+            || operation < 0 || operation > 2) {
+            return typed_invalid(&iterator->reader);
+        }
+    }
+    decoded.modifier_count = (uint32_t)modifier_count;
+    decoded.modifiers = (McBytes){
+        iterator->reader.data + modifiers_start,
+        iterator->reader.offset - modifiers_start,
+    };
+    --iterator->remaining;
+    iterator->remaining_modifiers -= decoded.modifier_count;
+    if (iterator->remaining == 0U
+        && (iterator->remaining_modifiers != 0U
+            || mc_reader_remaining(&iterator->reader) != 0U)) {
+        return typed_invalid(&iterator->reader);
+    }
+    *attribute = decoded;
+    return true;
+}
+
 static bool typed_skip_floats(McReader *reader, uint32_t count)
 {
     for (uint32_t index = 0U; index < count; ++index) {

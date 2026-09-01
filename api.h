@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define MC_PROTOCOL_API_VERSION 6
+#define MC_PROTOCOL_API_VERSION 7
 #define MC_DEFAULT_PORT 25565U
 #define MC_UUID_STRING_SIZE 37U
 #define MC_HANDSHAKE_HOST_SIZE 256U
@@ -955,6 +955,22 @@ typedef struct {
 } McUpdateAttributesPacket;
 
 typedef struct {
+    McBytes key;
+    int32_t registry_key;
+    double base_value;
+    uint32_t modifier_count;
+    McBytes modifiers;
+    bool registry_keyed;
+} McAttributeView;
+
+typedef struct {
+    McReader reader;
+    int protocol;
+    uint32_t remaining;
+    uint32_t remaining_modifiers;
+} McAttributeIterator;
+
+typedef struct {
     int32_t entity_id;
     uint32_t entry_count;
     McBytes entries;
@@ -1264,6 +1280,13 @@ bool mc_reader_item_stack(McReader *reader, int protocol,
 bool mc_window_items_iterator(const McWindowItemsPacket *packet,
     int protocol, McItemIterator *iterator);
 bool mc_item_iterator_next(McItemIterator *iterator, McItemStackView *item);
+/* Iterates the already-validated borrowed attribute envelope. Keys are strings
+ * through 1.20.4 and registry IDs from 1.20.5 onward. Modifier bytes remain a
+ * borrowed exact view; their count and complete wire form are validated. */
+bool mc_update_attributes_iterator(const McUpdateAttributesPacket *packet,
+    int protocol, McAttributeIterator *iterator);
+bool mc_attribute_iterator_next(McAttributeIterator *iterator,
+    McAttributeView *attribute);
 bool mc_multi_block_change_iterator(const McMultiBlockChangePacket *packet,
     McBlockChangeIterator *iterator);
 bool mc_block_change_iterator_next(McBlockChangeIterator *iterator,

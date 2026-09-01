@@ -3,6 +3,7 @@ mc776_play_serverbound_block_dig_decode
 mc776_play_serverbound_block_dig_encode
 mc776_play_serverbound_use_item_decode
 mc776_play_serverbound_use_item_encode
+mc_attribute_iterator_next
 mc_backend_name
 mc_block_change_iterator_next
 mc_canonical_header_init
@@ -173,6 +174,7 @@ mc_stream_decoder_reset
 mc_stream_decoder_retained_size
 mc_stream_decoder_set_compression
 mc_supported_protocols
+mc_update_attributes_iterator
 mc_uuid_format
 mc_uuid_parse
 mc_window_items_iterator
