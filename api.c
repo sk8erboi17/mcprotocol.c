@@ -21193,16 +21193,9 @@ static bool typed_skip_named_metadata_value(McReader *reader, int protocol,
     return typed_invalid(reader);
 }
 
-static bool typed_decode_metadata(McReader *reader, int protocol,
-    McEntityMetadataPacket *value)
+static bool typed_decode_metadata_entries(McReader *reader, int protocol,
+    McBytes *entries, uint32_t *entry_count)
 {
-    McEntityMetadataPacket decoded = {0};
-    if (protocol <= 5) {
-        if (!mc_reader_i32(reader, &decoded.entity_id)) return false;
-    } else if (!mc_reader_varint(reader, &decoded.entity_id)) {
-        return false;
-    }
-    if (decoded.entity_id < 0) return typed_invalid(reader);
     const size_t entries_start = reader->offset;
     uint32_t count = 0U;
     for (;;) {
@@ -21210,7 +21203,6 @@ static bool typed_decode_metadata(McReader *reader, int protocol,
         if (!mc_reader_u8(reader, &key)) return false;
         if ((protocol <= 47 && key == UINT8_C(0x7f))
             || (protocol > 47 && key == UINT8_MAX)) {
-            decoded.terminated = true;
             break;
         }
         if (count == MC_MAX_ENTITY_METADATA_ENTRIES) {
@@ -21229,9 +21221,271 @@ static bool typed_decode_metadata(McReader *reader, int protocol,
         }
         ++count;
     }
-    decoded.entry_count = count;
-    decoded.entries = (McBytes){reader->data + entries_start,
+    *entry_count = count;
+    *entries = (McBytes){reader->data + entries_start,
         reader->offset - entries_start};
+    return true;
+}
+
+static bool typed_decode_metadata(McReader *reader, int protocol,
+    McEntityMetadataPacket *value)
+{
+    McEntityMetadataPacket decoded = {0};
+    if (protocol <= 5) {
+        if (!mc_reader_i32(reader, &decoded.entity_id)) return false;
+    } else if (!mc_reader_varint(reader, &decoded.entity_id)) {
+        return false;
+    }
+    if (decoded.entity_id < 0
+        || !typed_decode_metadata_entries(reader, protocol,
+            &decoded.entries, &decoded.entry_count)) {
+        return typed_invalid(reader);
+    }
+    decoded.terminated = true;
+    *value = decoded;
+    return true;
+}
+
+static bool reader_profile_properties(McReader *reader,
+    McClientboundEntitySpawn *decoded)
+{
+    int32_t count = -1;
+    if (!mc_reader_varint(reader, &count) || count < 0
+        || (uint32_t)count > MC_MAX_PROFILE_PROPERTY_COUNT) {
+        return typed_invalid(reader);
+    }
+    const size_t start = reader->offset;
+    for (int32_t index = 0; index < count; ++index) {
+        McBytes name;
+        McBytes value;
+        bool signed_property = false;
+        if (!mc_reader_string_bounded(reader, 32767U, &name)
+            || name.size == 0U
+            || !mc_reader_string_bounded(reader, 32767U, &value)
+            || !mc_reader_bool(reader, &signed_property)) {
+            return typed_invalid(reader);
+        }
+        if (signed_property) {
+            McBytes signature;
+            if (!mc_reader_string_bounded(reader, 32767U, &signature)
+                || signature.size == 0U) {
+                return typed_invalid(reader);
+            }
+        }
+    }
+    decoded->property_count = (uint32_t)count;
+    decoded->properties = (McBytes){reader->data + start,
+        reader->offset - start};
+    decoded->has_properties = true;
+    return true;
+}
+
+bool mc_reader_clientbound_entity_spawn(McReader *reader, int protocol,
+    McClientboundEntitySpawn *value)
+{
+    McClientboundEntitySpawn decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (!mc_reader_varint(reader, &decoded.entity_id)
+        || decoded.entity_id < 0) {
+        return typed_invalid(reader);
+    }
+
+    decoded.named_player = protocol <= 763;
+    if (protocol <= 5) {
+        if (!mc_reader_string_bounded(reader, 36U,
+                &decoded.legacy_profile_id)
+            || decoded.legacy_profile_id.size != 36U
+            || !mc_reader_string_bounded(reader, 16U, &decoded.player_name)
+            || decoded.player_name.size == 0U
+            || !reader_profile_properties(reader, &decoded)) {
+            return typed_invalid(reader);
+        }
+        decoded.has_player_name = true;
+    } else {
+        if (!mc_reader_uuid(reader, &decoded.profile_id)) return false;
+        decoded.has_binary_profile_id = true;
+    }
+
+    if (protocol <= 47) {
+        int32_t fixed_x = 0;
+        int32_t fixed_y = 0;
+        int32_t fixed_z = 0;
+        uint16_t held = 0U;
+        if (!mc_reader_i32(reader, &fixed_x)
+            || !mc_reader_i32(reader, &fixed_y)
+            || !mc_reader_i32(reader, &fixed_z)
+            || !mc_reader_u8(reader, &decoded.yaw_raw)
+            || !mc_reader_u8(reader, &decoded.pitch_raw)
+            || !mc_reader_u16(reader, &held)
+            || !typed_decode_metadata_entries(reader, protocol,
+                &decoded.metadata, &decoded.metadata_entry_count)) {
+            return false;
+        }
+        decoded.x = (double)fixed_x / 32.0;
+        decoded.y = (double)fixed_y / 32.0;
+        decoded.z = (double)fixed_z / 32.0;
+        decoded.held_item_id = (int32_t)held;
+        decoded.has_held_item = true;
+        decoded.has_metadata = true;
+    } else if (protocol <= 763) {
+        if (!mc_reader_double(reader, &decoded.x)
+            || !mc_reader_double(reader, &decoded.y)
+            || !mc_reader_double(reader, &decoded.z)
+            || !mc_reader_u8(reader, &decoded.yaw_raw)
+            || !mc_reader_u8(reader, &decoded.pitch_raw)) {
+            return false;
+        }
+        if (protocol <= 498) {
+            if (!typed_decode_metadata_entries(reader, protocol,
+                    &decoded.metadata, &decoded.metadata_entry_count)) {
+                return false;
+            }
+            decoded.has_metadata = true;
+        }
+    } else {
+        if (!mc_reader_varint(reader, &decoded.entity_type)
+            || decoded.entity_type < 0
+            || !mc_reader_double(reader, &decoded.x)
+            || !mc_reader_double(reader, &decoded.y)
+            || !mc_reader_double(reader, &decoded.z)) {
+            return typed_invalid(reader);
+        }
+        decoded.has_entity_type = true;
+        decoded.has_velocity = true;
+        if (protocol >= 773) {
+            McEntityVelocityPacket velocity = {0};
+            if (!typed_read_lp_velocity(reader, &velocity)) return false;
+            decoded.velocity_x = velocity.velocity_x;
+            decoded.velocity_y = velocity.velocity_y;
+            decoded.velocity_z = velocity.velocity_z;
+            decoded.velocity_wire = velocity.velocity_wire;
+            decoded.low_precision_velocity = true;
+        }
+        if (!mc_reader_u8(reader, &decoded.pitch_raw)
+            || !mc_reader_u8(reader, &decoded.yaw_raw)
+            || !mc_reader_skip(reader, 1U)
+            || !mc_reader_varint(reader, &decoded.data)) {
+            return false;
+        }
+        if (protocol <= 772) {
+            const size_t start = reader->offset;
+            int16_t velocity_x = 0;
+            int16_t velocity_y = 0;
+            int16_t velocity_z = 0;
+            if (!mc_reader_i16(reader, &velocity_x)
+                || !mc_reader_i16(reader, &velocity_y)
+                || !mc_reader_i16(reader, &velocity_z)) {
+                return false;
+            }
+            decoded.velocity_x = (double)velocity_x / 8000.0;
+            decoded.velocity_y = (double)velocity_y / 8000.0;
+            decoded.velocity_z = (double)velocity_z / 8000.0;
+            decoded.velocity_wire = (McBytes){reader->data + start,
+                reader->offset - start};
+        }
+    }
+    if (!isfinite(decoded.x) || !isfinite(decoded.y)
+        || !isfinite(decoded.z) || !isfinite(decoded.velocity_x)
+        || !isfinite(decoded.velocity_y) || !isfinite(decoded.velocity_z)) {
+        return typed_invalid(reader);
+    }
+    decoded.yaw = (float)decoded.yaw_raw * (360.0F / 256.0F);
+    decoded.pitch = (float)decoded.pitch_raw * (360.0F / 256.0F);
+    *value = decoded;
+    return true;
+}
+
+bool mc_reader_clientbound_remove_entities(McReader *reader, int protocol,
+    McClientboundRemoveEntities *value)
+{
+    McClientboundRemoveEntities decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    int32_t count = -1;
+    if (protocol <= 5) {
+        uint8_t legacy_count = 0U;
+        if (!mc_reader_u8(reader, &legacy_count)) return false;
+        count = (int32_t)legacy_count;
+        decoded.fixed_i32_ids = true;
+    } else if (protocol == 755) {
+        count = 1;
+    } else if (!mc_reader_varint(reader, &count)) {
+        return false;
+    }
+    if (count < 0 || (uint32_t)count > MC_MAX_PACKET_ARRAY_COUNT) {
+        return typed_invalid(reader);
+    }
+    const size_t start = reader->offset;
+    for (int32_t index = 0; index < count; ++index) {
+        int32_t entity_id = -1;
+        const bool valid = decoded.fixed_i32_ids
+            ? mc_reader_i32(reader, &entity_id)
+            : mc_reader_varint(reader, &entity_id);
+        if (!valid || entity_id < 0) return typed_invalid(reader);
+    }
+    decoded.entity_count = (uint32_t)count;
+    decoded.entity_ids = (McBytes){reader->data + start,
+        reader->offset - start};
+    *value = decoded;
+    return true;
+}
+
+bool mc_remove_entities_iterator(const McClientboundRemoveEntities *packet,
+    McEntityIdIterator *iterator)
+{
+    if (packet == NULL || iterator == NULL
+        || packet->entity_count > MC_MAX_PACKET_ARRAY_COUNT
+        || (packet->entity_ids.size != 0U
+            && packet->entity_ids.data == NULL)) {
+        return false;
+    }
+    *iterator = (McEntityIdIterator){
+        .remaining = packet->entity_count,
+        .fixed_i32_ids = packet->fixed_i32_ids,
+    };
+    mc_reader_init_mode(&iterator->reader, packet->entity_ids.data,
+        packet->entity_ids.size, MC_DECODE_STRICT, NULL);
+    return true;
+}
+
+bool mc_entity_id_iterator_next(McEntityIdIterator *iterator,
+    int32_t *entity_id)
+{
+    if (iterator == NULL || entity_id == NULL || iterator->remaining == 0U) {
+        return false;
+    }
+    int32_t decoded = -1;
+    const bool valid = iterator->fixed_i32_ids
+        ? mc_reader_i32(&iterator->reader, &decoded)
+        : mc_reader_varint(&iterator->reader, &decoded);
+    if (!valid || decoded < 0) return typed_invalid(&iterator->reader);
+    --iterator->remaining;
+    if (iterator->remaining == 0U
+        && mc_reader_remaining(&iterator->reader) != 0U) {
+        return typed_invalid(&iterator->reader);
+    }
+    *entity_id = decoded;
+    return true;
+}
+
+bool mc_reader_clientbound_entity_status(McReader *reader, int protocol,
+    McClientboundEntityStatus *value)
+{
+    McClientboundEntityStatus decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (!mc_reader_i32(reader, &decoded.entity_id)
+        || decoded.entity_id < 0
+        || !mc_reader_u8(reader, &decoded.status)) {
+        return typed_invalid(reader);
+    }
     *value = decoded;
     return true;
 }

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define MC_PROTOCOL_API_VERSION 5
+#define MC_PROTOCOL_API_VERSION 6
 #define MC_DEFAULT_PORT 25565U
 #define MC_UUID_STRING_SIZE 37U
 #define MC_HANDSHAKE_HOST_SIZE 256U
@@ -24,6 +24,7 @@ extern "C" {
 #define MC_MAX_ITEM_COMPONENT_COUNT 256U
 #define MC_MAX_CONTAINER_SLOTS 4096U
 #define MC_MAX_ENTITY_METADATA_ENTRIES 256U
+#define MC_MAX_PROFILE_PROPERTY_COUNT 1024U
 #define MC_MAX_ATTRIBUTE_COUNT 1024U
 #define MC_MAX_ATTRIBUTE_MODIFIER_COUNT 1024U
 #define MC_MAX_CHUNK_SECTIONS 1024U
@@ -466,6 +467,65 @@ typedef struct {
 typedef struct {
     unsigned char bytes[16];
 } McUuid;
+
+/* Normalized clientbound player/entity spawn. Protocols through 1.20.4 use
+ * the dedicated named-player body; newer releases use the generic entity
+ * spawn and expose entity_type. Borrowed views point into the packet body.
+ * velocity_wire preserves either the three signed shorts or the 26.1+
+ * low-precision vector exactly as received. */
+typedef struct {
+    int32_t entity_id;
+    int32_t entity_type;
+    int32_t data;
+    int32_t held_item_id;
+    McUuid profile_id;
+    McBytes legacy_profile_id;
+    McBytes player_name;
+    McBytes properties;
+    McBytes metadata;
+    McBytes velocity_wire;
+    uint32_t property_count;
+    uint32_t metadata_entry_count;
+    double x;
+    double y;
+    double z;
+    double velocity_x;
+    double velocity_y;
+    double velocity_z;
+    uint8_t yaw_raw;
+    uint8_t pitch_raw;
+    float yaw;
+    float pitch;
+    bool named_player;
+    bool has_binary_profile_id;
+    bool has_player_name;
+    bool has_properties;
+    bool has_metadata;
+    bool has_entity_type;
+    bool has_held_item;
+    bool has_velocity;
+    bool low_precision_velocity;
+} McClientboundEntitySpawn;
+
+/* Borrowed encoded entity-ID list from entity_destroy. The decoder validates
+ * every ID and count before publishing this view; use the iterator to consume
+ * the release-specific fixed-i32 or VarInt representation without allocation. */
+typedef struct {
+    uint32_t entity_count;
+    McBytes entity_ids;
+    bool fixed_i32_ids;
+} McClientboundRemoveEntities;
+
+typedef struct {
+    McReader reader;
+    uint32_t remaining;
+    bool fixed_i32_ids;
+} McEntityIdIterator;
+
+typedef struct {
+    int32_t entity_id;
+    uint8_t status;
+} McClientboundEntityStatus;
 
 typedef struct {
     int32_t type_id;
@@ -1387,6 +1447,21 @@ bool mc_reader_clientbound_join_game(McReader *reader, int protocol,
  * packet ID). The caller may require mc_reader_remaining(reader) == 0. */
 bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
     McClientboundRespawn *value);
+/* Decodes the dedicated named-player spawn through 1.20.4 and the generic
+ * entity spawn used by later releases. Packet IDs are excluded. */
+bool mc_reader_clientbound_entity_spawn(McReader *reader, int protocol,
+    McClientboundEntitySpawn *value);
+/* Decodes one complete entity_destroy body and validates its bounded ID list.
+ * Protocol 755 carries one uncounted ID; all layouts normalize to a count. */
+bool mc_reader_clientbound_remove_entities(McReader *reader, int protocol,
+    McClientboundRemoveEntities *value);
+bool mc_remove_entities_iterator(const McClientboundRemoveEntities *packet,
+    McEntityIdIterator *iterator);
+bool mc_entity_id_iterator_next(McEntityIdIterator *iterator,
+    int32_t *entity_id);
+/* Entity status is stable as i32 entity ID plus one unsigned status byte. */
+bool mc_reader_clientbound_entity_status(McReader *reader, int protocol,
+    McClientboundEntityStatus *value);
 /* Decodes one complete clientbound block_change body. Protocols 1.7.x use
  * x:i32/y:u8/z:i32 plus separate block-id/metadata fields; their returned
  * state_id is (block_id << 4) | metadata. 1.8+ returns the wire state ID. */

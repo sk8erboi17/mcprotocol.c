@@ -52,6 +52,7 @@ mc_decode_canonical_block_change
 mc_decode_canonical_inventory
 mc_decode_canonical_movement
 mc_decode_packet
+mc_entity_id_iterator_next
 mc_entity_equipment_slot_supported
 mc_error_clear
 mc_error_name
@@ -116,8 +117,11 @@ mc_reader_bool
 mc_reader_buffer_i32
 mc_reader_buffer_varint
 mc_reader_bytes
+mc_reader_clientbound_entity_spawn
+mc_reader_clientbound_entity_status
 mc_reader_clientbound_join_game
 mc_reader_clientbound_player_position
+mc_reader_clientbound_remove_entities
 mc_reader_clientbound_respawn
 mc_reader_container_content
 mc_reader_container_open
@@ -150,6 +154,7 @@ mc_reader_u8
 mc_reader_uuid
 mc_reader_varint
 mc_reader_varlong
+mc_remove_entities_iterator
 mc_replay_reader_finish
 mc_replay_reader_init
 mc_replay_reader_next

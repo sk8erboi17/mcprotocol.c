@@ -754,6 +754,200 @@ static void clientbound_respawns_are_versioned(void)
     assert(reader.failed);
 }
 
+static void build_clientbound_entity_spawn_body(McPacket *packet,
+    int protocol)
+{
+    McUuid uuid = {{0}};
+    for (size_t index = 0U; index < sizeof(uuid.bytes); ++index) {
+        uuid.bytes[index] = (unsigned char)index;
+    }
+    assert(mc_packet_varint(packet, 42));
+    if (protocol <= 5) {
+        assert(mc_packet_string(packet,
+            "00112233-4455-6677-8899-aabbccddeeff"));
+        assert(mc_packet_string(packet, "Perry"));
+        assert(mc_packet_varint(packet, 1));
+        assert(mc_packet_string(packet, "textures"));
+        assert(mc_packet_string(packet, "value"));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_string(packet, "signature"));
+    } else {
+        assert(mc_packet_uuid(packet, &uuid));
+    }
+    if (protocol <= 47) {
+        assert(mc_packet_i32(packet, 400));
+        assert(mc_packet_i32(packet, 2048));
+        assert(mc_packet_i32(packet, -104));
+        assert(mc_packet_u8(packet, 64U));
+        assert(mc_packet_u8(packet, 32U));
+        assert(mc_packet_u16(packet, 5U));
+        assert(mc_packet_u8(packet, 0U));
+        assert(mc_packet_u8(packet, 2U));
+        assert(mc_packet_u8(packet, 0x7fU));
+        return;
+    }
+    if (protocol <= 763) {
+        assert(mc_packet_double(packet, 12.5));
+        assert(mc_packet_double(packet, 64.0));
+        assert(mc_packet_double(packet, -3.25));
+        assert(mc_packet_u8(packet, 64U));
+        assert(mc_packet_u8(packet, 32U));
+        if (protocol <= 498) assert(mc_packet_u8(packet, 0xffU));
+        return;
+    }
+    assert(mc_packet_varint(packet, 123));
+    assert(mc_packet_double(packet, 12.5));
+    assert(mc_packet_double(packet, 64.0));
+    assert(mc_packet_double(packet, -3.25));
+    if (protocol >= 773) assert(mc_packet_u8(packet, 0U));
+    assert(mc_packet_u8(packet, 32U));
+    assert(mc_packet_u8(packet, 64U));
+    assert(mc_packet_u8(packet, 64U));
+    assert(mc_packet_varint(packet, 0));
+    if (protocol <= 772) {
+        assert(mc_packet_i16(packet, 800));
+        assert(mc_packet_i16(packet, -400));
+        assert(mc_packet_i16(packet, 0));
+    }
+}
+
+static void clientbound_entity_lifecycle_is_versioned(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count != 0U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        unsigned char spawn_storage[512] = {0};
+        McPacket spawn;
+        mc_packet_init(&spawn, spawn_storage, sizeof(spawn_storage));
+        build_clientbound_entity_spawn_body(&spawn, protocol);
+        assert(!spawn.failed);
+
+        McReader reader;
+        McClientboundEntitySpawn decoded_spawn = {0};
+        mc_reader_init_mode(&reader, spawn.data, spawn.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_entity_spawn(
+            &reader, protocol, &decoded_spawn));
+        assert(mc_reader_finish(&reader));
+        assert(decoded_spawn.entity_id == 42);
+        assert(fabs(decoded_spawn.x - 12.5) < 1.0e-12);
+        assert(fabs(decoded_spawn.y - 64.0) < 1.0e-12);
+        assert(fabs(decoded_spawn.z + 3.25) < 1.0e-12);
+        assert(fabsf(decoded_spawn.yaw - 90.0F) < 1.0e-6F);
+        assert(fabsf(decoded_spawn.pitch - 45.0F) < 1.0e-6F);
+        assert(decoded_spawn.named_player == (protocol <= 763));
+        assert(decoded_spawn.has_binary_profile_id == (protocol >= 47));
+        assert(decoded_spawn.has_player_name == (protocol <= 5));
+        assert(decoded_spawn.has_properties == (protocol <= 5));
+        assert(decoded_spawn.property_count == (protocol <= 5 ? 1U : 0U));
+        assert(decoded_spawn.has_metadata == (protocol <= 498));
+        assert(decoded_spawn.metadata_entry_count
+            == (protocol <= 47 ? 1U : 0U));
+        assert(decoded_spawn.has_held_item == (protocol <= 47));
+        assert(decoded_spawn.has_entity_type == (protocol >= 764));
+        assert(decoded_spawn.has_velocity == (protocol >= 764));
+        assert(decoded_spawn.low_precision_velocity == (protocol >= 773));
+        if (protocol <= 5) {
+            assert(decoded_spawn.legacy_profile_id.size == 36U);
+            assert(decoded_spawn.player_name.size == 5U);
+            assert(decoded_spawn.properties.size != 0U);
+        } else {
+            assert(decoded_spawn.profile_id.bytes[15] == 15U);
+        }
+        if (protocol <= 47) {
+            assert(decoded_spawn.held_item_id == 5);
+            assert(decoded_spawn.metadata.size == 3U);
+        } else if (protocol <= 498) {
+            assert(decoded_spawn.metadata.size == 1U);
+        }
+        if (protocol >= 764) {
+            assert(decoded_spawn.entity_type == 123);
+            assert(decoded_spawn.velocity_wire.size
+                == (protocol >= 773 ? 1U : 6U));
+            const double expected_x = protocol >= 773 ? 0.0 : 0.1;
+            const double expected_y = protocol >= 773 ? 0.0 : -0.05;
+            assert(fabs(decoded_spawn.velocity_x - expected_x) < 1.0e-12);
+            assert(fabs(decoded_spawn.velocity_y - expected_y) < 1.0e-12);
+        }
+
+        unsigned char remove_storage[32] = {0};
+        McPacket remove;
+        mc_packet_init(&remove, remove_storage, sizeof(remove_storage));
+        const uint32_t expected_count = protocol == 755 ? 1U : 2U;
+        if (protocol <= 5) {
+            assert(mc_packet_u8(&remove, 2U));
+            assert(mc_packet_i32(&remove, 11));
+            assert(mc_packet_i32(&remove, 22));
+        } else if (protocol == 755) {
+            assert(mc_packet_varint(&remove, 11));
+        } else {
+            assert(mc_packet_varint(&remove, 2));
+            assert(mc_packet_varint(&remove, 11));
+            assert(mc_packet_varint(&remove, 22));
+        }
+        McClientboundRemoveEntities decoded_remove = {0};
+        mc_reader_init_mode(&reader, remove.data, remove.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_remove_entities(
+            &reader, protocol, &decoded_remove));
+        assert(mc_reader_finish(&reader));
+        assert(decoded_remove.entity_count == expected_count);
+        assert(decoded_remove.fixed_i32_ids == (protocol <= 5));
+        McEntityIdIterator iterator;
+        assert(mc_remove_entities_iterator(&decoded_remove, &iterator));
+        int32_t entity_id = -1;
+        assert(mc_entity_id_iterator_next(&iterator, &entity_id));
+        assert(entity_id == 11);
+        if (expected_count == 2U) {
+            assert(mc_entity_id_iterator_next(&iterator, &entity_id));
+            assert(entity_id == 22);
+        }
+        assert(!mc_entity_id_iterator_next(&iterator, &entity_id));
+
+        unsigned char status_storage[5] = {0};
+        McPacket status;
+        mc_packet_init(&status, status_storage, sizeof(status_storage));
+        assert(mc_packet_i32(&status, 42));
+        assert(mc_packet_u8(&status, 3U));
+        McClientboundEntityStatus decoded_status = {0};
+        mc_reader_init_mode(&reader, status.data, status.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_entity_status(
+            &reader, protocol, &decoded_status));
+        assert(mc_reader_finish(&reader));
+        assert(decoded_status.entity_id == 42);
+        assert(decoded_status.status == 3U);
+    }
+
+    unsigned char oversized_storage[96] = {0};
+    McPacket oversized;
+    mc_packet_init(&oversized, oversized_storage, sizeof(oversized_storage));
+    assert(mc_packet_varint(&oversized, 1));
+    assert(mc_packet_string(&oversized,
+        "00112233-4455-6677-8899-aabbccddeeff"));
+    assert(mc_packet_string(&oversized, "Perry"));
+    assert(mc_packet_varint(&oversized,
+        (int32_t)MC_MAX_PROFILE_PROPERTY_COUNT + 1));
+    McReader reader;
+    McClientboundEntitySpawn decoded_spawn = {0};
+    mc_reader_init(&reader, oversized.data, oversized.length);
+    assert(!mc_reader_clientbound_entity_spawn(&reader, 4, &decoded_spawn));
+    assert(reader.failed);
+
+    unsigned char negative_remove[] = {1U, 0xffU, 0xffU, 0xffU, 0xffU, 0x0fU};
+    McClientboundRemoveEntities decoded_remove = {0};
+    mc_reader_init(&reader, negative_remove, sizeof(negative_remove));
+    assert(!mc_reader_clientbound_remove_entities(&reader, 47,
+        &decoded_remove));
+    assert(reader.failed);
+    assert(!mc_reader_clientbound_entity_spawn(NULL, 47, &decoded_spawn));
+    mc_reader_init(&reader, NULL, 0U);
+    assert(!mc_reader_clientbound_entity_spawn(&reader, 999,
+        &decoded_spawn));
+}
+
 static void append_join_world_names(McPacket *packet)
 {
     assert(mc_packet_varint(packet, 1));
@@ -1870,6 +2064,7 @@ int main(int argc, char **argv)
     clientbound_player_positions_are_versioned();
     clientbound_join_games_are_versioned();
     clientbound_respawns_are_versioned();
+    clientbound_entity_lifecycle_is_versioned();
     entity_equipment_bodies_are_versioned();
     entity_hand_use_metadata_is_versioned();
     movement_and_hotbar_bodies_match_node();
@@ -1883,6 +2078,6 @@ int main(int argc, char **argv)
     creative_slots_match_node_release_boundaries();
     inventory_slot_updates_are_versioned();
     container_open_and_content_are_versioned();
-    puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, respawn, NBT and buffer codecs");
+    puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, entity lifecycle, respawn, NBT and buffer codecs");
     return 0;
 }
