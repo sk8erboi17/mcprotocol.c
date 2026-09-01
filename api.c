@@ -21750,6 +21750,124 @@ bool mc_reader_clientbound_entity_spawn(McReader *reader, int protocol,
     return true;
 }
 
+bool mc_reader_clientbound_object_spawn(McReader *reader, int protocol,
+    McClientboundObjectSpawn *value)
+{
+    McClientboundObjectSpawn decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (!mc_reader_varint(reader, &decoded.entity_id)
+        || decoded.entity_id < 0) {
+        return typed_invalid(reader);
+    }
+
+    if (protocol <= 47) {
+        uint8_t entity_type = 0U;
+        int32_t fixed_x = 0;
+        int32_t fixed_y = 0;
+        int32_t fixed_z = 0;
+        if (!mc_reader_u8(reader, &entity_type)
+            || !mc_reader_i32(reader, &fixed_x)
+            || !mc_reader_i32(reader, &fixed_y)
+            || !mc_reader_i32(reader, &fixed_z)
+            || !mc_reader_u8(reader, &decoded.pitch_raw)
+            || !mc_reader_u8(reader, &decoded.yaw_raw)
+            || !mc_reader_i32(reader, &decoded.data)) {
+            return false;
+        }
+        decoded.entity_type = (int32_t)entity_type;
+        decoded.x = (double)fixed_x / 32.0;
+        decoded.y = (double)fixed_y / 32.0;
+        decoded.z = (double)fixed_z / 32.0;
+        if (decoded.data > 0) {
+            const size_t start = reader->offset;
+            int16_t velocity_x = 0;
+            int16_t velocity_y = 0;
+            int16_t velocity_z = 0;
+            if (!mc_reader_i16(reader, &velocity_x)
+                || !mc_reader_i16(reader, &velocity_y)
+                || !mc_reader_i16(reader, &velocity_z)) {
+                return false;
+            }
+            decoded.velocity_x = (double)velocity_x / 8000.0;
+            decoded.velocity_y = (double)velocity_y / 8000.0;
+            decoded.velocity_z = (double)velocity_z / 8000.0;
+            decoded.velocity_wire = (McBytes){reader->data + start,
+                reader->offset - start};
+            decoded.has_velocity = true;
+        }
+    } else {
+        if (!mc_reader_uuid(reader, &decoded.entity_uuid)) return false;
+        decoded.has_entity_uuid = true;
+        if (protocol <= 404) {
+            uint8_t entity_type = 0U;
+            if (!mc_reader_u8(reader, &entity_type)) return false;
+            decoded.entity_type = (int32_t)entity_type;
+        } else if (!mc_reader_varint(reader, &decoded.entity_type)
+            || decoded.entity_type < 0) {
+            return typed_invalid(reader);
+        }
+        if (!mc_reader_double(reader, &decoded.x)
+            || !mc_reader_double(reader, &decoded.y)
+            || !mc_reader_double(reader, &decoded.z)) {
+            return false;
+        }
+        if (protocol >= 773) {
+            McEntityVelocityPacket velocity = {0};
+            if (!typed_read_lp_velocity(reader, &velocity)) return false;
+            decoded.velocity_x = velocity.velocity_x;
+            decoded.velocity_y = velocity.velocity_y;
+            decoded.velocity_z = velocity.velocity_z;
+            decoded.velocity_wire = velocity.velocity_wire;
+            decoded.has_velocity = true;
+            decoded.low_precision_velocity = true;
+        }
+        if (!mc_reader_u8(reader, &decoded.pitch_raw)
+            || !mc_reader_u8(reader, &decoded.yaw_raw)) {
+            return false;
+        }
+        if (protocol >= 761) {
+            if (!mc_reader_u8(reader, &decoded.head_yaw_raw)) return false;
+            decoded.has_head_yaw = true;
+        }
+        if (protocol >= 761) {
+            if (!mc_reader_varint(reader, &decoded.data)) return false;
+        } else if (!mc_reader_i32(reader, &decoded.data)) {
+            return false;
+        }
+        if (protocol <= 772) {
+            const size_t start = reader->offset;
+            int16_t velocity_x = 0;
+            int16_t velocity_y = 0;
+            int16_t velocity_z = 0;
+            if (!mc_reader_i16(reader, &velocity_x)
+                || !mc_reader_i16(reader, &velocity_y)
+                || !mc_reader_i16(reader, &velocity_z)) {
+                return false;
+            }
+            decoded.velocity_x = (double)velocity_x / 8000.0;
+            decoded.velocity_y = (double)velocity_y / 8000.0;
+            decoded.velocity_z = (double)velocity_z / 8000.0;
+            decoded.velocity_wire = (McBytes){reader->data + start,
+                reader->offset - start};
+            decoded.has_velocity = true;
+        }
+    }
+
+    if (!isfinite(decoded.x) || !isfinite(decoded.y)
+        || !isfinite(decoded.z) || !isfinite(decoded.velocity_x)
+        || !isfinite(decoded.velocity_y) || !isfinite(decoded.velocity_z)) {
+        return typed_invalid(reader);
+    }
+    decoded.yaw = (float)decoded.yaw_raw * (360.0F / 256.0F);
+    decoded.pitch = (float)decoded.pitch_raw * (360.0F / 256.0F);
+    decoded.head_yaw = (float)decoded.head_yaw_raw * (360.0F / 256.0F);
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_clientbound_remove_entities(McReader *reader, int protocol,
     McClientboundRemoveEntities *value)
 {

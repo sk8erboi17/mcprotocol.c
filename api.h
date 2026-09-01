@@ -507,6 +507,35 @@ typedef struct {
     bool low_precision_velocity;
 } McClientboundEntitySpawn;
 
+/* Normalized object/generic entity spawn. Through 1.8 this is the historical
+ * Spawn Object body with fixed-point coordinates and conditional velocity;
+ * later releases add UUIDs, doubles, registry entity types and eventually the
+ * low-precision velocity vector. velocity_wire borrows the exact encoded
+ * velocity bytes from the packet body. */
+typedef struct {
+    int32_t entity_id;
+    int32_t entity_type;
+    int32_t data;
+    McUuid entity_uuid;
+    McBytes velocity_wire;
+    double x;
+    double y;
+    double z;
+    double velocity_x;
+    double velocity_y;
+    double velocity_z;
+    uint8_t yaw_raw;
+    uint8_t pitch_raw;
+    uint8_t head_yaw_raw;
+    float yaw;
+    float pitch;
+    float head_yaw;
+    bool has_entity_uuid;
+    bool has_head_yaw;
+    bool has_velocity;
+    bool low_precision_velocity;
+} McClientboundObjectSpawn;
+
 /* Borrowed encoded entity-ID list from entity_destroy. The decoder validates
  * every ID and count before publishing this view; use the iterator to consume
  * the release-specific fixed-i32 or VarInt representation without allocation. */
@@ -1633,6 +1662,10 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
  * entity spawn used by later releases. Packet IDs are excluded. */
 bool mc_reader_clientbound_entity_spawn(McReader *reader, int protocol,
     McClientboundEntitySpawn *value);
+/* Decodes Spawn Object/generic entity spawn independently from the dedicated
+ * named-player packet used by historical releases. Packet IDs are excluded. */
+bool mc_reader_clientbound_object_spawn(McReader *reader, int protocol,
+    McClientboundObjectSpawn *value);
 /* Decodes one complete entity_destroy body and validates its bounded ID list.
  * Protocol 755 carries one uncounted ID; all layouts normalize to a count. */
 bool mc_reader_clientbound_remove_entities(McReader *reader, int protocol,

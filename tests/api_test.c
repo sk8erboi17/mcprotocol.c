@@ -811,6 +811,46 @@ static void build_clientbound_entity_spawn_body(McPacket *packet,
     }
 }
 
+static void build_clientbound_object_spawn_body(McPacket *packet,
+    int protocol)
+{
+    McUuid uuid = {{0}};
+    for (size_t index = 0U; index < sizeof(uuid.bytes); ++index) {
+        uuid.bytes[index] = (unsigned char)(15U - index);
+    }
+    assert(mc_packet_varint(packet, 43));
+    if (protocol <= 47) {
+        assert(mc_packet_u8(packet, 2U));
+        assert(mc_packet_i32(packet, 400));
+        assert(mc_packet_i32(packet, 2048));
+        assert(mc_packet_i32(packet, -104));
+    } else {
+        assert(mc_packet_uuid(packet, &uuid));
+        if (protocol <= 404) {
+            assert(mc_packet_u8(packet, 2U));
+        } else {
+            assert(mc_packet_varint(packet, 2));
+        }
+        assert(mc_packet_double(packet, 12.5));
+        assert(mc_packet_double(packet, 64.0));
+        assert(mc_packet_double(packet, -3.25));
+        if (protocol >= 773) assert(mc_packet_u8(packet, 0U));
+    }
+    assert(mc_packet_u8(packet, 32U));
+    assert(mc_packet_u8(packet, 64U));
+    if (protocol >= 761) assert(mc_packet_u8(packet, 96U));
+    if (protocol >= 761) {
+        assert(mc_packet_varint(packet, 1));
+    } else {
+        assert(mc_packet_i32(packet, 1));
+    }
+    if (protocol <= 772) {
+        assert(mc_packet_i16(packet, 800));
+        assert(mc_packet_i16(packet, -400));
+        assert(mc_packet_i16(packet, 0));
+    }
+}
+
 static void clientbound_entity_lifecycle_is_versioned(void)
 {
     size_t protocol_count = 0U;
@@ -870,6 +910,42 @@ static void clientbound_entity_lifecycle_is_versioned(void)
             const double expected_y = protocol >= 773 ? 0.0 : -0.05;
             assert(fabs(decoded_spawn.velocity_x - expected_x) < 1.0e-12);
             assert(fabs(decoded_spawn.velocity_y - expected_y) < 1.0e-12);
+        }
+
+        unsigned char object_storage[128] = {0};
+        McPacket object;
+        mc_packet_init(&object, object_storage, sizeof(object_storage));
+        build_clientbound_object_spawn_body(&object, protocol);
+        assert(!object.failed);
+        McClientboundObjectSpawn decoded_object = {0};
+        mc_reader_init_mode(&reader, object.data, object.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_object_spawn(
+            &reader, protocol, &decoded_object));
+        assert(mc_reader_finish(&reader));
+        assert(decoded_object.entity_id == 43);
+        assert(decoded_object.entity_type == 2);
+        assert(decoded_object.data == 1);
+        assert(fabs(decoded_object.x - 12.5) < 1.0e-12);
+        assert(fabs(decoded_object.y - 64.0) < 1.0e-12);
+        assert(fabs(decoded_object.z + 3.25) < 1.0e-12);
+        assert(fabsf(decoded_object.yaw - 90.0F) < 1.0e-6F);
+        assert(fabsf(decoded_object.pitch - 45.0F) < 1.0e-6F);
+        assert(decoded_object.has_entity_uuid == (protocol > 47));
+        assert(decoded_object.has_head_yaw == (protocol >= 761));
+        assert(decoded_object.has_velocity);
+        assert(decoded_object.low_precision_velocity == (protocol >= 773));
+        assert(decoded_object.velocity_wire.size
+            == (protocol >= 773 ? 1U : 6U));
+        const double expected_object_x = protocol >= 773 ? 0.0 : 0.1;
+        const double expected_object_y = protocol >= 773 ? 0.0 : -0.05;
+        assert(fabs(decoded_object.velocity_x - expected_object_x) < 1.0e-12);
+        assert(fabs(decoded_object.velocity_y - expected_object_y) < 1.0e-12);
+        if (decoded_object.has_entity_uuid) {
+            assert(decoded_object.entity_uuid.bytes[0] == 15U);
+        }
+        if (decoded_object.has_head_yaw) {
+            assert(fabsf(decoded_object.head_yaw - 135.0F) < 1.0e-6F);
         }
 
         unsigned char remove_storage[32] = {0};
@@ -943,9 +1019,18 @@ static void clientbound_entity_lifecycle_is_versioned(void)
         &decoded_remove));
     assert(reader.failed);
     assert(!mc_reader_clientbound_entity_spawn(NULL, 47, &decoded_spawn));
+    McClientboundObjectSpawn decoded_object = {0};
+    mc_reader_init(&reader, negative_remove, 1U);
+    assert(!mc_reader_clientbound_object_spawn(
+        &reader, 47, &decoded_object));
+    assert(reader.failed);
+    assert(!mc_reader_clientbound_object_spawn(NULL, 47, &decoded_object));
     mc_reader_init(&reader, NULL, 0U);
     assert(!mc_reader_clientbound_entity_spawn(&reader, 999,
         &decoded_spawn));
+    mc_reader_init(&reader, NULL, 0U);
+    assert(!mc_reader_clientbound_object_spawn(&reader, 999,
+        &decoded_object));
 }
 
 static void append_join_world_names(McPacket *packet)

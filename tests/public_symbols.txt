@@ -121,6 +121,7 @@ mc_reader_buffer_i32
 mc_reader_buffer_varint
 mc_reader_bytes
 mc_reader_clientbound_entity_spawn
+mc_reader_clientbound_object_spawn
 mc_reader_clientbound_entity_status
 mc_reader_clientbound_entity_look
 mc_reader_clientbound_entity_move
