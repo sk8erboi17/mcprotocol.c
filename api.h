@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define MC_PROTOCOL_API_VERSION 4
+#define MC_PROTOCOL_API_VERSION 5
 #define MC_DEFAULT_PORT 25565U
 #define MC_UUID_STRING_SIZE 37U
 #define MC_HANDSHAKE_HOST_SIZE 256U
@@ -963,6 +963,10 @@ typedef struct {
     bool has_portal_cooldown;
     bool has_sea_level;
     bool has_enforces_secure_chat;
+    /* Protocol 776 (26.2) inserts this release-local field immediately before
+     * enforcesSecureChat. Appended here to preserve prior member offsets. */
+    bool online_mode;
+    bool has_online_mode;
 } McJoinGamePacket;
 
 typedef struct {

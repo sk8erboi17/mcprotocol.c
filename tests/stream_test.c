@@ -353,6 +353,46 @@ static void partial_eof_reset_and_state_transition(void)
     mc_stream_decoder_destroy(stream);
 }
 
+static void coalesced_compression_transition(void)
+{
+    static const unsigned char negotiation[] = {0x01U};
+    static const unsigned char play_payload[] = {
+        1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U,
+    };
+    Buffer first;
+    Buffer second;
+    Buffer input;
+    Buffer encoded;
+    plain_frame(&first, 3, negotiation, sizeof(negotiation));
+    packet(&encoded, 2, play_payload, sizeof(play_payload));
+    compressed_frame(&second, 2, play_payload, sizeof(play_payload),
+        (int32_t)encoded.size, false, 0U);
+    clear(&input);
+    append(&input, first.data, first.size);
+    append(&input, second.data, second.size);
+
+    McStreamDecoder *stream = decoder(MC_DECODE_STRICT);
+    McDecodedFrame decoded;
+    McError error;
+    size_t count = 0U;
+    assert(mc_stream_decoder_feed(stream, input.data, input.size,
+        &decoded, 1U, &count, &error) == 0);
+    assert(count == 1U);
+    check_frame(&decoded, 3, negotiation, sizeof(negotiation), false);
+    assert(mc_stream_decoder_buffered_size(stream) == second.size);
+
+    /* TCP may coalesce Set Compression and the first compressed frame. The
+     * first feed stopped exactly at a packet boundary, so the retained bytes
+     * must be decoded under the newly negotiated framing mode. */
+    assert(mc_stream_decoder_set_compression(stream, 1, &error) == 0);
+    assert(mc_stream_decoder_feed(stream, NULL, 0U,
+        &decoded, 1U, &count, &error) == 0);
+    assert(count == 1U);
+    check_frame(&decoded, 2, play_payload, sizeof(play_payload), true);
+    assert(mc_stream_decoder_buffered_size(stream) == 0U);
+    mc_stream_decoder_destroy(stream);
+}
+
 static void malformed_framing_and_limits(void)
 {
     static const unsigned char noncanonical_outer[] = {
@@ -538,6 +578,7 @@ int main(void)
     fragmentation_matrix();
     coalescing_drain_and_buffer_reuse();
     partial_eof_reset_and_state_transition();
+    coalesced_compression_transition();
     malformed_framing_and_limits();
     valid_frames_before_an_error_remain_observable();
     compression_matrix();

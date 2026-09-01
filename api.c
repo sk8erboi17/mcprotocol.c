@@ -4174,6 +4174,10 @@ bool mc_reader_clientbound_join_game(McReader *reader, int protocol,
             if (!mc_reader_varint(reader, &decoded.sea_level)) return false;
             decoded.has_sea_level = true;
         }
+        if (protocol >= 776) {
+            if (!mc_reader_bool(reader, &decoded.online_mode)) return false;
+            decoded.has_online_mode = true;
+        }
         if (protocol >= 766) {
             if (!mc_reader_bool(reader, &decoded.enforces_secure_chat)) {
                 return false;
@@ -22640,6 +22644,10 @@ struct McStreamDecoder {
     size_t output_capacity;
     size_t stream_offset;
     int compression_threshold;
+    /* True only when the previous feed stopped at frame capacity after
+     * consuming at least one complete frame. Buffered bytes then begin at the
+     * next frame boundary and may legitimately use a newly negotiated mode. */
+    bool compression_transition_ready;
     bool failed;
     McError last_error;
 };
@@ -22985,6 +22993,7 @@ void mc_stream_decoder_reset(McStreamDecoder *decoder)
     decoder->output_size = 0U;
     decoder->stream_offset = 0U;
     decoder->compression_threshold = -1;
+    decoder->compression_transition_ready = false;
     decoder->failed = false;
     mc_error_clear(&decoder->last_error);
 }
@@ -23018,13 +23027,14 @@ int mc_stream_decoder_set_compression(McStreamDecoder *decoder, int threshold,
         copy_error(error, &decoder->last_error);
         return -1;
     }
-    if (decoder->buffer_size != 0U) {
+    if (decoder->buffer_size != 0U && !decoder->compression_transition_ready) {
         mc_error_clear(error);
         record_error(error, MC_ERROR_INVALID_STATE,
             stream_absolute_offset(decoder, decoder->buffer_size));
         return -1;
     }
     decoder->compression_threshold = threshold;
+    decoder->compression_transition_ready = false;
     return 0;
 }
 
@@ -23060,6 +23070,7 @@ int mc_stream_decoder_feed(McStreamDecoder *decoder, const void *data,
         copy_error(error, &decoder->last_error);
         return -1;
     }
+    decoder->compression_transition_ready = false;
     decoder->output_size = 0U;
     if (size > decoder->config.max_buffered_size - decoder->buffer_size) {
         return stream_fail(decoder, MC_ERROR_BUFFER_LIMIT,
@@ -23122,6 +23133,8 @@ int mc_stream_decoder_feed(McStreamDecoder *decoder, const void *data,
         ++emitted;
     }
     stream_consume(decoder, consumed);
+    decoder->compression_transition_ready = emitted != 0U &&
+        emitted == frame_capacity && decoder->buffer_size != 0U;
     *frame_count = emitted;
     return 0;
 }

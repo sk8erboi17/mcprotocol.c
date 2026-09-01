@@ -808,6 +808,7 @@ static void build_clientbound_join_game_body(McPacket *packet, int protocol)
         assert(mc_packet_bool(packet, false));
         assert(mc_packet_varint(packet, 7));
         if (protocol >= 768) assert(mc_packet_varint(packet, -63));
+        if (protocol >= 776) assert(mc_packet_bool(packet, true));
         if (protocol >= 766) assert(mc_packet_bool(packet, false));
         return;
     }
@@ -884,6 +885,8 @@ static void clientbound_join_games_are_versioned(void)
             assert(decoded.has_dimension_id == (protocol >= 766));
             assert(decoded.has_portal_cooldown == (protocol >= 763));
             assert(decoded.has_sea_level == (protocol >= 768));
+            assert(decoded.has_online_mode == (protocol >= 776));
+            if (decoded.has_online_mode) assert(decoded.online_mode);
             if (decoded.has_sea_level) assert(decoded.sea_level == -63);
         }
 
