@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T10:09:12.605120+00:00",
+  "generated_at": "2026-09-01T10:29:24.377704+00:00",
   "protocol": 47,
   "comparison": {
     "c": "mcprotocol.c working tree",
@@ -40,7 +40,7 @@
     "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
   },
   "sources": {
-    "api.c": "fc06b16b57088107a39d506f1041c8b1899b4ea0f11ff5ac3dd01d85b5e1f4cc",
+    "api.c": "05f621166854b3003b94c9d3fa4bb468821a6e26446316c97ba7fdfef5b263c6",
     "api.h": "927d2849ae3472fe4daa46e06e0ba725662d894249d6c3d4002e19e223cfb607",
     "benchmark/mock_server.c": "9b4f67af8ec586cd9eea33176fa55a9bcd08bf2cf5b5a7c010e0e4f3a19a6312",
     "benchmark/c_client.c": "f38ecc231ec3f8f59f8a2593e344669b29deac6b9097ef864a9de35b3da75510",
@@ -61,21 +61,21 @@
       "warmup_samples": {
         "mcprotocol.c": [
           {
-            "elapsed_ns": 23133000,
+            "elapsed_ns": 13964000,
             "operations": 32
           },
           {
-            "elapsed_ns": 20726000,
+            "elapsed_ns": 13931000,
             "operations": 32
           }
         ],
         "node-minecraft-protocol": [
           {
-            "elapsed_ns": 618579584,
+            "elapsed_ns": 605248208,
             "operations": 32
           },
           {
-            "elapsed_ns": 625386458,
+            "elapsed_ns": 619974083,
             "operations": 32
           }
         ]
@@ -83,61 +83,61 @@
       "raw_samples": {
         "mcprotocol.c": [
           {
-            "elapsed_ns": 19559000,
+            "elapsed_ns": 16925000,
             "operations": 32
           },
           {
-            "elapsed_ns": 19187000,
+            "elapsed_ns": 13694000,
             "operations": 32
           },
           {
-            "elapsed_ns": 24646000,
+            "elapsed_ns": 13357000,
             "operations": 32
           },
           {
-            "elapsed_ns": 21256000,
+            "elapsed_ns": 13371000,
             "operations": 32
           },
           {
-            "elapsed_ns": 19570000,
+            "elapsed_ns": 13420000,
             "operations": 32
           },
           {
-            "elapsed_ns": 27571000,
+            "elapsed_ns": 16530000,
             "operations": 32
           },
           {
-            "elapsed_ns": 18542000,
+            "elapsed_ns": 15314000,
             "operations": 32
           }
         ],
         "node-minecraft-protocol": [
           {
-            "elapsed_ns": 624770667,
+            "elapsed_ns": 607739416,
             "operations": 32
           },
           {
-            "elapsed_ns": 663790916,
+            "elapsed_ns": 618459208,
             "operations": 32
           },
           {
-            "elapsed_ns": 618275583,
+            "elapsed_ns": 620447709,
             "operations": 32
           },
           {
-            "elapsed_ns": 628830209,
+            "elapsed_ns": 619947792,
             "operations": 32
           },
           {
-            "elapsed_ns": 618021916,
+            "elapsed_ns": 624484708,
             "operations": 32
           },
           {
-            "elapsed_ns": 615475125,
+            "elapsed_ns": 614830334,
             "operations": 32
           },
           {
-            "elapsed_ns": 638593083,
+            "elapsed_ns": 626013834,
             "operations": 32
           }
         ]
@@ -145,54 +145,54 @@
       "implementations": {
         "mcprotocol.c": {
           "elapsed_ms": [
-            19.559,
-            19.187,
-            24.646,
-            21.256,
-            19.57,
-            27.571,
-            18.542
+            16.925,
+            13.694,
+            13.357,
+            13.371,
+            13.42,
+            16.53,
+            15.314
           ],
           "operations_per_second": [
-            1636.075463980776,
-            1667.795903476312,
-            1298.3851334902215,
-            1505.4572826496048,
-            1635.1558507920286,
-            1160.6398026912336,
-            1725.8116708014238
+            1890.6942392909896,
+            2336.789834964218,
+            2395.747548102119,
+            2393.2390995437886,
+            2384.500745156483,
+            1935.8741681790684,
+            2089.5912237168604
           ],
-          "median_elapsed_ms": 19.57,
-          "median_operations_per_second": 1635.1558507920286,
-          "q1_operations_per_second": 1401.921208069913,
-          "q3_operations_per_second": 1651.935683728544
+          "median_elapsed_ms": 13.694,
+          "median_operations_per_second": 2336.789834964218,
+          "q1_operations_per_second": 2012.7326959479644,
+          "q3_operations_per_second": 2388.8699223501358
         },
         "node-minecraft-protocol": {
           "elapsed_ms": [
-            624.770667,
-            663.790916,
-            618.275583,
-            628.830209,
-            618.021916,
-            615.475125,
-            638.593083
+            607.739416,
+            618.459208,
+            620.447709,
+            619.947792,
+            624.484708,
+            614.830334,
+            626.013834
           ],
           "operations_per_second": [
-            51.218793855442,
-            48.20795107114723,
-            51.756855486237114,
-            50.888140458277505,
-            51.778099079580215,
-            51.992353062197274,
-            50.1101575508296
+            52.6541460986957,
+            51.74148850250444,
+            51.57565985951606,
+            51.617249731248336,
+            51.2422475523612,
+            52.04687900125631,
+            51.11708122411876
           ],
-          "median_elapsed_ms": 624.770667,
-          "median_operations_per_second": 51.218793855442,
-          "q1_operations_per_second": 50.49914900455355,
-          "q3_operations_per_second": 51.767477282908665
+          "median_elapsed_ms": 619.947792,
+          "median_operations_per_second": 51.617249731248336,
+          "q1_operations_per_second": 51.40895370593863,
+          "q3_operations_per_second": 51.89418375188038
         }
       },
-      "mcprotocol_c_speedup": 31.924919110884005
+      "mcprotocol_c_speedup": 45.271490579815975
     },
     {
       "id": "keepalive_stream",
@@ -205,21 +205,21 @@
       "warmup_samples": {
         "mcprotocol.c": [
           {
-            "elapsed_ns": 262002000,
+            "elapsed_ns": 237933000,
             "operations": 10000
           },
           {
-            "elapsed_ns": 263280000,
+            "elapsed_ns": 237498000,
             "operations": 10000
           }
         ],
         "node-minecraft-protocol": [
           {
-            "elapsed_ns": 507660875,
+            "elapsed_ns": 498793166,
             "operations": 10000
           },
           {
-            "elapsed_ns": 510906167,
+            "elapsed_ns": 494580958,
             "operations": 10000
           }
         ]
@@ -227,61 +227,61 @@
       "raw_samples": {
         "mcprotocol.c": [
           {
-            "elapsed_ns": 264376000,
+            "elapsed_ns": 239135000,
             "operations": 10000
           },
           {
-            "elapsed_ns": 257942000,
+            "elapsed_ns": 238219000,
             "operations": 10000
           },
           {
-            "elapsed_ns": 263271000,
+            "elapsed_ns": 236425000,
             "operations": 10000
           },
           {
-            "elapsed_ns": 254624000,
+            "elapsed_ns": 234144000,
             "operations": 10000
           },
           {
-            "elapsed_ns": 259883000,
+            "elapsed_ns": 239703000,
             "operations": 10000
           },
           {
-            "elapsed_ns": 256357000,
+            "elapsed_ns": 235158000,
             "operations": 10000
           },
           {
-            "elapsed_ns": 260286000,
+            "elapsed_ns": 222531000,
             "operations": 10000
           }
         ],
         "node-minecraft-protocol": [
           {
-            "elapsed_ns": 501926666,
+            "elapsed_ns": 484530666,
             "operations": 10000
           },
           {
-            "elapsed_ns": 502330333,
+            "elapsed_ns": 489407584,
             "operations": 10000
           },
           {
-            "elapsed_ns": 497626750,
+            "elapsed_ns": 487420083,
             "operations": 10000
           },
           {
-            "elapsed_ns": 496122792,
+            "elapsed_ns": 489262125,
             "operations": 10000
           },
           {
-            "elapsed_ns": 503583083,
+            "elapsed_ns": 489822125,
             "operations": 10000
           },
           {
-            "elapsed_ns": 498469583,
+            "elapsed_ns": 484592667,
             "operations": 10000
           },
           {
-            "elapsed_ns": 497748500,
+            "elapsed_ns": 483502375,
             "operations": 10000
           }
         ]
@@ -289,54 +289,54 @@
       "implementations": {
         "mcprotocol.c": {
           "elapsed_ms": [
-            264.376,
-            257.942,
-            263.271,
-            254.624,
-            259.883,
-            256.357,
-            260.286
+            239.135,
+            238.219,
+            236.425,
+            234.144,
+            239.703,
+            235.158,
+            222.531
           ],
           "operations_per_second": [
-            37824.91602868641,
-            38768.40530041637,
-            37983.67461664976,
-            39273.59557622219,
-            38478.85394581408,
-            39008.10198278182,
-            38419.27725655625
+            41817.38348631526,
+            41978.17974217002,
+            42296.711430686264,
+            42708.76042093754,
+            41718.29305432139,
+            42524.600481378475,
+            44937.55926140628
           ],
-          "median_elapsed_ms": 259.883,
-          "median_operations_per_second": 38478.85394581408,
-          "q1_operations_per_second": 38201.475936603005,
-          "q3_operations_per_second": 38888.2536415991
+          "median_elapsed_ms": 236.425,
+          "median_operations_per_second": 42296.711430686264,
+          "q1_operations_per_second": 41897.78161424264,
+          "q3_operations_per_second": 42616.68045115801
         },
         "node-minecraft-protocol": {
           "elapsed_ms": [
-            501.926666,
-            502.330333,
-            497.62675,
-            496.122792,
-            503.583083,
-            498.469583,
-            497.7485
+            484.530666,
+            489.407584,
+            487.420083,
+            489.262125,
+            489.822125,
+            484.592667,
+            483.502375
           ],
           "operations_per_second": [
-            19923.229183444102,
-            19907.219100782433,
-            20095.38273414763,
-            20156.300337840556,
-            19857.696450855557,
-            20061.404629377357,
-            20090.46737458777
+            20638.5285838647,
+            20432.86685152799,
+            20516.183778172308,
+            20438.941600067654,
+            20415.57432710905,
+            20635.887996216832,
+            20682.421673730143
           ],
-          "median_elapsed_ms": 498.469583,
-          "median_operations_per_second": 20061.404629377357,
-          "q1_operations_per_second": 19915.224142113268,
-          "q3_operations_per_second": 20092.9250543677
+          "median_elapsed_ms": 487.420083,
+          "median_operations_per_second": 20516.183778172308,
+          "q1_operations_per_second": 20435.90422579782,
+          "q3_operations_per_second": 20637.208290040766
         }
       },
-      "mcprotocol_c_speedup": 1.9180538280687847
+      "mcprotocol_c_speedup": 2.0616266596172146
     },
     {
       "id": "concurrent_keepalive",
@@ -349,21 +349,21 @@
       "warmup_samples": {
         "mcprotocol.c": [
           {
-            "elapsed_ns": 126563000,
+            "elapsed_ns": 119373000,
             "operations": 8192
           },
           {
-            "elapsed_ns": 131702000,
+            "elapsed_ns": 119662000,
             "operations": 8192
           }
         ],
         "node-minecraft-protocol": [
           {
-            "elapsed_ns": 876408000,
+            "elapsed_ns": 879080416,
             "operations": 8192
           },
           {
-            "elapsed_ns": 919204584,
+            "elapsed_ns": 885816958,
             "operations": 8192
           }
         ]
@@ -371,61 +371,61 @@
       "raw_samples": {
         "mcprotocol.c": [
           {
-            "elapsed_ns": 127834000,
+            "elapsed_ns": 122543000,
             "operations": 8192
           },
           {
-            "elapsed_ns": 131661000,
+            "elapsed_ns": 118959000,
             "operations": 8192
           },
           {
-            "elapsed_ns": 132089000,
+            "elapsed_ns": 120359000,
             "operations": 8192
           },
           {
-            "elapsed_ns": 129716000,
+            "elapsed_ns": 118985000,
             "operations": 8192
           },
           {
-            "elapsed_ns": 125355000,
+            "elapsed_ns": 121423000,
             "operations": 8192
           },
           {
-            "elapsed_ns": 128054000,
+            "elapsed_ns": 120766000,
             "operations": 8192
           },
           {
-            "elapsed_ns": 131406000,
+            "elapsed_ns": 121473000,
             "operations": 8192
           }
         ],
         "node-minecraft-protocol": [
           {
-            "elapsed_ns": 871215583,
+            "elapsed_ns": 884973542,
             "operations": 8192
           },
           {
-            "elapsed_ns": 874755125,
+            "elapsed_ns": 881533583,
             "operations": 8192
           },
           {
-            "elapsed_ns": 876920125,
+            "elapsed_ns": 883119125,
             "operations": 8192
           },
           {
-            "elapsed_ns": 867836959,
+            "elapsed_ns": 887617417,
             "operations": 8192
           },
           {
-            "elapsed_ns": 866089250,
+            "elapsed_ns": 884992250,
             "operations": 8192
           },
           {
-            "elapsed_ns": 878874208,
+            "elapsed_ns": 883755166,
             "operations": 8192
           },
           {
-            "elapsed_ns": 861621792,
+            "elapsed_ns": 874488000,
             "operations": 8192
           }
         ]
@@ -433,54 +433,54 @@
       "implementations": {
         "mcprotocol.c": {
           "elapsed_ms": [
-            127.834,
-            131.661,
-            132.089,
-            129.716,
-            125.355,
-            128.054,
-            131.406
+            122.543,
+            118.959,
+            120.359,
+            118.985,
+            121.423,
+            120.766,
+            121.473
           ],
           "operations_per_second": [
-            64083.10778040271,
-            62220.39935895975,
-            62018.79036104445,
-            63153.35039625027,
-            65350.40485022536,
-            63973.01138582161,
-            62341.141195988006
+            66850.00367218038,
+            68864.06240805656,
+            68063.04472453245,
+            68849.01458166995,
+            67466.62493926192,
+            67833.6617922263,
+            67438.85472491829
           ],
-          "median_elapsed_ms": 129.716,
-          "median_operations_per_second": 63153.35039625027,
-          "q1_operations_per_second": 62280.77027747388,
-          "q3_operations_per_second": 64028.05958311216
+          "median_elapsed_ms": 120.766,
+          "median_operations_per_second": 67833.6617922263,
+          "q1_operations_per_second": 67452.7398320901,
+          "q3_operations_per_second": 68456.0296531012
         },
         "node-minecraft-protocol": {
           "elapsed_ms": [
-            871.215583,
-            874.755125,
-            876.920125,
-            867.836959,
-            866.08925,
-            878.874208,
-            861.621792
+            884.973542,
+            881.533583,
+            883.119125,
+            887.617417,
+            884.99225,
+            883.755166,
+            874.488
           ],
           "operations_per_second": [
-            9402.953941424163,
-            9364.906550275999,
-            9341.785832546608,
-            9439.561100785062,
-            9458.609490880992,
-            9321.015368788703,
-            9507.65182132255
+            9256.773916072623,
+            9292.896105127738,
+            9276.211745499228,
+            9229.201504052957,
+            9256.57823557212,
+            9269.535630640941,
+            9367.767196348035
           ],
-          "median_elapsed_ms": 871.215583,
-          "median_operations_per_second": 9402.953941424163,
-          "q1_operations_per_second": 9353.346191411303,
-          "q3_operations_per_second": 9449.085295833027
+          "median_elapsed_ms": 883.755166,
+          "median_operations_per_second": 9269.535630640941,
+          "q1_operations_per_second": 9256.676075822372,
+          "q3_operations_per_second": 9284.553925313483
         }
       },
-      "mcprotocol_c_speedup": 6.716330930648494
+      "mcprotocol_c_speedup": 7.317913700876075
     }
   ]
 }

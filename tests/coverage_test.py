@@ -25,10 +25,16 @@ TESTS = (
 )
 
 
-def resolve_tool(name: str) -> str:
-    value = shutil.which(name)
+def resolve_tool(name: str, environment: str) -> str:
+    requested = shlex.split(os.environ.get(environment, name))
+    if len(requested) != 1:
+        raise SystemExit(f"{environment} must resolve to exactly one executable")
+    value = shutil.which(requested[0])
     if value is None:
-        raise SystemExit(f"{name} is required for make coverage")
+        raise SystemExit(
+            f"{requested[0]} is required for make coverage "
+            f"(override with {environment})"
+        )
     return value
 
 
@@ -36,8 +42,8 @@ def main() -> None:
     compiler = shlex.split(os.environ.get("COVERAGE_CC", "clang"))
     if not compiler:
         raise SystemExit("COVERAGE_CC resolves to an empty command")
-    profdata = resolve_tool("llvm-profdata")
-    cov = resolve_tool("llvm-cov")
+    profdata = resolve_tool("llvm-profdata", "LLVM_PROFDATA")
+    cov = resolve_tool("llvm-cov", "LLVM_COV")
     BUILD.mkdir(parents=True, exist_ok=True)
     raw_profiles: list[Path] = []
     executables: list[Path] = []

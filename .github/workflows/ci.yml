@@ -72,11 +72,15 @@ jobs:
         run: make test-differential
 
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
-      FUZZ_CC: clang
+      FUZZ_CC: clang-18
+      LLVM_PROFDATA: llvm-profdata-18
+      LLVM_COV: llvm-cov-18
     steps:
       - uses: actions/checkout@v4
+      - name: Install LLVM coverage tools
+        run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18
       - run: make coverage
       - uses: actions/upload-artifact@v4
         with:

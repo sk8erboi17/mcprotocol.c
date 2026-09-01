@@ -3610,14 +3610,17 @@ static bool packet_block_place_cursor(McPacket *packet, int protocol,
         const float scaled_x = x * 16.0F;
         const float scaled_y = y * 16.0F;
         const float scaled_z = z * 16.0F;
-        if (floorf(scaled_x) != scaled_x || floorf(scaled_y) != scaled_y
-            || floorf(scaled_z) != scaled_z) {
+        const int8_t encoded_x = (int8_t)scaled_x;
+        const int8_t encoded_y = (int8_t)scaled_y;
+        const int8_t encoded_z = (int8_t)scaled_z;
+        if ((float)encoded_x != scaled_x || (float)encoded_y != scaled_y
+            || (float)encoded_z != scaled_z) {
             packet->failed = true;
             return false;
         }
-        return mc_packet_i8(packet, (int8_t)scaled_x)
-            && mc_packet_i8(packet, (int8_t)scaled_y)
-            && mc_packet_i8(packet, (int8_t)scaled_z);
+        return mc_packet_i8(packet, encoded_x)
+            && mc_packet_i8(packet, encoded_y)
+            && mc_packet_i8(packet, encoded_z);
     }
     return mc_packet_float(packet, x) && mc_packet_float(packet, y)
         && mc_packet_float(packet, z);
@@ -24148,13 +24151,19 @@ int mc_client_send_command(McClient *client, const char *command,
         return -1;
     }
     struct timespec now;
-    if (clock_gettime(CLOCK_REALTIME, &now) != 0
-        || now.tv_sec > INT64_MAX / 1000) {
+    if (clock_gettime(CLOCK_REALTIME, &now) != 0) {
         set_error(error, error_size, "Orologio comando non disponibile");
         return -1;
     }
-    int64_t timestamp_ms = (int64_t)now.tv_sec * INT64_C(1000)
-        + (int64_t)now.tv_nsec / INT64_C(1000000);
+    const int64_t seconds = (int64_t)now.tv_sec;
+    const int64_t nanoseconds = (int64_t)now.tv_nsec;
+    const int64_t fractional_ms = nanoseconds / INT64_C(1000000);
+    if (seconds < 0 || nanoseconds < 0 || nanoseconds >= INT64_C(1000000000)
+        || seconds > (INT64_MAX - fractional_ms) / INT64_C(1000)) {
+        set_error(error, error_size, "Orologio comando non disponibile");
+        return -1;
+    }
+    const int64_t timestamp_ms = seconds * INT64_C(1000) + fractional_ms;
     unsigned char storage[384];
     McPacket body;
     mc_packet_init(&body, storage, sizeof(storage));

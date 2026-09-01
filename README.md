@@ -645,9 +645,9 @@ multi-client test traffic. It contains no Perry source or fixture.
 
 | Workload | Work per run | mcprotocol.c | minecraft-protocol | Speedup |
 | --- | ---: | ---: | ---: | ---: |
-| Sequential offline login | 32 sessions | 19.570 ms | 624.771 ms | 31.92× |
-| Keep-alive stream | 10,000 echoes | 259.883 ms | 498.470 ms | 1.92× |
-| 32 concurrent streams | 8,192 echoes | 129.716 ms | 871.216 ms | 6.72× |
+| Sequential offline login | 32 sessions | 13.694 ms | 619.948 ms | 45.27× |
+| Keep-alive stream | 10,000 echoes | 236.425 ms | 487.420 ms | 2.06× |
+| 32 concurrent streams | 8,192 echoes | 120.766 ms | 883.755 ms | 7.32× |
 
 The checked-in run uses two discarded warm-ups and seven measured repetitions.
 The chart reports median operations per second with interquartile-range error
