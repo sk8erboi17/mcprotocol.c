@@ -25369,7 +25369,8 @@ static int handle_play(McClient *client, int32_t packet_id, McCursor body,
         }
         const int32_t teleport_id =
             decoded.has_teleport_id ? decoded.teleport_id : -1;
-        if (client->profile->protocol < 107) {
+        if (client->profile->protocol < 107
+            && (client->automatic_replies & MC_AUTOMATIC_TELEPORT) != 0U) {
             unsigned char storage[48];
             McPacket movement;
             mc_packet_init(&movement, storage, sizeof(storage));
