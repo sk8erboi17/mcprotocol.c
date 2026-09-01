@@ -22816,7 +22816,7 @@ typedef struct {
 
 static bool typed_read_palette(McReader *reader, uint32_t entry_count,
     uint8_t indirect_max_bits, uint8_t direct_max_bits,
-    McTypedPalette *palette)
+    bool fixed_storage, McTypedPalette *palette)
 {
     McTypedPalette decoded = {0};
     if (!mc_reader_u8(reader, &decoded.bits)
@@ -22847,17 +22847,22 @@ static bool typed_read_palette(McReader *reader, uint32_t entry_count,
     }
     decoded.palette = (McBytes){reader->data + palette_start,
         reader->offset - palette_start};
-    int32_t long_count = -1;
-    if (!mc_reader_varint(reader, &long_count) || long_count < 0
-        || (uint32_t)long_count > MC_MAX_PACKET_ARRAY_COUNT) {
-        return typed_invalid(reader);
-    }
     const uint32_t values_per_long = decoded.bits == 0U
         ? 0U : 64U / decoded.bits;
     const uint32_t expected = values_per_long == 0U
         ? 0U : (entry_count + values_per_long - 1U) / values_per_long;
-    if (reader->mode == MC_DECODE_STRICT && (uint32_t)long_count != expected) {
-        return typed_invalid(reader);
+    uint32_t long_count = expected;
+    if (!fixed_storage) {
+        int32_t encoded_long_count = -1;
+        if (!mc_reader_varint(reader, &encoded_long_count)
+            || encoded_long_count < 0
+            || (uint32_t)encoded_long_count > MC_MAX_PACKET_ARRAY_COUNT) {
+            return typed_invalid(reader);
+        }
+        long_count = (uint32_t)encoded_long_count;
+        if (reader->mode == MC_DECODE_STRICT && long_count != expected) {
+            return typed_invalid(reader);
+        }
     }
     const size_t data_start = reader->offset;
     if ((size_t)long_count > SIZE_MAX / 8U
@@ -22865,7 +22870,7 @@ static bool typed_read_palette(McReader *reader, uint32_t entry_count,
         return reader_fail(reader, MC_ERROR_INTEGER_OVERFLOW,
             reader->offset);
     }
-    decoded.long_count = (uint32_t)long_count;
+    decoded.long_count = long_count;
     decoded.data = (McBytes){reader->data + data_start,
         reader->offset - data_start};
     *palette = decoded;
@@ -22900,12 +22905,20 @@ bool mc_chunk_section_iterator_next(McChunkSectionIterator *iterator,
     McChunkSectionView decoded = {0};
     McTypedPalette blocks;
     McTypedPalette biomes;
+    const bool has_fluid_count = iterator->protocol >= 775;
+    const bool fixed_storage = iterator->protocol >= 770;
     if (!mc_reader_u16(&iterator->reader, &decoded.non_air_block_count)
         || decoded.non_air_block_count > 4096U
-        || !typed_read_palette(&iterator->reader, 4096U, 8U, 15U, &blocks)
-        || !typed_read_palette(&iterator->reader, 64U, 3U, 6U, &biomes)) {
+        || (has_fluid_count
+            && (!mc_reader_u16(&iterator->reader, &decoded.fluid_count)
+                || decoded.fluid_count > 4096U))
+        || !typed_read_palette(&iterator->reader, 4096U, 8U, 15U,
+            fixed_storage, &blocks)
+        || !typed_read_palette(&iterator->reader, 64U, 3U, 6U,
+            fixed_storage, &biomes)) {
         return typed_invalid(&iterator->reader);
     }
+    decoded.has_fluid_count = has_fluid_count;
     if (iterator->reader.mode == MC_DECODE_STRICT
         && blocks.bits > 0U && blocks.bits < 4U) {
         return typed_invalid(&iterator->reader);

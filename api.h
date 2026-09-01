@@ -1259,6 +1259,10 @@ typedef struct {
     McBytes block_data;
     McBytes biome_data;
     McBytes encoded;
+    /* Protocols 775+ insert the section-local fluid-state count after the
+     * non-air block count. Older releases leave this absent and zero. */
+    uint16_t fluid_count;
+    bool has_fluid_count;
 } McChunkSectionView;
 
 typedef struct {

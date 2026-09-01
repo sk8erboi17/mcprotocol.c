@@ -391,13 +391,29 @@ static void encode_chunk(McPacket *packet, int protocol)
         0U, 0U, 0U, /* singleton block palette and empty packed data */
         0U, 0U, 0U  /* singleton biome palette and empty packed data */
     };
+    static const unsigned char fixed_modern_section[] = {
+        0U, 0U, /* non-air block count */
+        0U, 0U, /* singleton block palette; fixed layout has no long count */
+        0U, 0U  /* singleton biome palette; fixed layout has no long count */
+    };
+    static const unsigned char fluid_fixed_modern_section[] = {
+        0U, 0U, /* non-air block count */
+        0U, 7U, /* protocol 775+ fluid count */
+        0U, 0U, /* singleton block palette */
+        0U, 0U  /* singleton biome palette */
+    };
     const McBytes named_nbt = {
         named_empty_compound, sizeof(named_empty_compound)
     };
     const McBytes anonymous_nbt = {
         anonymous_empty_compound, sizeof(anonymous_empty_compound)
     };
-    const McBytes section = {modern_section, sizeof(modern_section)};
+    const McBytes section = protocol >= 775
+        ? (McBytes){fluid_fixed_modern_section,
+            sizeof(fluid_fixed_modern_section)}
+        : protocol >= 770
+            ? (McBytes){fixed_modern_section, sizeof(fixed_modern_section)}
+            : (McBytes){modern_section, sizeof(modern_section)};
 
     assert(mc_packet_i32(packet, 3));
     assert(mc_packet_i32(packet, -2));
@@ -482,6 +498,8 @@ static void test_chunk_envelopes_and_sections(void)
                 1U, &iterator));
             assert(mc_chunk_section_iterator_next(&iterator, &section));
             assert(section.non_air_block_count == 0U);
+            assert(section.has_fluid_count == (protocol >= 775));
+            assert(section.fluid_count == (protocol >= 775 ? 7U : 0U));
             assert(section.block_palette_count == 1U);
             assert(section.biome_palette_count == 1U);
             assert(mc_chunk_section_block_state(&section, 0U, &state_id));
