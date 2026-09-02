@@ -227,6 +227,60 @@ static void relative_movement_is_normalized_for_every_protocol(void)
     }
 }
 
+static void system_chat_is_normalized_for_every_protocol(void)
+{
+    size_t count = 0U;
+    const int *protocols = mc_supported_protocols(&count);
+    const McUuid sender = sample_uuid();
+    assert(protocols != NULL && count == 51U);
+    for (size_t index = 0U; index < count; ++index) {
+        const int protocol = protocols[index];
+        unsigned char storage[128] = {0};
+        McPacket body;
+        mc_packet_init(&body, storage, sizeof(storage));
+        if (protocol >= 765) {
+            assert(mc_packet_u8(&body, MC_NBT_STRING));
+            assert(mc_packet_u16(&body, 5U));
+            assert(mc_packet_bytes(&body, "hello", 5U));
+        } else {
+            assert(mc_packet_string(&body, "{\"text\":\"hello\"}"));
+        }
+        if (protocol >= 47 && protocol <= 758) {
+            assert(mc_packet_u8(&body, 0U));
+            if (protocol >= 735) assert(mc_packet_uuid(&body, &sender));
+        } else if (protocol == 759) {
+            assert(mc_packet_varint(&body, 1));
+        } else if (protocol >= 760) {
+            assert(mc_packet_bool(&body, false));
+        }
+
+        McReader reader;
+        McClientboundSystemChat chat = {0};
+        mc_reader_init_mode(&reader, body.data, body.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_system_chat(&reader, protocol, &chat));
+        assert(mc_reader_finish(&reader));
+        assert(chat.content_is_nbt == (protocol >= 765));
+        assert(chat.has_position == (protocol >= 47 && protocol <= 758));
+        assert(chat.has_sender == (protocol >= 735 && protocol <= 758));
+        assert(chat.has_chat_type == (protocol == 759));
+        assert(chat.has_overlay == (protocol >= 760));
+        if (protocol >= 765) {
+            assert(chat.content.size == 8U);
+            assert(chat.content.data[0] == MC_NBT_STRING);
+        } else {
+            assert(bytes_equal(chat.content, "{\"text\":\"hello\"}"));
+        }
+        if (chat.has_position) assert(chat.position == 0U);
+        if (chat.has_sender) {
+            assert(memcmp(chat.sender.bytes, sender.bytes,
+                sizeof(sender.bytes)) == 0);
+        }
+        if (chat.has_chat_type) assert(chat.chat_type == 1);
+        if (chat.has_overlay) assert(!chat.overlay);
+    }
+}
+
 static void living_spawn_is_normalized_for_every_applicable_protocol(void)
 {
     size_t count = 0U;
@@ -302,11 +356,28 @@ static void malformed_player_projection_is_rejected(void)
     mc_reader_init_mode(&reader, invalid_ground, sizeof(invalid_ground),
         MC_DECODE_STRICT, NULL);
     assert(!mc_reader_clientbound_entity_move(&reader, 47, &movement));
+
+    const unsigned char invalid_position[] = {2U, '{', '}', 3U};
+    McClientboundSystemChat chat = {0};
+    mc_reader_init_mode(&reader, invalid_position, sizeof(invalid_position),
+        MC_DECODE_STRICT, NULL);
+    assert(!mc_reader_clientbound_system_chat(&reader, 47, &chat));
+
+    const unsigned char invalid_overlay[] = {2U, '{', '}', 2U};
+    mc_reader_init_mode(&reader, invalid_overlay, sizeof(invalid_overlay),
+        MC_DECODE_STRICT, NULL);
+    assert(!mc_reader_clientbound_system_chat(&reader, 760, &chat));
+
+    const unsigned char truncated_nbt[] = {MC_NBT_STRING, 0U, 5U, 'h'};
+    mc_reader_init_mode(&reader, truncated_nbt, sizeof(truncated_nbt),
+        MC_DECODE_STRICT, NULL);
+    assert(!mc_reader_clientbound_system_chat(&reader, 765, &chat));
 }
 
 int main(void)
 {
     player_info_is_normalized_for_every_protocol();
+    system_chat_is_normalized_for_every_protocol();
     relative_movement_is_normalized_for_every_protocol();
     living_spawn_is_normalized_for_every_applicable_protocol();
     malformed_player_projection_is_rejected();

@@ -22570,6 +22570,50 @@ bool mc_uuid_iterator_next(McUuidIterator *iterator, McUuid *profile_id)
     return true;
 }
 
+bool mc_reader_clientbound_system_chat(McReader *reader, int protocol,
+    McClientboundSystemChat *value)
+{
+    McClientboundSystemChat decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+
+    if (protocol >= 765) {
+        if (!mc_reader_nbt(reader, false, &decoded.content)) return false;
+        decoded.content_is_nbt = true;
+    } else if (!mc_reader_string(reader, &decoded.content)) {
+        return false;
+    }
+
+    if (protocol <= 5) {
+        *value = decoded;
+        return true;
+    }
+    if (protocol <= 758) {
+        if (!mc_reader_u8(reader, &decoded.position)
+            || decoded.position > UINT8_C(2)) {
+            return typed_invalid(reader);
+        }
+        decoded.has_position = true;
+        if (protocol >= 735) {
+            if (!mc_reader_uuid(reader, &decoded.sender)) return false;
+            decoded.has_sender = true;
+        }
+    } else if (protocol == 759) {
+        if (!mc_reader_varint(reader, &decoded.chat_type)
+            || decoded.chat_type < 0) {
+            return typed_invalid(reader);
+        }
+        decoded.has_chat_type = true;
+    } else {
+        if (!mc_reader_bool(reader, &decoded.overlay)) return false;
+        decoded.has_overlay = true;
+    }
+    *value = decoded;
+    return true;
+}
+
 static bool reader_clientbound_entity_movement(McReader *reader,
     int protocol, bool carries_position, bool carries_rotation,
     McClientboundEntityMovement *value)

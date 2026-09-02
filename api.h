@@ -675,6 +675,23 @@ typedef struct {
     McBytes profile_ids;
 } McClientboundPlayerRemove;
 
+/* Normalized system-delivered chat component. Historical releases carry the
+ * component through the clientbound `chat` packet; 1.19+ uses the dedicated
+ * `system_chat` packet. `content` is a borrowed encoded JSON string payload
+ * through 1.20.2 and a complete anonymous network-NBT value afterward. */
+typedef struct {
+    McBytes content;
+    McUuid sender;
+    int32_t chat_type;
+    uint8_t position;
+    bool overlay;
+    bool content_is_nbt;
+    bool has_sender;
+    bool has_chat_type;
+    bool has_position;
+    bool has_overlay;
+} McClientboundSystemChat;
+
 typedef struct {
     McReader reader;
     uint32_t remaining;
@@ -1759,6 +1776,11 @@ bool mc_reader_clientbound_player_remove(McReader *reader, int protocol,
 bool mc_player_remove_iterator(const McClientboundPlayerRemove *packet,
     McUuidIterator *iterator);
 bool mc_uuid_iterator_next(McUuidIterator *iterator, McUuid *profile_id);
+/* Decodes the system-delivered chat body selected by the release. It does not
+ * interpret component semantics; callers may inspect the borrowed JSON/NBT
+ * value with the public primitive readers. */
+bool mc_reader_clientbound_system_chat(McReader *reader, int protocol,
+    McClientboundSystemChat *value);
 /* Decodes the three clientbound relative movement body variants. */
 bool mc_reader_clientbound_entity_move(McReader *reader, int protocol,
     McClientboundEntityMovement *value);

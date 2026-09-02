@@ -181,6 +181,7 @@ Available symmetric field codecs are:
 | `clientbound_player_position` | Release-aware correction body with normalized 1.7 feet Y, teleport/dismount boundaries and modern velocity deltas | observing authoritative movement and teleport responses |
 | `clientbound_respawn` | Release-aware dimension identity, world, spawn info, last-death location, portal/sea-level and keep-data fields | observing authoritative respawn and dimension-change projections |
 | `clientbound_player_info`, `clientbound_player_remove` | Bounded, allocation-free Player Info field/action normalization and UUID/name iterators | observing TAB add/update/remove across 1.7 through current |
+| `clientbound_system_chat` | Borrowed JSON/network-NBT component plus normalized historical position/sender, 1.19 chat type or overlay flag | observing system and command feedback without duplicating release wire envelopes |
 | `clientbound_entity_move`, `clientbound_entity_move_look`, `clientbound_entity_look` | Exact signed wire deltas plus normalized block deltas and rotation | observing remote entity tracking without release-specific coordinate math |
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `inventory_slot_update` | Normalized container-slot or dedicated player-inventory update | observing authoritative main/off-hand inventory reconciliation |
