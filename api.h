@@ -2333,6 +2333,13 @@ int mc_client_run(McClient *client, char *error, size_t error_size);
 /* Wait checks socket readability without consuming a packet. */
 int mc_client_wait(McClient *client, unsigned int timeout_ms,
     char *error, size_t error_size);
+/* Half-closes outbound traffic, then observes peer EOF without consuming
+ * application packets. wait_closed returns 1 for EOF, 0 for timeout or
+ * pending unread data, and -1 for invalid state or socket failure. */
+int mc_client_shutdown_write(McClient *client,
+    char *error, size_t error_size);
+int mc_client_wait_closed(McClient *client, unsigned int timeout_ms,
+    char *error, size_t error_size);
 void mc_client_disconnect(McClient *client);
 
 

@@ -571,6 +571,8 @@ mc_client_send/send_named      send one numeric or named packet
 mc_client_send_batch           frame and send multiple ordered packets
 mc_client_wait/poll/run        readiness, one-packet and continuous drivers
 mc_client_set_*                backend, state, compression, replies and crypto
+mc_client_shutdown_write       half-close outbound traffic while retaining reads
+mc_client_wait_closed          observe peer EOF without consuming packet data
 mc_client_disconnect           interrupt and close a connection
 mc_client_traffic              cumulative on-wire byte counters
 

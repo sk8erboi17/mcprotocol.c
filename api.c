@@ -25033,6 +25033,55 @@ int mc_client_wait(McClient *client, unsigned int timeout_ms,
     return result > 0 ? 1 : 0;
 }
 
+int mc_client_shutdown_write(McClient *client,
+    char *error, size_t error_size)
+{
+    if (client == NULL || atomic_load(&client->socket_fd) < 0
+        || client->state == MC_STATE_DISCONNECTED) {
+        set_error(error, error_size, "Client non connesso");
+        return -1;
+    }
+    if (shutdown(atomic_load(&client->socket_fd), SHUT_WR) != 0) {
+        set_error(error, error_size,
+            "Half-close scrittura fallita: %s", strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
+int mc_client_wait_closed(McClient *client, unsigned int timeout_ms,
+    char *error, size_t error_size)
+{
+    if (client == NULL || timeout_ms == 0U
+        || atomic_load(&client->socket_fd) < 0
+        || client->state == MC_STATE_DISCONNECTED) {
+        set_error(error, error_size, "Client non connesso o timeout non valido");
+        return -1;
+    }
+    if (stream_decoder_frame_ready(client->stream_decoder)) return 0;
+    int ready = backend_wait(client, timeout_ms);
+    if (ready == 0) return 0;
+    if (ready < 0) {
+        set_error(error, error_size,
+            "Attesa chiusura socket fallita: %s", strerror(errno));
+        return -1;
+    }
+    unsigned char byte = 0U;
+    ssize_t received;
+    do {
+        received = recv(atomic_load(&client->socket_fd), &byte, sizeof(byte),
+            MSG_PEEK);
+    } while (received < 0 && errno == EINTR);
+    if (received > 0) return 0;
+    if (received < 0) {
+        set_error(error, error_size,
+            "Osservazione chiusura socket fallita: %s", strerror(errno));
+        return -1;
+    }
+    mc_client_disconnect(client);
+    return 1;
+}
+
 
 /* ============================================================
  * TRANSPORT / TCP

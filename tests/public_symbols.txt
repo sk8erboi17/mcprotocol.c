@@ -46,11 +46,13 @@ mc_client_set_creative_slot_damage
 mc_client_set_read_timeout
 mc_client_set_state
 mc_client_set_stream_transforms
+mc_client_shutdown_write
 mc_client_state
 mc_client_swing_arm
 mc_client_traffic
 mc_client_use_item
 mc_client_wait
+mc_client_wait_closed
 mc_decode_canonical_action
 mc_decode_canonical_block_change
 mc_decode_canonical_inventory

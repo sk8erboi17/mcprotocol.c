@@ -170,10 +170,17 @@ static int observe_bound_peer(int listener)
     if (peer < 0) return EXIT_FAILURE;
     struct in_addr expected;
     unsigned char handshake_byte = 0U;
-    const bool valid = peer_address.sin_family == AF_INET
+    bool valid = peer_address.sin_family == AF_INET
         && inet_pton(AF_INET, "127.0.0.1", &expected) == 1
         && memcmp(&peer_address.sin_addr, &expected, sizeof(expected)) == 0
         && recv(peer, &handshake_byte, sizeof(handshake_byte), 0) == 1;
+    unsigned char buffer[256];
+    ssize_t received = 1;
+    while (valid && received > 0) {
+        received = recv(peer, buffer, sizeof(buffer), 0);
+        if (received < 0) valid = false;
+    }
+    valid = valid && received == 0;
     (void)close(peer);
     return valid ? EXIT_SUCCESS : EXIT_FAILURE;
 }
@@ -208,6 +215,10 @@ static void check_local_address(void)
     assert(opened == 0);
     assert(mc_client_set_local_address(client, "127.0.0.3",
         error, sizeof(error)) != 0);
+    assert(mc_client_shutdown_write(NULL, error, sizeof(error)) != 0);
+    assert(mc_client_wait_closed(NULL, 1000U, error, sizeof(error)) != 0);
+    assert(mc_client_shutdown_write(client, error, sizeof(error)) == 0);
+    assert(mc_client_wait_closed(client, 5000U, error, sizeof(error)) == 1);
     mc_client_destroy(client);
     (void)close(listener);
 
