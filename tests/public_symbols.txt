@@ -40,6 +40,7 @@ mc_client_set_automatic_replies
 mc_client_set_backend
 mc_client_set_compression
 mc_client_set_creative_slot
+mc_client_set_creative_slot_damage
 mc_client_set_read_timeout
 mc_client_set_state
 mc_client_set_stream_transforms
@@ -99,6 +100,7 @@ mc_packet_player_position
 mc_packet_position
 mc_packet_respawn_request
 mc_packet_set_creative_slot
+mc_packet_set_creative_slot_damage
 mc_packet_string
 mc_packet_string_n
 mc_packet_u16

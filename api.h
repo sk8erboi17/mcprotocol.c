@@ -1566,6 +1566,12 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
  * canonical player-inventory slot and the item is metadata-free. */
 bool mc_packet_set_creative_slot(McPacket *packet, int protocol,
     int16_t slot, int32_t item_id, int32_t count);
+/* Builds a creative mutation for a metadata-free stack while preserving the
+ * legacy numeric damage/data field through protocol 340. Flattened releases
+ * require damage=0. This is required for historical spawn eggs, durability
+ * and other pre-flattening data-value items. */
+bool mc_packet_set_creative_slot_damage(McPacket *packet, int protocol,
+    int16_t slot, int32_t item_id, int32_t count, int32_t damage);
 /* Selects one hotbar slot. The body is a signed big-endian short in every
  * supported release; Vanilla accepts only indices 0 through 8. */
 bool mc_packet_held_item_slot(McPacket *packet, int protocol, int16_t slot);
@@ -2219,6 +2225,11 @@ int mc_client_close_window(McClient *client, int32_t window_id,
 /* Writes one metadata-free stack into a creative player-inventory slot. */
 int mc_client_set_creative_slot(McClient *client, int16_t slot,
     int32_t item_id, int32_t count, char *error, size_t error_size);
+/* Sends the damage-aware creative mutation described by
+ * mc_packet_set_creative_slot_damage(). */
+int mc_client_set_creative_slot_damage(McClient *client, int16_t slot,
+    int32_t item_id, int32_t count, int32_t damage,
+    char *error, size_t error_size);
 /* Selects one of the nine player hotbar slots while in PLAY. */
 int mc_client_select_hotbar_slot(McClient *client, int16_t slot,
     char *error, size_t error_size);

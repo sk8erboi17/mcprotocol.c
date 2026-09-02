@@ -3258,8 +3258,36 @@ bool mc_packet_plain_item(McPacket *packet, int protocol,
 bool mc_packet_set_creative_slot(McPacket *packet, int protocol,
     int16_t slot, int32_t item_id, int32_t count)
 {
-    return mc_packet_i16(packet, slot)
-        && mc_packet_plain_item(packet, protocol, item_id, count);
+    return mc_packet_set_creative_slot_damage(
+        packet, protocol, slot, item_id, count, 0);
+}
+
+bool mc_packet_set_creative_slot_damage(McPacket *packet, int protocol,
+    int16_t slot, int32_t item_id, int32_t count, int32_t damage)
+{
+    if (!mc_protocol_supported(protocol) || count < 0 || count > 127
+        || damage < 0 || damage > (int32_t)UINT16_MAX
+        || (count != 0 && item_id <= 0)
+        || (count == 0 && damage != 0)
+        || (protocol <= 401 && item_id > (int32_t)UINT16_MAX)
+        || (protocol > 340 && damage != 0)) {
+        if (packet != NULL) packet->failed = true;
+        return false;
+    }
+    if (!mc_packet_i16(packet, slot)) return false;
+    if (protocol > 340) {
+        return mc_packet_plain_item(packet, protocol, item_id, count);
+    }
+    if (!mc_packet_u16(packet,
+            count == 0 ? UINT16_MAX : (uint16_t)item_id)) {
+        return false;
+    }
+    if (count == 0) return true;
+    return mc_packet_u8(packet, (uint8_t)count)
+        && mc_packet_u16(packet, (uint16_t)damage)
+        && (protocol <= 5
+            ? mc_packet_i16(packet, -1)
+            : mc_packet_u8(packet, (uint8_t)MC_NBT_END));
 }
 
 bool mc_packet_held_item_slot(McPacket *packet, int protocol, int16_t slot)
@@ -26081,6 +26109,14 @@ int mc_client_close_window(McClient *client, int32_t window_id,
 int mc_client_set_creative_slot(McClient *client, int16_t slot,
     int32_t item_id, int32_t count, char *error, size_t error_size)
 {
+    return mc_client_set_creative_slot_damage(
+        client, slot, item_id, count, 0, error, error_size);
+}
+
+int mc_client_set_creative_slot_damage(McClient *client, int16_t slot,
+    int32_t item_id, int32_t count, int32_t damage,
+    char *error, size_t error_size)
+{
     if (client == NULL || client->profile == NULL
         || atomic_load(&client->socket_fd) < 0
         || client->state != MC_STATE_PLAY) {
@@ -26090,8 +26126,8 @@ int mc_client_set_creative_slot(McClient *client, int16_t slot,
     unsigned char storage[32];
     McPacket body;
     mc_packet_init(&body, storage, sizeof(storage));
-    if (!mc_packet_set_creative_slot(&body, client->profile->protocol,
-            slot, item_id, count)) {
+    if (!mc_packet_set_creative_slot_damage(&body, client->profile->protocol,
+            slot, item_id, count, damage)) {
         set_error(error, error_size, "Slot creativo Minecraft non valido");
         return -1;
     }

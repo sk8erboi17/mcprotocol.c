@@ -2013,6 +2013,27 @@ static void creative_slots_match_node_release_boundaries(void)
     assert(!mc_packet_set_creative_slot(&packet, 776, 37, 3, 128));
     assert(packet.failed);
     assert(!mc_packet_set_creative_slot(NULL, 776, 37, 3, 7));
+
+    static const unsigned char spawn_egg_17[] = {
+        0x00U, 0x24U, 0x01U, 0x7fU, 0x01U, 0x00U, 0x5aU, 0xffU, 0xffU,
+    };
+    static const unsigned char spawn_egg_18[] = {
+        0x00U, 0x24U, 0x01U, 0x7fU, 0x01U, 0x00U, 0x5aU, 0x00U,
+    };
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_set_creative_slot_damage(&packet, 4, 36, 383, 1, 90));
+    assert(packet.length == sizeof(spawn_egg_17));
+    assert(memcmp(packet.data, spawn_egg_17, sizeof(spawn_egg_17)) == 0);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_set_creative_slot_damage(&packet, 47, 36, 383, 1, 90));
+    assert(packet.length == sizeof(spawn_egg_18));
+    assert(memcmp(packet.data, spawn_egg_18, sizeof(spawn_egg_18)) == 0);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_set_creative_slot_damage(&packet, 393, 36, 383, 1, 90));
+    assert(packet.failed);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(!mc_packet_set_creative_slot_damage(&packet, 47, 36, 0, 0, 90));
+    assert(packet.failed);
 }
 
 static void inventory_slot_updates_are_versioned(void)
