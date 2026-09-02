@@ -26419,7 +26419,9 @@ static int read_protocol_packet(McClient *client, McState state,
  * exchange is bounded even if a broken peer never sends finish_configuration.
  * Known-pack selection is echoed on protocol 776 because that release sends
  * the concrete registry list; older releases accept an empty selection. */
-static int configuration(McClient *client, char *error, size_t error_size)
+static int configuration(McClient *client,
+    const McClientInformation *requested_information,
+    char *error, size_t error_size)
 {
     change_state(client, MC_STATE_CONFIGURATION);
     if (send_frame(client, 0x03, NULL, 0U, error, error_size) != 0) return -1;
@@ -26435,8 +26437,9 @@ static int configuration(McClient *client, char *error, size_t error_size)
         if (client->profile->protocol == 776 && !information_sent) {
             unsigned char storage[128];
             McPacket settings;
-            McClientInformation information = default_client_information();
-            information.server_listing = false;
+            McClientInformation information = requested_information != NULL
+                ? *requested_information : default_client_information();
+            if (requested_information == NULL) information.server_listing = false;
             mc_packet_init(&settings, storage, sizeof(storage));
             mc_packet_client_information(
                 &settings, client->profile->protocol, &information);
@@ -26468,7 +26471,8 @@ static int configuration(McClient *client, char *error, size_t error_size)
         if (!information_sent) {
             unsigned char storage[128];
             McPacket settings;
-            const McClientInformation information = default_client_information();
+            const McClientInformation information = requested_information != NULL
+                ? *requested_information : default_client_information();
             mc_packet_init(&settings, storage, sizeof(storage));
             mc_packet_client_information(
                 &settings, client->profile->protocol, &information);
@@ -26539,18 +26543,19 @@ fail:
     return -1;
 }
 
-int mc_client_connect(McClient *client, const char *host, uint16_t port,
-    const char *username, char *error, size_t error_size)
+static int client_connect_profile(McClient *client, const char *host,
+    uint16_t port, const char *username, const McUuid *profile_id,
+    const McClientInformation *configuration_information,
+    char *error, size_t error_size)
 {
-    if (client == NULL || host == NULL || host[0] == '\0' || !valid_username(username)) {
+    if (client == NULL || host == NULL || host[0] == '\0'
+        || !valid_username(username) || profile_id == NULL) {
         set_error(error, error_size, "Host o username non valido");
         return -1;
     }
     if (mc_client_open(client, host, port, MC_STATE_LOGIN,
             error, error_size) != 0) return -1;
     unsigned char storage[512];
-    McUuid uuid;
-    (void)mc_offline_uuid(username, &uuid);
     McPacket login;
     mc_packet_init(&login, storage, sizeof(storage));
     mc_packet_string(&login, username);
@@ -26559,9 +26564,9 @@ int mc_client_connect(McClient *client, const char *host, uint16_t port,
     }
     if ((client->profile->flags & MC_PROTOCOL_FEATURE_OPTIONAL_UUID) != 0U) {
         mc_packet_u8(&login, 1U);
-        mc_packet_uuid(&login, &uuid);
+        mc_packet_uuid(&login, profile_id);
     } else if ((client->profile->flags & MC_PROTOCOL_FEATURE_REQUIRED_UUID) != 0U) {
-        mc_packet_uuid(&login, &uuid);
+        mc_packet_uuid(&login, profile_id);
     }
     if (send_builder(client, 0x00, &login, error, error_size) != 0) goto fail;
 
@@ -26600,7 +26605,8 @@ int mc_client_connect(McClient *client, const char *host, uint16_t port,
         if (packet_id == 0x02) {
             free(frame.data);
             if ((client->profile->flags & MC_PROTOCOL_FEATURE_CONFIGURATION) != 0U) {
-                if (configuration(client, error, error_size) != 0) goto fail;
+                if (configuration(client, configuration_information,
+                        error, error_size) != 0) goto fail;
             } else {
                 change_state(client, MC_STATE_PLAY);
             }
@@ -26613,6 +26619,27 @@ int mc_client_connect(McClient *client, const char *host, uint16_t port,
 fail:
     mc_client_disconnect(client);
     return -1;
+}
+
+int mc_client_connect_profile(McClient *client, const char *host, uint16_t port,
+    const char *username, const McUuid *profile_id,
+    const McClientInformation *configuration_information,
+    char *error, size_t error_size)
+{
+    return client_connect_profile(client, host, port, username, profile_id,
+        configuration_information, error, error_size);
+}
+
+int mc_client_connect(McClient *client, const char *host, uint16_t port,
+    const char *username, char *error, size_t error_size)
+{
+    McUuid profile_id;
+    if (!valid_username(username) || !mc_offline_uuid(username, &profile_id)) {
+        set_error(error, error_size, "Host o username non valido");
+        return -1;
+    }
+    return client_connect_profile(client, host, port, username, &profile_id,
+        NULL, error, error_size);
 }
 
 

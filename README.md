@@ -118,6 +118,11 @@ application can disable all or selected replies before connecting:
 mc_client_set_automatic_replies(client, 0U, error, sizeof(error));
 ```
 
+When a harness or authenticated frontend already owns the profile UUID,
+`mc_client_connect_profile` performs the same complete exchange without
+replacing that identity. Its optional `McClientInformation` argument also
+preserves explicit CONFIGURATION values; passing `NULL` uses the defaults.
+
 ## Finding packets
 
 Packet IDs move between releases. Resolve them from the built-in catalog rather
@@ -552,6 +557,7 @@ mc_uuid_* / mc_offline_uuid    UUID conversion and offline player UUIDs
 
 mc_client_create/destroy       allocate or release a client/peer
 mc_client_connect              complete offline login through PLAY
+mc_client_connect_profile      preserve explicit profile/configuration values
 mc_client_open                 raw LOGIN or STATUS handshake
 mc_client_send/send_named      send one numeric or named packet
 mc_client_send_batch           frame and send multiple ordered packets

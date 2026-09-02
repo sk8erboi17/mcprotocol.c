@@ -16,6 +16,7 @@ mc_client_click_container_button
 mc_client_click_window
 mc_client_close_window
 mc_client_connect
+mc_client_connect_profile
 mc_client_create
 mc_client_destroy
 mc_client_dig_block

@@ -2202,6 +2202,13 @@ int mc_client_open(McClient *client, const char *host, uint16_t port,
  * including the CONFIGURATION exchange required by modern versions. */
 int mc_client_connect(McClient *client, const char *host, uint16_t port,
     const char *username, char *error, size_t error_size);
+/* Performs the same complete offline login while preserving a caller-owned
+ * profile UUID on releases that carry one. configuration_information may be
+ * NULL to use the conservative defaults used by mc_client_connect(). */
+int mc_client_connect_profile(McClient *client, const char *host, uint16_t port,
+    const char *username, const McUuid *profile_id,
+    const McClientInformation *configuration_information,
+    char *error, size_t error_size);
 
 /* Performs the server-list status handshake, copies the response JSON with a
  * terminating NUL and verifies a ping/pong nonce. timeout_ms applies to each

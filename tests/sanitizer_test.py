@@ -24,6 +24,7 @@ TESTS = (
     "replay_test",
     "property_test",
     "generated_test",
+    "connect_profile_test",
 )
 
 
