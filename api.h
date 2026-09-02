@@ -2238,6 +2238,11 @@ int mc_client_connect_profile(McClient *client, const char *host, uint16_t port,
 int mc_status_ping(int protocol, const char *host, uint16_t port,
     unsigned int timeout_ms, char *json, size_t json_capacity,
     McStatus *status, char *error, size_t error_size);
+/* Equivalent status exchange with a caller-selected i64 ping nonce. Useful
+ * for exact black-box contracts that must prove the echoed value itself. */
+int mc_status_ping_nonce(int protocol, const char *host, uint16_t port,
+    unsigned int timeout_ms, int64_t nonce, char *json, size_t json_capacity,
+    McStatus *status, char *error, size_t error_size);
 
 /* Sends one serverbound body. The library adds the packet ID, framing and the
  * negotiated compression envelope. The numeric form is useful for generated

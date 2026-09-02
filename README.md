@@ -496,6 +496,9 @@ if (mc_status_ping(776, "example.org", 25565, 5000U,
 }
 ```
 
+Use `mc_status_ping_nonce` when a test or protocol probe must choose and verify
+the exact signed 64-bit nonce instead of letting the library generate it.
+
 For custom authentication, call `mc_client_open(..., MC_STATE_LOGIN, ...)`.
 It sends only the handshake. The application can then send Login Start, poll
 LOGIN packets, install compression with `mc_client_set_compression`, transition
@@ -568,6 +571,7 @@ mc_client_disconnect           interrupt and close a connection
 mc_client_traffic              cumulative on-wire byte counters
 
 mc_status_ping                 server-list JSON plus verified ping/pong
+mc_status_ping_nonce           status exchange with caller-selected nonce
 mc_server_create/destroy       raw listener lifecycle
 mc_server_accept               accept and validate one client handshake
 ```

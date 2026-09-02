@@ -26723,8 +26723,8 @@ static int status_read_packet(McClient *client, unsigned int timeout_ms,
     return 0;
 }
 
-int mc_status_ping(int protocol, const char *host, uint16_t port,
-    unsigned int timeout_ms, char *json, size_t json_capacity,
+static int status_ping_nonce(int protocol, const char *host, uint16_t port,
+    unsigned int timeout_ms, int64_t nonce, char *json, size_t json_capacity,
     McStatus *status, char *error, size_t error_size)
 {
     if (!mc_protocol_supported(protocol) || host == NULL || host[0] == '\0'
@@ -26792,7 +26792,7 @@ int mc_status_ping(int protocol, const char *host, uint16_t port,
     uint64_t started = monotonic_milliseconds();
     McPacket ping;
     mc_packet_init(&ping, storage, sizeof(storage));
-    mc_packet_i64(&ping, (int64_t)started);
+    mc_packet_i64(&ping, nonce);
     if (send_builder(client, 0x01, &ping, error, error_size) != 0
         || status_read_packet(client, timeout_ms, &frame, &packet_id, &body,
             error, error_size) != 0) {
@@ -26801,7 +26801,7 @@ int mc_status_ping(int protocol, const char *host, uint16_t port,
     }
     int64_t echoed = -1;
     if (packet_id != 0x01 || !mc_reader_i64(&body, &echoed)
-        || echoed != (int64_t)started || mc_reader_remaining(&body) != 0U) {
+        || echoed != nonce || mc_reader_remaining(&body) != 0U) {
         free(frame.data);
         set_error(error, error_size, "Pong status non valido");
         mc_client_destroy(client);
@@ -26812,6 +26812,23 @@ int mc_status_ping(int protocol, const char *host, uint16_t port,
     status->latency_ms = finished >= started ? finished - started : 0U;
     mc_client_destroy(client);
     return 0;
+}
+
+int mc_status_ping_nonce(int protocol, const char *host, uint16_t port,
+    unsigned int timeout_ms, int64_t nonce, char *json, size_t json_capacity,
+    McStatus *status, char *error, size_t error_size)
+{
+    return status_ping_nonce(protocol, host, port, timeout_ms, nonce,
+        json, json_capacity, status, error, error_size);
+}
+
+int mc_status_ping(int protocol, const char *host, uint16_t port,
+    unsigned int timeout_ms, char *json, size_t json_capacity,
+    McStatus *status, char *error, size_t error_size)
+{
+    return status_ping_nonce(protocol, host, port, timeout_ms,
+        (int64_t)monotonic_milliseconds(), json, json_capacity,
+        status, error, error_size);
 }
 
 

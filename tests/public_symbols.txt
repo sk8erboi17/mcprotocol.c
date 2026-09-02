@@ -186,6 +186,7 @@ mc_server_create
 mc_server_destroy
 mc_server_port
 mc_status_ping
+mc_status_ping_nonce
 mc_stream_decoder_buffered_size
 mc_stream_decoder_config_init
 mc_stream_decoder_create

@@ -25,6 +25,13 @@ typedef struct ServerObservation {
     bool valid;
 } ServerObservation;
 
+typedef struct StatusObservation {
+    bool request;
+    bool ping;
+    bool valid;
+    int64_t nonce;
+} StatusObservation;
+
 static bool bytes_equal(McBytes bytes, const char *text)
 {
     const size_t size = strlen(text);
@@ -95,6 +102,28 @@ static void observe_serverbound(void *userdata, McState state, int32_t packet_id
     }
 }
 
+static void observe_status(void *userdata, McState state, int32_t packet_id,
+    const unsigned char *payload, size_t payload_size)
+{
+    StatusObservation *observation = userdata;
+    if (observation == NULL || !observation->valid || state != MC_STATE_STATUS) {
+        return;
+    }
+    if (packet_id == 0x00) {
+        observation->request = payload_size == 0U;
+        observation->valid = observation->request;
+    } else if (packet_id == 0x01) {
+        McReader reader;
+        mc_reader_init_mode(&reader, payload, payload_size,
+            MC_DECODE_STRICT, NULL);
+        observation->ping = mc_reader_i64(&reader, &observation->nonce)
+            && mc_reader_finish(&reader);
+        observation->valid = observation->ping;
+    } else {
+        observation->valid = false;
+    }
+}
+
 static int poll_until(McClient *peer, const bool *complete, char *error,
     size_t error_size)
 {
@@ -147,6 +176,53 @@ static int run_server(McServer *server)
     return EXIT_SUCCESS;
 }
 
+static int run_status_server(McServer *server)
+{
+    StatusObservation observation = {.valid = true};
+    const McCallbacks callbacks = {.on_packet = observe_status};
+    McClient *peer = NULL;
+    McHandshake handshake = {0};
+    char error[256] = {0};
+    if (mc_server_accept(server, 5000U, &callbacks, &observation, &peer,
+            &handshake, error, sizeof(error)) != 1
+        || handshake.protocol != 776 || handshake.next_state != MC_STATE_STATUS
+        || poll_until(peer, &observation.request, error, sizeof(error)) != 0
+        || !observation.valid) {
+        fprintf(stderr, "status server request failed: %s\n", error);
+        mc_client_destroy(peer);
+        return EXIT_FAILURE;
+    }
+
+    static const char response_json[] =
+        "{\"version\":{\"name\":\"26.2\",\"protocol\":776},"
+        "\"players\":{\"max\":5,\"online\":2,\"sample\":[]},"
+        "\"description\":{\"text\":\"mcprotocol status nonce\"}}";
+    unsigned char storage[512];
+    McPacket response;
+    mc_packet_init(&response, storage, sizeof(storage));
+    if (!mc_packet_string(&response, response_json)
+        || mc_client_send(peer, 0x00, response.data, response.length,
+            error, sizeof(error)) != 0
+        || poll_until(peer, &observation.ping, error, sizeof(error)) != 0
+        || !observation.valid || observation.nonce != INT64_C(42)) {
+        fprintf(stderr, "status server ping failed: %s\n", error);
+        mc_client_destroy(peer);
+        return EXIT_FAILURE;
+    }
+
+    McPacket pong;
+    mc_packet_init(&pong, storage, sizeof(storage));
+    if (!mc_packet_i64(&pong, observation.nonce)
+        || mc_client_send(peer, 0x01, pong.data, pong.length,
+            error, sizeof(error)) != 0) {
+        fprintf(stderr, "status server pong failed: %s\n", error);
+        mc_client_destroy(peer);
+        return EXIT_FAILURE;
+    }
+    mc_client_destroy(peer);
+    return EXIT_SUCCESS;
+}
+
 int main(void)
 {
     char error[256] = {0};
@@ -189,6 +265,34 @@ int main(void)
     assert(mc_client_connect_profile(NULL, "127.0.0.1", port,
         "ProfileClient", &PROFILE_ID, &information,
         error, sizeof(error)) != 0);
-    puts("PASS explicit profile UUID and configuration information connect");
+
+    server = mc_server_create("127.0.0.1", 0U, 1, error, sizeof(error));
+    assert(server != NULL);
+    const uint16_t status_port = mc_server_port(server);
+    assert(status_port != 0U);
+    const pid_t status_child = fork();
+    assert(status_child >= 0);
+    if (status_child == 0) {
+        const int result = run_status_server(server);
+        mc_server_destroy(server);
+        _exit(result);
+    }
+
+    static const char expected_json[] =
+        "{\"version\":{\"name\":\"26.2\",\"protocol\":776},"
+        "\"players\":{\"max\":5,\"online\":2,\"sample\":[]},"
+        "\"description\":{\"text\":\"mcprotocol status nonce\"}}";
+    char json[512];
+    McStatus ping_status = {0};
+    assert(mc_status_ping_nonce(776, "127.0.0.1", status_port, 5000U,
+        INT64_C(42), json, sizeof(json), &ping_status,
+        error, sizeof(error)) == 0);
+    assert(strcmp(json, expected_json) == 0);
+    assert(ping_status.json_size == strlen(expected_json));
+    mc_server_destroy(server);
+    assert(waitpid(status_child, &status, 0) == status_child);
+    assert(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
+
+    puts("PASS explicit profile connect and exact status ping nonce");
     return EXIT_SUCCESS;
 }
