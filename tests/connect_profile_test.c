@@ -2,12 +2,15 @@
 
 #include "api.h"
 
+#include <arpa/inet.h>
 #include <assert.h>
+#include <netinet/in.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -131,6 +134,86 @@ static int poll_until(McClient *peer, const bool *complete, char *error,
         if (mc_client_poll(peer, 5000U, error, error_size) <= 0) return -1;
     }
     return *complete ? 0 : -1;
+}
+
+static int create_bind_listener(uint16_t *port)
+{
+    const int listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) return -1;
+    struct sockaddr_in address;
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_port = htons(0U);
+    if (inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) != 1
+        || bind(listener, (const struct sockaddr *)(const void *)&address,
+            (socklen_t)sizeof(address)) != 0
+        || listen(listener, 1) != 0) {
+        (void)close(listener);
+        return -1;
+    }
+    socklen_t address_size = (socklen_t)sizeof(address);
+    if (getsockname(listener, (struct sockaddr *)(void *)&address,
+            &address_size) != 0) {
+        (void)close(listener);
+        return -1;
+    }
+    *port = ntohs(address.sin_port);
+    return listener;
+}
+
+static int observe_bound_peer(int listener)
+{
+    struct sockaddr_in peer_address;
+    socklen_t peer_size = (socklen_t)sizeof(peer_address);
+    const int peer = accept(listener,
+        (struct sockaddr *)(void *)&peer_address, &peer_size);
+    if (peer < 0) return EXIT_FAILURE;
+    struct in_addr expected;
+    unsigned char handshake_byte = 0U;
+    const bool valid = peer_address.sin_family == AF_INET
+        && inet_pton(AF_INET, "127.0.0.1", &expected) == 1
+        && memcmp(&peer_address.sin_addr, &expected, sizeof(expected)) == 0
+        && recv(peer, &handshake_byte, sizeof(handshake_byte), 0) == 1;
+    (void)close(peer);
+    return valid ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+static void check_local_address(void)
+{
+    uint16_t port = 0U;
+    const int listener = create_bind_listener(&port);
+    assert(listener >= 0);
+    assert(port != 0U);
+    const pid_t child = fork();
+    assert(child >= 0);
+    if (child == 0) {
+        const int result = observe_bound_peer(listener);
+        (void)close(listener);
+        _exit(result);
+    }
+
+    char error[256] = {0};
+    McClient *client = mc_client_create(47, NULL, NULL,
+        error, sizeof(error));
+    assert(client != NULL);
+    assert(mc_client_set_local_address(NULL, "127.0.0.1",
+        error, sizeof(error)) != 0);
+    assert(mc_client_set_local_address(client, "localhost",
+        error, sizeof(error)) != 0);
+    assert(mc_client_set_local_address(client, "127.0.0.1",
+        error, sizeof(error)) == 0);
+    const int opened = mc_client_open(client, "127.0.0.1", port,
+        MC_STATE_LOGIN, error, sizeof(error));
+    if (opened != 0) fprintf(stderr, "local source bind failed: %s\n", error);
+    assert(opened == 0);
+    assert(mc_client_set_local_address(client, "127.0.0.3",
+        error, sizeof(error)) != 0);
+    mc_client_destroy(client);
+    (void)close(listener);
+
+    int status = 0;
+    assert(waitpid(child, &status, 0) == child);
+    assert(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
 }
 
 static int run_server(McServer *server)
@@ -293,6 +376,8 @@ int main(void)
     assert(waitpid(status_child, &status, 0) == status_child);
     assert(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
 
-    puts("PASS explicit profile connect and exact status ping nonce");
+    check_local_address();
+
+    puts("PASS explicit profile connect, status nonce and local source bind");
     return EXIT_SUCCESS;
 }

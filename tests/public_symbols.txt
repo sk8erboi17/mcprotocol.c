@@ -40,6 +40,7 @@ mc_client_send_player_position
 mc_client_set_automatic_replies
 mc_client_set_backend
 mc_client_set_compression
+mc_client_set_local_address
 mc_client_set_creative_slot
 mc_client_set_creative_slot_damage
 mc_client_set_read_timeout

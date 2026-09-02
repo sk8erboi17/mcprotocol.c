@@ -2280,6 +2280,8 @@ struct McClient {
     unsigned int read_timeout_ms;
     McStreamTransforms transforms;
     McStreamDecoder *stream_decoder;
+    struct sockaddr_storage local_address;
+    socklen_t local_address_size;
     bool player_loaded_sent;
     bool server_side;
 #if defined(__linux__)
@@ -25039,7 +25041,9 @@ int mc_client_wait(McClient *client, unsigned int timeout_ms,
 /* Try every resolved address because localhost and real servers commonly
  * publish both IPv6 and IPv4. A failure in one address family must not prevent
  * a valid address later in the getaddrinfo() list from connecting. */
-static int connect_tcp(const char *host, uint16_t port, char *error, size_t size)
+static int connect_tcp(const char *host, uint16_t port,
+    const struct sockaddr_storage *local_address,
+    socklen_t local_address_size, char *error, size_t size)
 {
     char service[6];
     (void)snprintf(service, sizeof(service), "%u", (unsigned int)port);
@@ -25060,6 +25064,15 @@ static int connect_tcp(const char *host, uint16_t port, char *error, size_t size
         int socket_fd = socket(address->ai_family, address->ai_socktype,
             address->ai_protocol);
         if (socket_fd < 0) continue;
+        if (local_address_size != 0U
+            && (local_address == NULL
+                || local_address->ss_family != address->ai_family
+                || bind(socket_fd,
+                    (const struct sockaddr *)(const void *)local_address,
+                    local_address_size) != 0)) {
+            (void)close(socket_fd);
+            continue;
+        }
 #if defined(__APPLE__) && defined(SO_NOSIGPIPE)
         int enabled = 1;
         (void)setsockopt(socket_fd, SOL_SOCKET, SO_NOSIGPIPE,
@@ -25075,7 +25088,10 @@ static int connect_tcp(const char *host, uint16_t port, char *error, size_t size
         (void)close(socket_fd);
     }
     freeaddrinfo(addresses);
-    if (connected < 0) set_error(error, size, "Connessione TCP fallita: %s", strerror(errno));
+    if (connected < 0) set_error(error, size,
+        local_address_size == 0U ? "Connessione TCP fallita: %s"
+                                 : "Bind/connessione TCP fallita: %s",
+        strerror(errno));
     return connected;
 }
 
@@ -25783,6 +25799,37 @@ McClient *mc_client_create(int protocol, const McCallbacks *callbacks,
     client->ring.fd = -1;
 #endif
     return client;
+}
+
+int mc_client_set_local_address(McClient *client, const char *address,
+    char *error, size_t error_size)
+{
+    if (client == NULL || address == NULL || address[0] == '\0'
+        || atomic_load(&client->socket_fd) >= 0) {
+        set_error(error, error_size,
+            "L'indirizzo locale va configurato prima della connessione");
+        return -1;
+    }
+    struct sockaddr_storage local;
+    memset(&local, 0, sizeof(local));
+    socklen_t local_size = 0U;
+    struct sockaddr_in *ipv4 = (struct sockaddr_in *)(void *)&local;
+    struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)(void *)&local;
+    if (inet_pton(AF_INET, address, &ipv4->sin_addr) == 1) {
+        ipv4->sin_family = AF_INET;
+        ipv4->sin_port = htons(0U);
+        local_size = (socklen_t)sizeof(*ipv4);
+    } else if (inet_pton(AF_INET6, address, &ipv6->sin6_addr) == 1) {
+        ipv6->sin6_family = AF_INET6;
+        ipv6->sin6_port = htons(0U);
+        local_size = (socklen_t)sizeof(*ipv6);
+    } else {
+        set_error(error, error_size, "Indirizzo locale numerico non valido");
+        return -1;
+    }
+    client->local_address = local;
+    client->local_address_size = local_size;
+    return 0;
 }
 
 int mc_client_protocol(const McClient *client)
@@ -26560,7 +26607,12 @@ int mc_client_open(McClient *client, const char *host, uint16_t port,
     client->transforms = (McStreamTransforms){0};
     client->server_side = false;
     uint16_t effective_port = port == 0U ? MC_DEFAULT_PORT : port;
-    int socket_fd = connect_tcp(host, effective_port, error, error_size);
+    int socket_fd = connect_tcp(host,
+        effective_port,
+        client->local_address_size == 0U ? NULL : &client->local_address,
+        client->local_address_size,
+        error,
+        error_size);
     if (socket_fd < 0) return -1;
     atomic_store(&client->socket_fd, socket_fd);
     if (backend_init(client, socket_fd) != 0) {
@@ -26740,7 +26792,8 @@ static int status_ping_nonce(int protocol, const char *host, uint16_t port,
     if (client == NULL) return -1;
     client->read_timeout_ms = timeout_ms;
     uint16_t effective_port = port == 0U ? MC_DEFAULT_PORT : port;
-    int socket_fd = connect_tcp(host, effective_port, error, error_size);
+    int socket_fd = connect_tcp(host, effective_port, NULL, 0U,
+        error, error_size);
     if (socket_fd < 0) {
         mc_client_destroy(client);
         return -1;

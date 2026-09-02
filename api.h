@@ -2203,6 +2203,13 @@ McClient *mc_client_create(int protocol, const McCallbacks *callbacks,
     void *userdata, char *error, size_t error_size);
 void mc_client_destroy(McClient *client);
 
+/* Selects the numeric IPv4 or IPv6 source address used by subsequent outbound
+ * connects. This is useful for multi-source load and admission tests without
+ * exposing the socket descriptor. It must be configured before connecting;
+ * port selection remains owned by the operating system. */
+int mc_client_set_local_address(McClient *client, const char *address,
+    char *error, size_t error_size);
+
 /* A raw server validates the initial handshake and returns a normal McClient
  * representing the accepted peer. Named sends on that object resolve the
  * clientbound catalog; received callbacks contain serverbound packet IDs. */
