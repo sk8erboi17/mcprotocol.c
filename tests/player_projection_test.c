@@ -227,6 +227,68 @@ static void relative_movement_is_normalized_for_every_protocol(void)
     }
 }
 
+static void living_spawn_is_normalized_for_every_applicable_protocol(void)
+{
+    size_t count = 0U;
+    const int *protocols = mc_supported_protocols(&count);
+    const McUuid uuid = sample_uuid();
+    size_t applicable = 0U;
+    assert(protocols != NULL && count == 51U);
+    for (size_t index = 0U; index < count; ++index) {
+        const int protocol = protocols[index];
+        if (protocol > 758) continue;
+        ++applicable;
+        unsigned char storage[128] = {0};
+        McPacket body;
+        mc_packet_init(&body, storage, sizeof(storage));
+        assert(mc_packet_varint(&body, 300000));
+        if (protocol > 47) assert(mc_packet_uuid(&body, &uuid));
+        if (protocol <= 210) assert(mc_packet_u8(&body, 90U));
+        else assert(mc_packet_varint(&body, 90));
+        if (protocol <= 47) {
+            assert(mc_packet_i32(&body, 320));
+            assert(mc_packet_i32(&body, 640));
+            assert(mc_packet_i32(&body, -160));
+        } else {
+            assert(mc_packet_double(&body, 10.0));
+            assert(mc_packet_double(&body, 20.0));
+            assert(mc_packet_double(&body, -5.0));
+        }
+        assert(mc_packet_u8(&body, 64U));
+        assert(mc_packet_u8(&body, 32U));
+        assert(mc_packet_u8(&body, 16U));
+        assert(mc_packet_i16(&body, 800));
+        assert(mc_packet_i16(&body, -400));
+        assert(mc_packet_i16(&body, 0));
+        if (protocol <= 47) assert(mc_packet_u8(&body, UINT8_C(0x7f)));
+        else if (protocol <= 498) assert(mc_packet_u8(&body, UINT8_MAX));
+
+        McReader reader;
+        McClientboundLivingEntitySpawn spawn = {0};
+        mc_reader_init_mode(&reader, body.data, body.length,
+            MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_living_entity_spawn(
+            &reader, protocol, &spawn));
+        assert(mc_reader_finish(&reader));
+        assert(spawn.entity_id == 300000 && spawn.entity_type == 90);
+        assert(fabs(spawn.x - 10.0) < 1.0e-12);
+        assert(fabs(spawn.y - 20.0) < 1.0e-12);
+        assert(fabs(spawn.z + 5.0) < 1.0e-12);
+        assert(fabs(spawn.velocity_x - 0.1) < 1.0e-12);
+        assert(fabs(spawn.velocity_y + 0.05) < 1.0e-12);
+        assert(fabs(spawn.velocity_z) < 1.0e-12);
+        assert(fabsf(spawn.yaw - 90.0F) < 1.0e-6F);
+        assert(fabsf(spawn.pitch - 45.0F) < 1.0e-6F);
+        assert(fabsf(spawn.head_yaw - 22.5F) < 1.0e-6F);
+        assert(spawn.has_entity_uuid == (protocol > 47));
+        assert(spawn.fixed_point_position == (protocol <= 47));
+        assert(spawn.varint_entity_type == (protocol > 210));
+        assert(spawn.has_metadata == (protocol <= 498));
+        assert(spawn.metadata_entry_count == 0U);
+    }
+    assert(applicable == 33U);
+}
+
 static void malformed_player_projection_is_rejected(void)
 {
     const unsigned char invalid_mask[] = {UINT8_C(0x40), 0U};
@@ -246,6 +308,7 @@ int main(void)
 {
     player_info_is_normalized_for_every_protocol();
     relative_movement_is_normalized_for_every_protocol();
+    living_spawn_is_normalized_for_every_applicable_protocol();
     malformed_player_projection_is_rejected();
     puts("player projection tests passed");
     return 0;

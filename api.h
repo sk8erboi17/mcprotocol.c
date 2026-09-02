@@ -507,6 +507,34 @@ typedef struct {
     bool low_precision_velocity;
 } McClientboundEntitySpawn;
 
+/* Normalized Spawn Living Entity projection used through 1.18.2. The two
+ * pre-1.9 releases use fixed-point positions and no UUID; entity type widens
+ * from u8 to VarInt in 1.11, and inline metadata disappears in 1.15. */
+typedef struct {
+    int32_t entity_id;
+    int32_t entity_type;
+    McUuid entity_uuid;
+    McBytes metadata;
+    McBytes velocity_wire;
+    double x;
+    double y;
+    double z;
+    double velocity_x;
+    double velocity_y;
+    double velocity_z;
+    uint32_t metadata_entry_count;
+    uint8_t yaw_raw;
+    uint8_t pitch_raw;
+    uint8_t head_yaw_raw;
+    float yaw;
+    float pitch;
+    float head_yaw;
+    bool has_entity_uuid;
+    bool fixed_point_position;
+    bool varint_entity_type;
+    bool has_metadata;
+} McClientboundLivingEntitySpawn;
+
 /* Normalized object/generic entity spawn. Through 1.8 this is the historical
  * Spawn Object body with fixed-point coordinates and conditional velocity;
  * later releases add UUIDs, doubles, registry entity types and eventually the
@@ -1694,6 +1722,10 @@ bool mc_reader_clientbound_respawn(McReader *reader, int protocol,
  * entity spawn used by later releases. Packet IDs are excluded. */
 bool mc_reader_clientbound_entity_spawn(McReader *reader, int protocol,
     McClientboundEntitySpawn *value);
+/* Decodes the dedicated living-entity spawn packet present through protocol
+ * 758. Later releases use the generic entity-spawn decoder instead. */
+bool mc_reader_clientbound_living_entity_spawn(McReader *reader, int protocol,
+    McClientboundLivingEntitySpawn *value);
 /* Decodes Spawn Object/generic entity spawn independently from the dedicated
  * named-player packet used by historical releases. Packet IDs are excluded. */
 bool mc_reader_clientbound_object_spawn(McReader *reader, int protocol,
