@@ -513,6 +513,50 @@ static void test_chunk_envelopes_and_sections(void)
     }
 }
 
+static void test_indirect_chunk_palette_indexing(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    for (size_t protocol_index = 0U; protocol_index < protocol_count;
+         ++protocol_index) {
+        const int protocol = protocols[protocol_index];
+        if (protocol < 757) continue;
+
+        unsigned char bytes[4096];
+        McPacket packet;
+        mc_packet_init(&packet, bytes, sizeof(bytes));
+        assert(mc_packet_u16(&packet, 1U));
+        if (protocol >= 775) assert(mc_packet_u16(&packet, 0U));
+        assert(mc_packet_u8(&packet, 4U));
+        assert(mc_packet_varint(&packet, 2));
+        assert(mc_packet_varint(&packet, 85));
+        assert(mc_packet_varint(&packet, 30417));
+        if (protocol < 770) assert(mc_packet_varint(&packet, 256));
+        for (uint32_t word = 0U; word < 256U; ++word) {
+            assert(mc_packet_u64(&packet, word == 0U ? UINT64_C(0x10) : 0U));
+        }
+        assert(mc_packet_u8(&packet, 0U));
+        assert(mc_packet_varint(&packet, 39));
+        if (protocol < 770) assert(mc_packet_varint(&packet, 0));
+
+        const McChunkEnvelope chunk = {
+            .chunk_data = {packet.data, packet.length},
+        };
+        McChunkSectionIterator iterator;
+        McChunkSectionView section;
+        int32_t state_id = -1;
+        assert(mc_chunk_section_iterator_init(&chunk, protocol, 1U, &iterator));
+        assert(mc_chunk_section_iterator_next(&iterator, &section));
+        assert(section.block_palette_count == 2U);
+        assert(mc_chunk_section_block_state(&section, 0U, &state_id));
+        assert(state_id == 85);
+        assert(mc_chunk_section_block_state(&section, 1U, &state_id));
+        assert(state_id == 30417);
+        assert(iterator.remaining == 0U);
+        assert(mc_reader_finish(&iterator.reader));
+    }
+}
+
 int main(void)
 {
     test_entity_metadata();
@@ -520,6 +564,7 @@ int main(void)
     test_explosion_envelope();
     test_effects_respawn_and_chunk_unload();
     test_chunk_envelopes_and_sections();
+    test_indirect_chunk_palette_indexing();
     puts("PASS bounded Tier B envelopes and exact metadata decoding");
     return 0;
 }

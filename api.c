@@ -23176,7 +23176,7 @@ static bool typed_read_palette(McReader *reader, uint32_t entry_count,
         || decoded.bits > direct_max_bits) {
         return typed_invalid(reader);
     }
-    const size_t palette_start = reader->offset;
+    size_t palette_start = reader->offset;
     if (decoded.bits == 0U) {
         int32_t singleton = -1;
         if (!mc_reader_varint(reader, &singleton) || singleton < 0) {
@@ -23191,6 +23191,9 @@ static bool typed_read_palette(McReader *reader, uint32_t entry_count,
             return typed_invalid(reader);
         }
         decoded.palette_count = (uint32_t)count;
+        /* The borrowed palette contains entries only. Keeping the preceding
+         * count in this slice made indexed access read the count as entry 0. */
+        palette_start = reader->offset;
         for (int32_t index = 0; index < count; ++index) {
             int32_t entry = -1;
             if (!mc_reader_varint(reader, &entry) || entry < 0) {
