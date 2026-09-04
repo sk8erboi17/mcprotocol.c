@@ -23166,6 +23166,11 @@ static bool typed_decode_chunk(McReader *reader, int protocol,
         return true;
     }
 
+    /* Chunk Data packets are unconditionally full chunks from 1.18 onward;
+     * the historical ground-up flag no longer exists on the wire.  Preserve
+     * that semantic fact in the normalized envelope instead of leaving the
+     * zero-initialized field false. */
+    decoded.ground_up = true;
     if (protocol >= 770) {
         decoded.heightmap_format = MC_CHUNK_HEIGHTMAP_REGISTRY;
         if (!typed_read_registry_heightmaps(reader, &decoded.heightmaps)) {

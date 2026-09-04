@@ -491,6 +491,7 @@ static void test_chunk_envelopes_and_sections(void)
         assert_exact(protocol, "map_chunk", packet.data, packet.length);
 
         if (protocol >= 757) {
+            assert(decoded.chunk.ground_up);
             McChunkSectionIterator iterator;
             McChunkSectionView section;
             int32_t state_id = -1;
