@@ -506,10 +506,16 @@ static void test_chunk_envelopes_and_sections(void)
             assert(mc_chunk_section_block_state(&section, 0U, &state_id));
             assert(state_id == 0);
             assert(!mc_chunk_section_iterator_next(&iterator, &section));
-        } else {
+        } else if (protocol < 107) {
             McChunkSectionIterator iterator;
             assert(!mc_chunk_section_iterator_init(&decoded.chunk, protocol,
                 0U, &iterator));
+        } else {
+            McChunkSectionIterator iterator;
+            assert(mc_chunk_section_iterator_init(&decoded.chunk, protocol,
+                0U, &iterator));
+            assert(iterator.remaining == 0U);
+            assert(mc_reader_finish(&iterator.reader));
         }
     }
 }
@@ -558,6 +564,81 @@ static void test_indirect_chunk_palette_indexing(void)
     }
 }
 
+static bool bytes_equal_value(McBytes bytes, unsigned char value)
+{
+    for (size_t index = 0U; index < bytes.size; ++index) {
+        if (bytes.data[index] != value) return false;
+    }
+    return true;
+}
+
+static void test_legacy_chunk_section_views(void)
+{
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    for (size_t protocol_index = 0U; protocol_index < protocol_count;
+         ++protocol_index) {
+        const int protocol = protocols[protocol_index];
+        if (protocol < 107 || protocol >= 757) continue;
+
+        unsigned char bytes[8192];
+        McPacket packet;
+        mc_packet_init(&packet, bytes, sizeof(bytes));
+        if (protocol >= 477) assert(mc_packet_u16(&packet, 1U));
+        assert(mc_packet_u8(&packet, 5U));
+        assert(mc_packet_varint(&packet, 2));
+        assert(mc_packet_varint(&packet, 85));
+        assert(mc_packet_varint(&packet, 30417));
+
+        const bool padded = protocol >= 735;
+        const uint32_t long_count = padded ? 342U : 320U;
+        assert(mc_packet_varint(&packet, (int32_t)long_count));
+        for (uint32_t word = 0U; word < long_count; ++word) {
+            const uint64_t packed = padded
+                ? (word == 1U ? UINT64_C(1) : UINT64_C(0))
+                : (word == 0U ? UINT64_C(1) << 60U : UINT64_C(0));
+            assert(mc_packet_u64(&packet, packed));
+        }
+        if (protocol <= 404) {
+            unsigned char block_light[2048] = {0};
+            unsigned char sky_light[2048];
+            memset(sky_light, 0xff, sizeof(sky_light));
+            assert(mc_packet_bytes(&packet, block_light, sizeof(block_light)));
+            assert(mc_packet_bytes(&packet, sky_light, sizeof(sky_light)));
+        }
+
+        const McChunkEnvelope chunk = {
+            .chunk_data = {packet.data, packet.length},
+        };
+        McChunkSectionIterator iterator;
+        McChunkSectionView section;
+        int32_t state_id = -1;
+        assert(mc_chunk_section_iterator_init(&chunk, protocol, 1U, &iterator));
+        assert(mc_chunk_section_iterator_next(&iterator, &section));
+        assert(section.has_non_air_block_count == (protocol >= 477));
+        assert(section.non_air_block_count == (protocol >= 477 ? 1U : 0U));
+        assert(section.block_storage_padded == padded);
+        assert(section.block_bits_per_entry == 5U);
+        assert(section.block_palette_count == 2U);
+        assert(section.biome_palette_count == 0U);
+        assert(section.has_block_light == (protocol <= 404));
+        assert(section.has_sky_light == (protocol <= 404));
+        assert(section.block_light.size == (protocol <= 404 ? 2048U : 0U));
+        assert(section.sky_light.size == (protocol <= 404 ? 2048U : 0U));
+        assert(bytes_equal_value(section.block_light, 0U));
+        assert(bytes_equal_value(section.sky_light,
+            protocol <= 404 ? UINT8_C(0xff) : 0U));
+        assert(mc_chunk_section_block_state(&section, 0U, &state_id));
+        assert(state_id == 85);
+        assert(mc_chunk_section_block_state(&section, 12U, &state_id));
+        assert(state_id == 30417);
+        assert(mc_chunk_section_block_state(&section, 13U, &state_id));
+        assert(state_id == 85);
+        assert(iterator.remaining == 0U);
+        assert(mc_reader_finish(&iterator.reader));
+    }
+}
+
 int main(void)
 {
     test_entity_metadata();
@@ -566,6 +647,7 @@ int main(void)
     test_effects_respawn_and_chunk_unload();
     test_chunk_envelopes_and_sections();
     test_indirect_chunk_palette_indexing();
+    test_legacy_chunk_section_views();
     puts("PASS bounded Tier B envelopes and exact metadata decoding");
     return 0;
 }

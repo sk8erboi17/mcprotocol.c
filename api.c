@@ -23220,7 +23220,7 @@ typedef struct {
 
 static bool typed_read_palette(McReader *reader, uint32_t entry_count,
     uint8_t indirect_max_bits, uint8_t direct_max_bits,
-    bool fixed_storage, McTypedPalette *palette)
+    bool padded_storage, bool fixed_storage, McTypedPalette *palette)
 {
     McTypedPalette decoded = {0};
     if (!mc_reader_u8(reader, &decoded.bits)
@@ -23256,8 +23256,11 @@ static bool typed_read_palette(McReader *reader, uint32_t entry_count,
         reader->offset - palette_start};
     const uint32_t values_per_long = decoded.bits == 0U
         ? 0U : 64U / decoded.bits;
-    const uint32_t expected = values_per_long == 0U
-        ? 0U : (entry_count + values_per_long - 1U) / values_per_long;
+    const uint32_t expected = decoded.bits == 0U
+        ? 0U
+        : padded_storage
+            ? (entry_count + values_per_long - 1U) / values_per_long
+            : (entry_count * (uint32_t)decoded.bits + 63U) / 64U;
     uint32_t long_count = expected;
     if (!fixed_storage) {
         int32_t encoded_long_count = -1;
@@ -23287,7 +23290,7 @@ static bool typed_read_palette(McReader *reader, uint32_t entry_count,
 bool mc_chunk_section_iterator_init(const McChunkEnvelope *chunk, int protocol,
     uint32_t section_count, McChunkSectionIterator *iterator)
 {
-    if (chunk == NULL || iterator == NULL || protocol < 757
+    if (chunk == NULL || iterator == NULL || protocol < 107
         || !mc_protocol_supported(protocol)
         || section_count > MC_MAX_CHUNK_SECTIONS
         || (chunk->chunk_data.size != 0U && chunk->chunk_data.data == NULL)) {
@@ -23310,22 +23313,46 @@ bool mc_chunk_section_iterator_next(McChunkSectionIterator *iterator,
     }
     const size_t start = iterator->reader.offset;
     McChunkSectionView decoded = {0};
-    McTypedPalette blocks;
-    McTypedPalette biomes;
+    McTypedPalette blocks = {0};
+    McTypedPalette biomes = {0};
+    const bool has_non_air_block_count = iterator->protocol >= 477;
     const bool has_fluid_count = iterator->protocol >= 775;
+    const bool block_storage_padded = iterator->protocol >= 735;
     const bool fixed_storage = iterator->protocol >= 770;
-    if (!mc_reader_u16(&iterator->reader, &decoded.non_air_block_count)
-        || decoded.non_air_block_count > 4096U
+    if ((has_non_air_block_count
+            && (!mc_reader_u16(&iterator->reader,
+                    &decoded.non_air_block_count)
+                || decoded.non_air_block_count > 4096U))
         || (has_fluid_count
             && (!mc_reader_u16(&iterator->reader, &decoded.fluid_count)
                 || decoded.fluid_count > 4096U))
         || !typed_read_palette(&iterator->reader, 4096U, 8U, 15U,
-            fixed_storage, &blocks)
-        || !typed_read_palette(&iterator->reader, 64U, 3U, 6U,
-            fixed_storage, &biomes)) {
+            block_storage_padded, fixed_storage, &blocks)) {
         return typed_invalid(&iterator->reader);
     }
+    if (iterator->protocol <= 404) {
+        const size_t block_light_start = iterator->reader.offset;
+        if (!mc_reader_skip(&iterator->reader, 2048U)) {
+            return typed_invalid(&iterator->reader);
+        }
+        decoded.block_light = (McBytes){
+            iterator->reader.data + block_light_start, 2048U};
+        const size_t sky_light_start = iterator->reader.offset;
+        if (!mc_reader_skip(&iterator->reader, 2048U)) {
+            return typed_invalid(&iterator->reader);
+        }
+        decoded.sky_light = (McBytes){
+            iterator->reader.data + sky_light_start, 2048U};
+        decoded.has_block_light = true;
+        decoded.has_sky_light = true;
+    } else if (iterator->protocol >= 757
+        && !typed_read_palette(&iterator->reader, 64U, 3U, 6U,
+            true, fixed_storage, &biomes)) {
+        return typed_invalid(&iterator->reader);
+    }
+    decoded.has_non_air_block_count = has_non_air_block_count;
     decoded.has_fluid_count = has_fluid_count;
+    decoded.block_storage_padded = block_storage_padded;
     if (iterator->reader.mode == MC_DECODE_STRICT
         && blocks.bits > 0U && blocks.bits < 4U) {
         return typed_invalid(&iterator->reader);
@@ -23343,7 +23370,7 @@ bool mc_chunk_section_iterator_next(McChunkSectionIterator *iterator,
     decoded.encoded = (McBytes){iterator->reader.data + start,
         iterator->reader.offset - start};
     --iterator->remaining;
-    if (iterator->remaining == 0U
+    if (iterator->protocol >= 757 && iterator->remaining == 0U
         && mc_reader_remaining(&iterator->reader) != 0U) {
         return typed_invalid(&iterator->reader);
     }
@@ -23375,8 +23402,13 @@ bool mc_chunk_section_block_state(const McChunkSectionView *section,
             && typed_palette_entry(section->block_palette, 0U, state_id);
     }
     const uint32_t values_per_long = 64U / section->block_bits_per_entry;
-    const uint32_t word_index = block_index / values_per_long;
-    const uint32_t value_index = block_index % values_per_long;
+    const uint32_t bit_index = block_index
+        * (uint32_t)section->block_bits_per_entry;
+    const uint32_t word_index = section->block_storage_padded
+        ? block_index / values_per_long : bit_index / 64U;
+    const uint32_t shift = section->block_storage_padded
+        ? (block_index % values_per_long) * section->block_bits_per_entry
+        : bit_index % 64U;
     if (word_index >= section->block_long_count
         || section->block_data.size / 8U <= word_index) {
         return false;
@@ -23387,9 +23419,22 @@ bool mc_chunk_section_block_state(const McChunkSectionView *section,
     for (size_t index = 0U; index < 8U; ++index) {
         word = (word << 8U) | bytes[index];
     }
+    uint64_t packed = word >> shift;
+    if (!section->block_storage_padded
+        && shift + section->block_bits_per_entry > 64U) {
+        if (word_index + 1U >= section->block_long_count
+            || section->block_data.size / 8U <= word_index + 1U) {
+            return false;
+        }
+        const unsigned char *next_bytes = bytes + 8U;
+        uint64_t next_word = 0U;
+        for (size_t index = 0U; index < 8U; ++index) {
+            next_word = (next_word << 8U) | next_bytes[index];
+        }
+        packed |= next_word << (64U - shift);
+    }
     const uint64_t mask = (UINT64_C(1) << section->block_bits_per_entry) - 1U;
-    const uint32_t raw = (uint32_t)((word
-        >> (value_index * section->block_bits_per_entry)) & mask);
+    const uint32_t raw = (uint32_t)(packed & mask);
     if (section->block_palette_count == 0U) {
         if (raw > (uint32_t)INT32_MAX) return false;
         *state_id = (int32_t)raw;

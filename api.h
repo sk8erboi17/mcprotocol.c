@@ -1363,6 +1363,15 @@ typedef struct {
      * non-air block count. Older releases leave this absent and zero. */
     uint16_t fluid_count;
     bool has_fluid_count;
+    /* Section-local light arrays were embedded in chunk data through 1.13.2.
+     * Later releases project lighting through a separate/combined packet. */
+    McBytes block_light;
+    McBytes sky_light;
+    bool has_non_air_block_count;
+    bool has_block_light;
+    bool has_sky_light;
+    /* False for the continuous pre-1.16 bit stream, true for padded values. */
+    bool block_storage_padded;
 } McChunkSectionView;
 
 typedef struct {
@@ -1570,8 +1579,10 @@ bool mc_replay_reader_init(McReplayReader *reader, const void *data,
     size_t size, McError *error);
 bool mc_replay_reader_next(McReplayReader *reader, McReplayRecord *record);
 bool mc_replay_reader_finish(McReplayReader *reader);
-/* Modern (1.18+) section views are initialized with the dimension section
- * count supplied by the caller/profile. No 4096-entry array is materialized. */
+/* Palette-based (1.9+) section views are initialized with the section count
+ * supplied by the caller/profile. Legacy biome tails remain available through
+ * the iterator reader after the requested sections. No 4096-entry array is
+ * materialized. */
 bool mc_chunk_section_iterator_init(const McChunkEnvelope *chunk, int protocol,
     uint32_t section_count, McChunkSectionIterator *iterator);
 bool mc_chunk_section_iterator_next(McChunkSectionIterator *iterator,
