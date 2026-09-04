@@ -32,6 +32,7 @@ typedef union {
     McWindowItemsPacket window_items;
     McMultiBlockChangePacket multi_block;
     McEntityMetadataPacket metadata;
+    McTimeUpdatePacket time_update;
 } TestDecoded;
 
 static int32_t packet_id(int protocol, McPacketDirection direction,
@@ -592,6 +593,50 @@ static void test_clientbound_tier_a(void)
         assert(decoded.held.slot == 4);
         assert_exact_rejections(protocol, MC_PACKET_CLIENTBOUND,
             "held_item_slot", body.data, body.length);
+
+        mc_packet_init(&body, storage, sizeof(storage));
+        assert(mc_packet_i64(&body, 1200));
+        if (protocol < 775) {
+            assert(mc_packet_i64(&body, -6000));
+            if (protocol >= 768) assert(mc_packet_bool(&body, false));
+        } else {
+            assert(mc_packet_varint(&body, 2));
+            assert(mc_packet_varint(&body, 0));
+            assert(mc_packet_varlong(&body, 6000));
+            assert(mc_packet_float(&body, 0.0F));
+            assert(mc_packet_float(&body, 1.0F));
+            assert(mc_packet_varint(&body, 1));
+            assert(mc_packet_varlong(&body, 18000));
+            assert(mc_packet_float(&body, 0.5F));
+            assert(mc_packet_float(&body, -1.0F));
+        }
+        assert(decode(protocol, MC_PACKET_CLIENTBOUND, "update_time",
+            body.data, body.length, &decoded) == MC_FAMILY_UPDATE_TIME);
+        assert(decoded.time_update.age == 1200);
+        if (protocol < 775) {
+            assert(decoded.time_update.has_time_of_day);
+            assert(decoded.time_update.time_of_day == -6000);
+            assert(decoded.time_update.has_tick_day_time == (protocol >= 768));
+            if (protocol >= 768) assert(!decoded.time_update.tick_day_time);
+            assert(!decoded.time_update.has_clock_updates);
+        } else {
+            assert(!decoded.time_update.has_time_of_day);
+            assert(!decoded.time_update.has_tick_day_time);
+            assert(decoded.time_update.has_clock_updates);
+            assert(decoded.time_update.clock_update_count == 2U);
+            McClockUpdateIterator clocks;
+            McClockUpdate clock = {0};
+            assert(mc_time_update_iterator(&decoded.time_update, &clocks));
+            assert(mc_time_update_iterator_next(&clocks, &clock));
+            assert(clock.id == 0 && clock.total_ticks == 6000);
+            assert(clock.partial_tick == 0.0F && clock.rate == 1.0F);
+            assert(mc_time_update_iterator_next(&clocks, &clock));
+            assert(clock.id == 1 && clock.total_ticks == 18000);
+            assert(clock.partial_tick == 0.5F && clock.rate == -1.0F);
+            assert(!mc_time_update_iterator_next(&clocks, &clock));
+        }
+        assert_exact_rejections(protocol, MC_PACKET_CLIENTBOUND,
+            "update_time", body.data, body.length);
     }
 }
 

@@ -19,6 +19,8 @@ crafting and combat belong to the application.
   writers for the important Minecraft wire types;
 - stable structured errors, strict/Vanilla-compatible decoding and a pure
   exact-consumption dispatcher for typed packet families;
+- normalized allocation-free world-clock decoding across the historical,
+  explicit-day-tick and 26.1+ clock-map representations;
 - bounded incremental stream framing, canonical cross-version views,
   deterministic replay and borrowed inventory/chunk iterators;
 - zlib framing, ordered multi-packet batching and optional external stream

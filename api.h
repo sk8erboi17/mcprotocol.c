@@ -27,6 +27,7 @@ extern "C" {
 #define MC_MAX_PROFILE_PROPERTY_COUNT 1024U
 #define MC_MAX_ATTRIBUTE_COUNT 1024U
 #define MC_MAX_ATTRIBUTE_MODIFIER_COUNT 1024U
+#define MC_MAX_CLOCK_UPDATE_COUNT 1024U
 #define MC_MAX_CHUNK_SECTIONS 1024U
 #define MC_MAX_CHUNK_BLOCK_ENTITIES 65536U
 #define MC_MAX_CHUNK_LIGHT_ARRAYS 1024U
@@ -907,7 +908,8 @@ typedef enum {
     MC_FAMILY_RESPAWN,
     MC_FAMILY_GAME_STATE_CHANGE,
     /* Appended to preserve the stable numeric values of existing families. */
-    MC_FAMILY_JOIN_GAME
+    MC_FAMILY_JOIN_GAME,
+    MC_FAMILY_UPDATE_TIME
 } McPacketFamily;
 
 enum {
@@ -1317,6 +1319,33 @@ typedef struct {
     uint8_t reason;
     float value;
 } McGameStateChangePacket;
+
+/* Normalized clientbound world-clock update. Through 1.21.1 the packet has
+ * age/time_of_day only; 1.21.2-1.21.11 adds tick_day_time; 26.1+ replaces the
+ * single day-time value with a bounded list of named clocks. clock_updates is
+ * borrowed from the packet body and can be consumed with the iterator below. */
+typedef struct {
+    int64_t age;
+    int64_t time_of_day;
+    uint32_t clock_update_count;
+    McBytes clock_updates;
+    bool tick_day_time;
+    bool has_time_of_day;
+    bool has_tick_day_time;
+    bool has_clock_updates;
+} McTimeUpdatePacket;
+
+typedef struct {
+    int32_t id;
+    int64_t total_ticks;
+    float partial_tick;
+    float rate;
+} McClockUpdate;
+
+typedef struct {
+    McReader reader;
+    uint32_t remaining;
+} McClockUpdateIterator;
 
 typedef enum {
     MC_CHUNK_HEIGHTMAP_NONE = 0,
@@ -1792,6 +1821,14 @@ bool mc_uuid_iterator_next(McUuidIterator *iterator, McUuid *profile_id);
  * value with the public primitive readers. */
 bool mc_reader_clientbound_system_chat(McReader *reader, int protocol,
     McClientboundSystemChat *value);
+/* Decodes the release-aware clientbound update_time body. The clock iterator
+ * is available only for the 26.1+ clock-map representation. */
+bool mc_reader_clientbound_time_update(McReader *reader, int protocol,
+    McTimeUpdatePacket *value);
+bool mc_time_update_iterator(const McTimeUpdatePacket *packet,
+    McClockUpdateIterator *iterator);
+bool mc_time_update_iterator_next(McClockUpdateIterator *iterator,
+    McClockUpdate *clock);
 /* Decodes the three clientbound relative movement body variants. */
 bool mc_reader_clientbound_entity_move(McReader *reader, int protocol,
     McClientboundEntityMovement *value);

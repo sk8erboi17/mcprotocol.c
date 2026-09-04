@@ -141,6 +141,7 @@ mc_reader_clientbound_player_position
 mc_reader_clientbound_remove_entities
 mc_reader_clientbound_respawn
 mc_reader_clientbound_system_chat
+mc_reader_clientbound_time_update
 mc_reader_container_content
 mc_reader_container_open
 mc_reader_double
@@ -200,6 +201,8 @@ mc_stream_decoder_reset
 mc_stream_decoder_retained_size
 mc_stream_decoder_set_compression
 mc_supported_protocols
+mc_time_update_iterator
+mc_time_update_iterator_next
 mc_update_attributes_iterator
 mc_uuid_format
 mc_uuid_parse

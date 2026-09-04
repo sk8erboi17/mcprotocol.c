@@ -2588,6 +2588,7 @@ McPacketFamily mc_packet_family(int protocol, McState state,
         {"held_item_slot", MC_FAMILY_HELD_ITEM_SLOT},
         {"respawn", MC_FAMILY_RESPAWN},
         {"game_state_change", MC_FAMILY_GAME_STATE_CHANGE},
+        {"update_time", MC_FAMILY_UPDATE_TIME},
     };
     const char *name = mc_packet_name(protocol, state, direction, packet_id);
     if (name == NULL || state != MC_STATE_PLAY) return MC_FAMILY_UNKNOWN;
@@ -2613,7 +2614,8 @@ const char *mc_packet_family_name(McPacketFamily family)
         "entity_move_look", "entity_teleport", "entity_head_rotation",
         "entity_metadata", "attach_entity", "set_passengers", "block_change",
         "multi_block_change", "map_chunk", "unload_chunk", "set_slot",
-        "window_items", "respawn", "game_state_change", "join_game"
+        "window_items", "respawn", "game_state_change", "join_game",
+        "update_time"
     };
     const size_t count = sizeof(names) / sizeof(names[0]);
     return (int)family >= 0 && (size_t)family < count ? names[family] : "unknown";
@@ -2663,6 +2665,7 @@ size_t mc_packet_decoded_size(McPacketFamily family)
     case MC_FAMILY_RESPAWN: return sizeof(McRespawnPacket);
     case MC_FAMILY_GAME_STATE_CHANGE: return sizeof(McGameStateChangePacket);
     case MC_FAMILY_JOIN_GAME: return sizeof(McJoinGamePacket);
+    case MC_FAMILY_UPDATE_TIME: return sizeof(McTimeUpdatePacket);
     default: return 0U;
     }
 }
@@ -22616,6 +22619,95 @@ bool mc_reader_clientbound_system_chat(McReader *reader, int protocol,
     return true;
 }
 
+static bool reader_clock_update(McReader *reader, McClockUpdate *value)
+{
+    McClockUpdate decoded = {0};
+    if (!mc_reader_varint(reader, &decoded.id) || decoded.id < 0
+        || !mc_reader_varlong(reader, &decoded.total_ticks)
+        || !mc_reader_float(reader, &decoded.partial_tick)
+        || !mc_reader_float(reader, &decoded.rate)
+        || !isfinite(decoded.partial_tick) || !isfinite(decoded.rate)) {
+        return typed_invalid(reader);
+    }
+    if (value != NULL) *value = decoded;
+    return true;
+}
+
+bool mc_reader_clientbound_time_update(McReader *reader, int protocol,
+    McTimeUpdatePacket *value)
+{
+    McTimeUpdatePacket decoded = {0};
+    if (reader == NULL || value == NULL || !mc_protocol_supported(protocol)) {
+        if (reader != NULL) reader->failed = true;
+        return false;
+    }
+    if (!mc_reader_i64(reader, &decoded.age)) return false;
+    if (protocol < 775) {
+        if (!mc_reader_i64(reader, &decoded.time_of_day)) return false;
+        decoded.has_time_of_day = true;
+        if (protocol >= 768) {
+            if (!mc_reader_bool(reader, &decoded.tick_day_time)) return false;
+            decoded.has_tick_day_time = true;
+        }
+        *value = decoded;
+        return true;
+    }
+
+    int32_t count = -1;
+    if (!mc_reader_varint(reader, &count)
+        || !typed_count(reader, count, MC_MAX_CLOCK_UPDATE_COUNT)) {
+        return false;
+    }
+    decoded.clock_update_count = (uint32_t)count;
+    decoded.has_clock_updates = true;
+    const size_t start = reader->offset;
+    for (int32_t index = 0; index < count; ++index) {
+        if (!reader_clock_update(reader, NULL)) return false;
+    }
+    decoded.clock_updates = (McBytes){reader->data + start,
+        reader->offset - start};
+    *value = decoded;
+    return true;
+}
+
+bool mc_time_update_iterator(const McTimeUpdatePacket *packet,
+    McClockUpdateIterator *iterator)
+{
+    if (packet == NULL || iterator == NULL || !packet->has_clock_updates
+        || packet->has_time_of_day || packet->has_tick_day_time
+        || packet->clock_update_count > MC_MAX_CLOCK_UPDATE_COUNT
+        || (packet->clock_update_count == 0U
+            && packet->clock_updates.size != 0U)
+        || (packet->clock_update_count != 0U
+            && (packet->clock_updates.data == NULL
+                || packet->clock_updates.size == 0U))) {
+        return false;
+    }
+    *iterator = (McClockUpdateIterator){
+        .remaining = packet->clock_update_count,
+    };
+    mc_reader_init_mode(&iterator->reader, packet->clock_updates.data,
+        packet->clock_updates.size, MC_DECODE_STRICT, NULL);
+    return true;
+}
+
+bool mc_time_update_iterator_next(McClockUpdateIterator *iterator,
+    McClockUpdate *clock)
+{
+    if (iterator == NULL || clock == NULL || iterator->remaining == 0U) {
+        return false;
+    }
+    McClockUpdate decoded = {0};
+    if (!reader_clock_update(&iterator->reader, &decoded)) return false;
+    --iterator->remaining;
+    if (iterator->remaining == 0U
+        && mc_reader_remaining(&iterator->reader) != 0U) {
+        return typed_invalid(&iterator->reader);
+    }
+    *clock = decoded;
+    return true;
+}
+
 static bool reader_clientbound_entity_movement(McReader *reader,
     int protocol, bool carries_position, bool carries_rotation,
     McClientboundEntityMovement *value)
@@ -23481,6 +23573,7 @@ typedef union {
     McRespawnPacket respawn;
     McGameStateChangePacket game_state;
     McJoinGamePacket join_game;
+    McTimeUpdatePacket time_update;
     McChunkEnvelope chunk;
 } McTypedPacketStorage;
 
@@ -23567,6 +23660,8 @@ static bool typed_decode_dispatch(McReader *reader, int protocol,
         return typed_decode_game_state(reader, output);
     case MC_FAMILY_JOIN_GAME:
         return mc_reader_clientbound_join_game(reader, protocol, output);
+    case MC_FAMILY_UPDATE_TIME:
+        return mc_reader_clientbound_time_update(reader, protocol, output);
     case MC_FAMILY_MAP_CHUNK:
         return typed_decode_chunk(reader, protocol, output);
     default:
