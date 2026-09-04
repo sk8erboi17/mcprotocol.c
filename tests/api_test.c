@@ -1980,6 +1980,40 @@ static void close_windows_and_container_ids_are_versioned(void)
     assert(packet.length == 2U && packet.data[0] == 0x80U
         && packet.data[1] == 0x01U);
 
+    static const unsigned char close_1_21_1[] = {0x80U};
+    static const unsigned char close_1_21_3[] = {0x80U, 0x01U};
+    static const unsigned char close_26_2[] = {0x01U};
+    static const struct {
+        int protocol;
+        const unsigned char *body;
+        size_t body_size;
+        int32_t window_id;
+    } clientbound_cases[] = {
+        {767, close_1_21_1, sizeof(close_1_21_1), 128},
+        {768, close_1_21_3, sizeof(close_1_21_3), 128},
+        {776, close_26_2, sizeof(close_26_2), 1},
+    };
+    for (size_t index = 0U;
+            index < sizeof(clientbound_cases) / sizeof(clientbound_cases[0]);
+            ++index) {
+        const int32_t packet_id = mc_packet_id(clientbound_cases[index].protocol,
+            MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, "close_window");
+        assert(packet_id >= 0);
+        assert(mc_packet_family(clientbound_cases[index].protocol,
+            MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, packet_id) ==
+            MC_FAMILY_CLOSE_WINDOW);
+        McCloseWindowPacket decoded = {0};
+        McPacketFamily family = MC_FAMILY_UNKNOWN;
+        McError error;
+        assert(mc_decode_packet(clientbound_cases[index].protocol,
+            MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, packet_id,
+            clientbound_cases[index].body,
+            clientbound_cases[index].body_size, MC_DECODE_STRICT,
+            &decoded, sizeof(decoded), &family, &error) == 0);
+        assert(family == MC_FAMILY_CLOSE_WINDOW);
+        assert(decoded.window_id == clientbound_cases[index].window_id);
+    }
+
     const McEmptyWindowClick click = {
         .window_id = 128,
         .state_id = 17,
