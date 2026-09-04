@@ -44,6 +44,41 @@ static void status_packet_catalog_is_public(void)
     assert(status_count == sizeof(expected) / sizeof(expected[0]));
 }
 
+static void place_carrier_ids_match_release_sources(void)
+{
+    static const struct {
+        int protocol;
+        int32_t set_test_block;
+        int32_t update_sign;
+        int32_t test_instance_block_action;
+        int32_t block_place;
+    } expected[] = {
+        {770, 57, 58, 61, 62},
+        {771, 58, 59, 62, 63},
+        {772, 58, 59, 62, 63},
+        {773, 58, 59, 62, 63},
+        {774, 58, 59, 62, 63},
+        {775, 60, 61, 65, 66},
+        {776, 60, 61, 65, 66},
+    };
+    for (size_t index = 0U;
+            index < sizeof(expected) / sizeof(expected[0]); ++index) {
+        assert(mc_packet_id(expected[index].protocol,
+            MC_STATE_PLAY, MC_PACKET_SERVERBOUND,
+            "set_test_block") == expected[index].set_test_block);
+        assert(mc_packet_id(expected[index].protocol,
+            MC_STATE_PLAY, MC_PACKET_SERVERBOUND,
+            "update_sign") == expected[index].update_sign);
+        assert(mc_packet_id(expected[index].protocol,
+            MC_STATE_PLAY, MC_PACKET_SERVERBOUND,
+            "test_instance_block_action") ==
+            expected[index].test_instance_block_action);
+        assert(mc_packet_id(expected[index].protocol,
+            MC_STATE_PLAY, MC_PACKET_SERVERBOUND,
+            "block_place") == expected[index].block_place);
+    }
+}
+
 static void nbt_writer_validates_complete_values(void)
 {
     static const unsigned char compound[] = {10U, 0U};
@@ -2236,6 +2271,7 @@ int main(int argc, char **argv)
     }
     invalid_commands_fail_sticky();
     status_packet_catalog_is_public();
+    place_carrier_ids_match_release_sources();
     nbt_writer_validates_complete_values();
     length_prefixed_buffers_round_trip();
     expect_player_abilities(4);

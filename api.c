@@ -1614,7 +1614,7 @@ static const char *const packet_names_25_play_serverbound[] = {
     "advancement_tab", "select_trade", "set_beacon_effect", "held_item_slot",
     "update_command_block", "update_command_block_minecart", "set_creative_slot", "update_jigsaw_block",
     "update_structure_block", "set_test_block", "update_sign", "arm_animation",
-    "test_instance_block_action", "spectate", "block_place", "use_item",
+    "spectate", "test_instance_block_action", "block_place", "use_item",
 };
 
 static const char *const packet_names_25_play_clientbound[] = {
