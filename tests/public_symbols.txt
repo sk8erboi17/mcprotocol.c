@@ -122,6 +122,7 @@ mc_protocol_features
 mc_protocol_name
 mc_protocol_supported
 mc_reader_block_change
+mc_reader_clientbound_block_event
 mc_reader_bool
 mc_reader_buffer_i32
 mc_reader_buffer_varint

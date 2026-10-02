@@ -389,6 +389,89 @@ static void block_changes_are_versioned(void)
     assert(!mc_reader_block_change(NULL, 776, &position, &state_id));
 }
 
+static void clientbound_block_events_are_versioned(void)
+{
+    /* Independent golden bodies derived from the archived packet serializers;
+     * provenance and SHA-256 hashes are in fixtures/block_event_sources.tsv. */
+    static const unsigned char legacy[] = {
+        0xffU,0xffU,0xffU,0xf7U,0x00U,0x40U,0x00U,0x00U,0x00U,0x08U,
+        0xfeU,0xffU,0xc9U,0x01U,
+    };
+    static const unsigned char packed_xyz[] = {
+        0xffU,0xffU,0xfdU,0xc1U,0x00U,0x00U,0x00U,0x08U,
+        0xfeU,0xffU,0xc9U,0x01U,
+    };
+    static const unsigned char packed_xzy[] = {
+        0xffU,0xffU,0xfdU,0xc0U,0x00U,0x00U,0x8fU,0xc4U,
+        0xfeU,0xffU,0xc9U,0x01U,
+    };
+    size_t protocol_count = 0U;
+    const int *protocols = mc_supported_protocols(&protocol_count);
+    assert(protocols != NULL && protocol_count == 51U);
+    for (size_t index = 0U; index < protocol_count; ++index) {
+        const int protocol = protocols[index];
+        const unsigned char *body = protocol <= 5 ? legacy
+            : protocol < 477 ? packed_xyz : packed_xzy;
+        const size_t size = protocol <= 5 ? sizeof(legacy) : sizeof(packed_xyz);
+        McReader reader;
+        McClientboundBlockEvent decoded = {0};
+        mc_reader_init_mode(&reader, body, size, MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_block_event(&reader, protocol, &decoded));
+        assert(mc_reader_finish(&reader));
+        assert(decoded.position.x == -9 && decoded.position.z == 8);
+        assert(decoded.position.y == (protocol < 477 ? 64 : -60));
+        assert(decoded.action == 254U && decoded.parameter == 255U);
+        assert(decoded.block_id == 201);
+
+        unsigned char extended[20];
+        memcpy(extended, body, size);
+        extended[size - 2U] = 0x88U;
+        extended[size - 1U] = 0x27U; /* registry ID 5000 */
+        mc_reader_init_mode(&reader, extended, size, MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_block_event(&reader, protocol, &decoded));
+        assert(mc_reader_finish(&reader));
+        assert(decoded.block_id == (protocol <= 340 ? 904 : 5000));
+
+        for (size_t length = 0U; length < size; ++length) {
+            decoded = (McClientboundBlockEvent){{11, 12, 13}, 42, 9U, 10U};
+            mc_reader_init_mode(&reader, body, length, MC_DECODE_STRICT, NULL);
+            assert(!mc_reader_clientbound_block_event(&reader, protocol, &decoded));
+            assert(reader.failed);
+            assert(decoded.position.x == 11 && decoded.position.y == 12
+                && decoded.position.z == 13 && decoded.block_id == 42
+                && decoded.action == 9U && decoded.parameter == 10U);
+        }
+        memcpy(extended, body, size);
+        extended[size] = 0U;
+        mc_reader_init_mode(&reader, extended, size + 1U, MC_DECODE_STRICT, NULL);
+        assert(mc_reader_clientbound_block_event(&reader, protocol, &decoded));
+        assert(!mc_reader_finish(&reader));
+
+        memcpy(extended, body, size - 2U);
+        memset(extended + size - 2U, 0xff, 4U);
+        extended[size + 2U] = 0x0fU; /* negative registry ID */
+        mc_reader_init_mode(&reader, extended, size + 3U, MC_DECODE_STRICT, NULL);
+        assert(!mc_reader_clientbound_block_event(&reader, protocol, &decoded));
+        assert(reader.failed);
+    }
+    unsigned char signed_legacy[sizeof(legacy)];
+    memcpy(signed_legacy, legacy, sizeof(legacy));
+    signed_legacy[4] = 0xffU;
+    signed_legacy[5] = 0xc4U;
+    McReader reader;
+    McClientboundBlockEvent decoded = {0};
+    mc_reader_init(&reader, signed_legacy, sizeof(signed_legacy));
+    assert(mc_reader_clientbound_block_event(&reader, 5, &decoded));
+    assert(decoded.position.y == -60 && mc_reader_finish(&reader));
+    assert(!mc_reader_clientbound_block_event(NULL, 776, &decoded));
+    mc_reader_init(&reader, packed_xzy, sizeof(packed_xzy));
+    assert(!mc_reader_clientbound_block_event(&reader, 999, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, packed_xzy, sizeof(packed_xzy));
+    assert(!mc_reader_clientbound_block_event(&reader, 776, NULL));
+    assert(reader.failed);
+}
+
 static void client_information_bodies_match_node(void)
 {
     /* Bodies exclude the packet ID. They were serialized by the historical
@@ -2315,6 +2398,7 @@ int main(int argc, char **argv)
     attack_and_respawn_bodies_are_versioned();
     block_dig_bodies_are_versioned();
     block_changes_are_versioned();
+    clientbound_block_events_are_versioned();
     client_information_bodies_match_node();
     player_action_bodies_match_node();
     player_positions_are_versioned();

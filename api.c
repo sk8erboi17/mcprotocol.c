@@ -4535,6 +4535,44 @@ bool mc_reader_block_change(McReader *reader, int protocol,
     return true;
 }
 
+bool mc_reader_clientbound_block_event(McReader *reader, int protocol,
+    McClientboundBlockEvent *value)
+{
+    McClientboundBlockEvent decoded = {0};
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
+    if (!mc_protocol_supported(protocol)) {
+        return reader_fail_protocol(reader, MC_ERROR_UNSUPPORTED_PROTOCOL,
+            reader->offset, protocol);
+    }
+    if (protocol <= 5) {
+        int16_t y = 0;
+        if (!mc_reader_i32(reader, &decoded.position.x)
+            || !mc_reader_i16(reader, &y)
+            || !mc_reader_i32(reader, &decoded.position.z)) {
+            return false;
+        }
+        decoded.position.y = (int32_t)y;
+    } else if (!mc_reader_position(reader, protocol, &decoded.position)) {
+        return false;
+    }
+    if (!mc_reader_u8(reader, &decoded.action)
+        || !mc_reader_u8(reader, &decoded.parameter)
+        || !mc_reader_varint(reader, &decoded.block_id)) {
+        return false;
+    }
+    if (decoded.block_id < 0) {
+        return reader_fail_protocol(reader, MC_ERROR_INVALID_PACKET_BODY,
+            reader->offset, protocol);
+    }
+    if (protocol <= 340) decoded.block_id &= 4095;
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_uuid(McReader *reader, McUuid *value)
 {
     McBytes bytes;

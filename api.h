@@ -591,6 +591,16 @@ typedef struct {
     bool particle_after_common_fields;
 } McClientboundWorldParticles;
 
+/* Block Event uses signed i32/i16/i32 coordinates on 1.7 and release-aware
+ * packed positions thereafter. The two event bytes remain unsigned; block_id
+ * is the release's BLOCK registry ID, including the pre-1.13 12-bit mask. */
+typedef struct {
+    McPosition position;
+    int32_t block_id;
+    uint8_t action;
+    uint8_t parameter;
+} McClientboundBlockEvent;
+
 /* Borrowed encoded entity-ID list from entity_destroy. The decoder validates
  * every ID and count before publishing this view; use the iterator to consume
  * the release-specific fixed-i32 or VarInt representation without allocation. */
@@ -1791,6 +1801,10 @@ bool mc_reader_clientbound_object_spawn(McReader *reader, int protocol,
  * Particle-specific payload is validated and returned as a borrowed slice. */
 bool mc_reader_clientbound_world_particles(McReader *reader, int protocol,
     McClientboundWorldParticles *value);
+/* Decodes one block_action body without its packet ID. Output is published
+ * only on success; use mc_reader_finish to require exact body consumption. */
+bool mc_reader_clientbound_block_event(McReader *reader, int protocol,
+    McClientboundBlockEvent *value);
 /* Decodes one complete entity_destroy body and validates its bounded ID list.
  * Protocol 755 carries one uncounted ID; all layouts normalize to a count. */
 bool mc_reader_clientbound_remove_entities(McReader *reader, int protocol,

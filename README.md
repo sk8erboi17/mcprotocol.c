@@ -183,6 +183,7 @@ Available symmetric field codecs are:
 | `uuid` | 16 network bytes | player IDs, profiles and resource packs |
 | `position` | Release-aware packed block position | block use, digging and block updates |
 | `block_change` | Complete release-aware block-change body | authoritative block-state observations from 1.7 through current |
+| `clientbound_block_event` | Signed legacy or packed block position, two unsigned event bytes and release BLOCK registry ID | observing chest/shulker lid events across all supported releases |
 | `clientbound_player_position` | Release-aware correction body with normalized 1.7 feet Y, teleport/dismount boundaries and modern velocity deltas | observing authoritative movement and teleport responses |
 | `clientbound_respawn` | Release-aware dimension identity, world, spawn info, last-death location, portal/sea-level and keep-data fields | observing authoritative respawn and dimension-change projections |
 | `clientbound_player_info`, `clientbound_player_remove` | Bounded, allocation-free Player Info field/action normalization and UUID/name iterators | observing TAB add/update/remove across 1.7 through current |
