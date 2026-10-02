@@ -25847,8 +25847,13 @@ static bool typed_read_palette(McReader *reader, uint32_t entry_count,
         }
     }
     const size_t data_start = reader->offset;
-    if ((size_t)long_count > SIZE_MAX / 8U
-        || !mc_reader_skip(reader, (size_t)long_count * 8U)) {
+    /* Compute in size_t and verify the round trip instead of comparing the
+     * uint32_t count directly with SIZE_MAX.  On 64-bit builds GCC correctly
+     * observes that the old comparison can never be true, which turns the
+     * overflow guard into a -Wtype-limits error under -Werror. */
+    const size_t data_size = (size_t)long_count * 8U;
+    if (data_size / 8U != (size_t)long_count
+        || !mc_reader_skip(reader, data_size)) {
         return reader_fail(reader, MC_ERROR_INTEGER_OVERFLOW,
             reader->offset);
     }
@@ -27495,6 +27500,7 @@ static int backend_epoll(McClient *client, int socket_fd)
 
 static int backend_init(McClient *client, int socket_fd)
 {
+    (void)socket_fd;
     /* Prefer the native scalable interface, but retain poll as the portability
      * floor. Automatic fallback is safe here because all backends implement the
      * same one-socket readiness contract and no application state is lost. */
