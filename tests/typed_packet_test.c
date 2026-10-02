@@ -106,7 +106,7 @@ static void test_family_catalog(void)
 {
     size_t protocol_count = 0U;
     const int *protocols = mc_supported_protocols(&protocol_count);
-    assert(protocol_count == 51U);
+    assert(protocol_count == 52U);
     for (size_t protocol_index = 0U; protocol_index < protocol_count;
             ++protocol_index) {
         const int protocol = protocols[protocol_index];
@@ -362,18 +362,37 @@ static void test_serverbound_tier_a(void)
         }
 
         mc_packet_init(&body, storage, sizeof(storage));
+        /* 26.3 replaced SWING(hand) with the empty main-hand PUNCH. */
+        const char *swing = protocol >= 777 ? "punch" : "arm_animation";
         assert(mc_packet_arm_animation(&body, protocol, 7, 0));
-        assert(decode(protocol, MC_PACKET_SERVERBOUND, "arm_animation",
+        assert(decode(protocol, MC_PACKET_SERVERBOUND, swing,
             body.data, body.length, &decoded) == MC_FAMILY_ARM_ANIMATION);
-        assert_exact_rejections(protocol, MC_PACKET_SERVERBOUND,
-            "arm_animation", body.data, body.length);
+        if (protocol >= 777) {
+            assert(body.length == 0U && decoded.arm.hand == 0);
+            mc_packet_init(&body, storage, sizeof(storage));
+            assert(!mc_packet_arm_animation(&body, protocol, 7, 1));
+        } else {
+            assert_exact_rejections(protocol, MC_PACKET_SERVERBOUND,
+                swing, body.data, body.length);
+        }
 
         if (packet_id(protocol, MC_PACKET_SERVERBOUND, "teleport_confirm") >= 0) {
             mc_packet_init(&body, storage, sizeof(storage));
             assert(mc_packet_varint(&body, 44));
+            if (protocol >= 777) {
+                assert(mc_packet_double(&body, 1.5));
+                assert(mc_packet_double(&body, 70.0));
+                assert(mc_packet_double(&body, -2.5));
+                assert(mc_packet_float(&body, 45.0F));
+                assert(mc_packet_float(&body, -10.0F));
+            }
             assert(decode(protocol, MC_PACKET_SERVERBOUND, "teleport_confirm",
                 body.data, body.length, &decoded) == MC_FAMILY_TELEPORT_CONFIRM);
             assert(decoded.teleport.teleport_id == 44);
+            assert(decoded.teleport.has_position == (protocol >= 777));
+            if (protocol >= 777) {
+                assert(decoded.teleport.y == 70.0 && decoded.teleport.pitch == -10.0F);
+            }
             assert_exact_rejections(protocol, MC_PACKET_SERVERBOUND,
                 "teleport_confirm", body.data, body.length);
         }
@@ -425,6 +444,19 @@ static void encode_entity_move(McPacket *body, int protocol, bool rotation)
 {
     if (protocol <= 5) assert(mc_packet_i32(body, 9));
     else assert(mc_packet_varint(body, 9));
+    if (protocol >= 777) {
+        /* 26.3 VecDelta as ViaVersion writes it: one step, onGround in bit 0. */
+        assert(mc_packet_varint(body, (1 << 1) | 1));
+        assert(mc_packet_varint(body, 1));
+        assert(mc_packet_i16(body, 300));
+        assert(mc_packet_i16(body, -200));
+        assert(mc_packet_i16(body, 100));
+        if (rotation) {
+            assert(mc_packet_u8(body, 64U));
+            assert(mc_packet_u8(body, 32U));
+        }
+        return;
+    }
     if (protocol <= 47) {
         assert(mc_packet_i8(body, 3));
         assert(mc_packet_i8(body, -2));
@@ -524,12 +556,15 @@ static void test_clientbound_tier_a(void)
                 "sync_entity_position") >= 0) {
             mc_packet_init(&body, storage, sizeof(storage));
             assert(mc_packet_varint(&body, 9));
+            if (protocol >= 777) assert(mc_packet_varint(&body, 0)); /* linear path */
             assert(mc_packet_double(&body, 10.0));
             assert(mc_packet_double(&body, 65.0));
             assert(mc_packet_double(&body, -3.0));
-            assert(mc_packet_double(&body, 0.25));
-            assert(mc_packet_double(&body, -0.5));
-            assert(mc_packet_double(&body, 0.75));
+            if (protocol < 777) {
+                assert(mc_packet_double(&body, 0.25));
+                assert(mc_packet_double(&body, -0.5));
+                assert(mc_packet_double(&body, 0.75));
+            }
             assert(mc_packet_float(&body, 30.0F));
             assert(mc_packet_float(&body, 5.0F));
             assert(mc_packet_bool(&body, true));
@@ -537,8 +572,13 @@ static void test_clientbound_tier_a(void)
                 "sync_entity_position", body.data, body.length, &decoded)
                 == MC_FAMILY_ENTITY_TELEPORT);
             assert(decoded.entity_teleport.entity_id == 9);
-            assert(decoded.entity_teleport.delta_x == 0.25);
-            assert((decoded.entity_teleport.presence & MC_MOVE_HAS_DELTA) != 0U);
+            assert(decoded.entity_teleport.y == 65.0);
+            if (protocol < 777) {
+                assert(decoded.entity_teleport.delta_x == 0.25);
+                assert((decoded.entity_teleport.presence & MC_MOVE_HAS_DELTA) != 0U);
+            } else {
+                assert((decoded.entity_teleport.presence & MC_MOVE_HAS_DELTA) == 0U);
+            }
             assert_exact_rejections(protocol, MC_PACKET_CLIENTBOUND,
                 "sync_entity_position", body.data, body.length);
         }
@@ -839,6 +879,96 @@ static void test_inventory_and_multi_block(void)
     }
 }
 
+static void assert_metadata_value(int protocol, int32_t serializer,
+    const unsigned char *value, size_t value_size)
+{
+    unsigned char storage[128];
+    McPacket body;
+    mc_packet_init(&body, storage, sizeof(storage));
+    assert(mc_packet_varint(&body, 7));
+    assert(mc_packet_u8(&body, 5U));
+    assert(mc_packet_varint(&body, serializer));
+    for (size_t index = 0U; index < value_size; ++index) {
+        assert(mc_packet_u8(&body, value[index]));
+    }
+    assert(mc_packet_u8(&body, UINT8_MAX));
+
+    TestDecoded decoded;
+    assert(decode(protocol, MC_PACKET_CLIENTBOUND, "entity_metadata",
+        body.data, body.length, &decoded) == MC_FAMILY_ENTITY_METADATA);
+    assert(decoded.metadata.entity_id == 7);
+    assert(decoded.metadata.entry_count == 1U);
+    McEntityMetadataIterator iterator;
+    McEntityMetadataEntry entry;
+    assert(mc_entity_metadata_iterator(&decoded.metadata, protocol, &iterator));
+    assert(mc_entity_metadata_iterator_next(&iterator, &entry));
+    assert(entry.index == 5U);
+    assert(entry.serializer == serializer);
+    assert(entry.value.size == value_size);
+    assert(memcmp(entry.value.data, value, value_size) == 0);
+    assert(!mc_entity_metadata_iterator_next(&iterator, &entry));
+    assert_exact_rejections(protocol, MC_PACKET_CLIENTBOUND,
+        "entity_metadata", body.data, body.length);
+}
+
+static void test_metadata_serializer_removal(void)
+{
+    /* NBT disappeared from the serializer registry in 1.21.9, before 26.1.
+     * Keep both sides of that boundary and the later profiles in this test:
+     * their additional variants must not move the particle/villager prefix. */
+    static const unsigned char compound[] = {10U, 0U};
+    static const unsigned char particle[] = {5U};
+    static const unsigned char particles[] = {2U, 0U, 5U};
+    static const unsigned char empty_particles[] = {0U};
+    static const unsigned char villager[] = {2U, 5U, 1U};
+    assert_metadata_value(772, 16, compound, sizeof(compound));
+    static const int protocols[] = {772, 773, 774, 775, 776};
+    for (size_t index = 0U;
+            index < sizeof(protocols) / sizeof(protocols[0]); ++index) {
+        const int protocol = protocols[index];
+        const int32_t particle_type = protocol == 772 ? 17 : 16;
+        assert_metadata_value(protocol, particle_type, particle,
+            sizeof(particle));
+        assert_metadata_value(protocol, particle_type + 1, particles,
+            sizeof(particles));
+        assert_metadata_value(protocol, particle_type + 1, empty_particles,
+            sizeof(empty_particles));
+        assert_metadata_value(protocol, particle_type + 2, villager,
+            sizeof(villager));
+    }
+
+    /* Captured from a native villager during the private protocol-774 run.
+     * Serializer 18 is three villager VarInts, not a particle list. The HP
+     * entry before it also checks that the iterator keeps value boundaries. */
+    static const unsigned char captured[] = {
+        0xd3U, 0x02U, 9U, 3U, 0U, 0U, 0U, 0U,
+        20U, 18U, 2U, 5U, 1U, UINT8_MAX,
+    };
+    TestDecoded decoded;
+    assert(decode(774, MC_PACKET_CLIENTBOUND, "entity_metadata",
+        captured, sizeof(captured), &decoded) == MC_FAMILY_ENTITY_METADATA);
+    assert(decoded.metadata.entity_id == 339);
+    assert(decoded.metadata.entry_count == 2U);
+    McEntityMetadataIterator iterator;
+    McEntityMetadataEntry entry;
+    assert(mc_entity_metadata_iterator(&decoded.metadata, 774, &iterator));
+    assert(mc_entity_metadata_iterator_next(&iterator, &entry));
+    assert(entry.index == 9U && entry.serializer == 3);
+    assert(entry.value.size == 4U);
+    McReader health;
+    float value = -1.0f;
+    mc_reader_init(&health, entry.value.data, entry.value.size);
+    assert(mc_reader_float(&health, &value));
+    assert(value == 0.0f && mc_reader_remaining(&health) == 0U);
+    assert(mc_entity_metadata_iterator_next(&iterator, &entry));
+    assert(entry.index == 20U && entry.serializer == 18);
+    assert(entry.value.size == sizeof(villager));
+    assert(memcmp(entry.value.data, villager, sizeof(villager)) == 0);
+    assert(!mc_entity_metadata_iterator_next(&iterator, &entry));
+    assert_exact_rejections(774, MC_PACKET_CLIENTBOUND,
+        "entity_metadata", captured, sizeof(captured));
+}
+
 static void test_dispatch_errors(void)
 {
     TestDecoded decoded;
@@ -861,6 +991,7 @@ int main(void)
     test_serverbound_tier_a();
     test_clientbound_tier_a();
     test_inventory_and_multi_block();
+    test_metadata_serializer_removal();
     test_dispatch_errors();
     puts("PASS typed packet families, exact decoding and cross-version Tier A core");
     return 0;

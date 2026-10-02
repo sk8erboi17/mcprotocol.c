@@ -234,6 +234,7 @@ static void test_explosion_envelope(void)
             assert(mc_packet_varint(&packet, 0));
             assert(mc_packet_varint(&packet, 1));
             assert(mc_packet_varint(&packet, 0));
+            if (protocol >= 777) assert(mc_packet_bool(&packet, true)); /* playSound */
         } else if (protocol >= 768) {
             assert(mc_packet_bool(&packet, false));
             assert(mc_packet_varint(&packet, 0));
@@ -285,8 +286,12 @@ static void encode_respawn(McPacket *packet, int protocol)
     }
     assert(mc_packet_string(packet, "minecraft:overworld"));
     assert(mc_packet_i64(packet, 123));
-    assert(mc_packet_u8(packet, 1U));
-    assert(mc_packet_u8(packet, UINT8_MAX));
+    assert(mc_packet_u8(packet, 1U)); /* 777: VarInt 1, the same byte. */
+    if (protocol >= 777) {
+        assert(mc_packet_varint(packet, 0)); /* OptVarInt: no previous mode. */
+    } else {
+        assert(mc_packet_u8(packet, UINT8_MAX));
+    }
     assert(mc_packet_bool(packet, false));
     assert(mc_packet_bool(packet, false));
     if (protocol < 759) {
@@ -470,6 +475,41 @@ static void encode_chunk(McPacket *packet, int protocol)
     assert(mc_packet_varint(packet, 0));
 }
 
+/* 26.3 (777) light masks are BitSet byte arrays: a non-empty trimmed mask
+ * decodes, an untrimmed one (trailing zero byte) is rejected in strict mode,
+ * and the 776 long-array reading of the same bytes does not apply. */
+static void test_777_light_masks(void)
+{
+    static const unsigned char section[] = {0U, 0U, 0U, 7U, 0U, 0U, 0U, 0U};
+    for (int trailing = 0; trailing <= 1; ++trailing) {
+        unsigned char bytes[2400];
+        McPacket packet;
+        mc_packet_init(&packet, bytes, sizeof(bytes));
+        assert(mc_packet_i32(&packet, 3) && mc_packet_i32(&packet, -2));
+        assert(mc_packet_varint(&packet, 0)); /* registry heightmaps */
+        assert(mc_packet_buffer_varint(&packet, &(McBytes){section, sizeof(section)}));
+        assert(mc_packet_varint(&packet, 0)); /* block entities */
+        assert(mc_packet_varint(&packet, trailing ? 2 : 1)); /* sky mask */
+        assert(mc_packet_u8(&packet, 0x02U));
+        if (trailing) assert(mc_packet_u8(&packet, 0x00U));
+        for (int mask = 0; mask < 3; ++mask) assert(mc_packet_varint(&packet, 0));
+        unsigned char light[2048];
+        memset(light, 0xff, sizeof(light));
+        assert(mc_packet_varint(&packet, 1));
+        assert(mc_packet_buffer_varint(&packet, &(McBytes){light, sizeof(light)}));
+        assert(mc_packet_varint(&packet, 0));
+        assert(!packet.failed);
+        EnvelopeStorage decoded;
+        McPacketFamily family = MC_FAMILY_UNKNOWN;
+        McError error;
+        const int result = mc_decode_packet(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND,
+            packet_id(777, "map_chunk"), packet.data, packet.length,
+            MC_DECODE_STRICT, &decoded, sizeof(decoded), &family, &error);
+        assert((result == 0) == (trailing == 0));
+        if (result == 0) assert(decoded.chunk.sky_light_count == 1U);
+    }
+}
+
 static void test_chunk_envelopes_and_sections(void)
 {
     size_t protocol_count = 0U;
@@ -646,6 +686,7 @@ int main(void)
     test_explosion_envelope();
     test_effects_respawn_and_chunk_unload();
     test_chunk_envelopes_and_sections();
+    test_777_light_masks();
     test_indirect_chunk_palette_indexing();
     test_legacy_chunk_section_views();
     puts("PASS bounded Tier B envelopes and exact metadata decoding");

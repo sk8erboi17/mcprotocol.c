@@ -21,12 +21,24 @@ static const McUuid PROFILE_ID = {{
 }};
 
 typedef struct ServerObservation {
+    int protocol;
     bool login_start;
     bool login_acknowledged;
     bool settings;
     bool configuration_finished;
+    bool known_packs_echoed;
+    int teleport_confirms;
+    double confirmed_x;
+    double confirmed_y;
+    float confirmed_yaw;
     bool valid;
 } ServerObservation;
+
+/* Clientbound select_known_packs body used by the 777 scenario. */
+static const unsigned char KNOWN_PACKS[] = {
+    0x01U, 0x09U, 'm', 'i', 'n', 'e', 'c', 'r', 'a', 'f', 't',
+    0x04U, 'c', 'o', 'r', 'e', 0x04U, '2', '6', '.', '3',
+};
 
 typedef struct StatusObservation {
     bool request;
@@ -84,8 +96,8 @@ static void observe_serverbound(void *userdata, McState state, int32_t packet_id
     const unsigned char *payload, size_t payload_size)
 {
     ServerObservation *observation = userdata;
-    const char *name = mc_packet_name(
-        776, state, MC_PACKET_SERVERBOUND, packet_id);
+    const char *name = observation == NULL ? NULL : mc_packet_name(
+        observation->protocol, state, MC_PACKET_SERVERBOUND, packet_id);
     if (observation == NULL || name == NULL || !observation->valid) return;
     if (state == MC_STATE_LOGIN && strcmp(name, "login_start") == 0) {
         observation->login_start = true;
@@ -102,6 +114,31 @@ static void observe_serverbound(void *userdata, McState state, int32_t packet_id
             && strcmp(name, "finish_configuration") == 0) {
         observation->configuration_finished = payload_size == 0U;
         observation->valid = observation->configuration_finished;
+    } else if (state == MC_STATE_CONFIGURATION
+            && strcmp(name, "select_known_packs") == 0) {
+        /* 776+ echoes the concrete pack list instead of an empty selection. */
+        observation->known_packs_echoed = payload_size == sizeof(KNOWN_PACKS)
+            && memcmp(payload, KNOWN_PACKS, sizeof(KNOWN_PACKS)) == 0;
+        observation->valid = observation->known_packs_echoed;
+    } else if (state == MC_STATE_PLAY
+            && strcmp(name, "teleport_confirm") == 0) {
+        /* 777 ACCEPT_TELEPORTATION: id, then the accepted absolute pose. */
+        McReader reader;
+        int32_t id = -1;
+        double z = 0.0;
+        float pitch = 0.0F;
+        mc_reader_init_mode(&reader, payload, payload_size,
+            MC_DECODE_STRICT, NULL);
+        observation->valid = mc_reader_varint(&reader, &id)
+            && id == (observation->teleport_confirms < 2
+                ? 7 + observation->teleport_confirms : -9)
+            && mc_reader_double(&reader, &observation->confirmed_x)
+            && mc_reader_double(&reader, &observation->confirmed_y)
+            && mc_reader_double(&reader, &z) && z == -4.0
+            && mc_reader_float(&reader, &observation->confirmed_yaw)
+            && mc_reader_float(&reader, &pitch) && pitch == 10.0F
+            && mc_reader_finish(&reader);
+        observation->teleport_confirms++;
     }
 }
 
@@ -227,9 +264,104 @@ static void check_local_address(void)
     assert(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
 }
 
+static bool send_position(McClient *peer, int32_t teleport_id, double x,
+    float yaw, int32_t flags, char *error, size_t error_size)
+{
+    unsigned char storage[96];
+    McPacket position;
+    mc_packet_init(&position, storage, sizeof(storage));
+    return mc_packet_varint(&position, teleport_id)
+        && mc_packet_double(&position, x)
+        && mc_packet_double(&position, 70.0)
+        && mc_packet_double(&position, -4.0)
+        && mc_packet_double(&position, 0.0)
+        && mc_packet_double(&position, 0.0)
+        && mc_packet_double(&position, 0.0)
+        && mc_packet_float(&position, yaw)
+        && mc_packet_float(&position, 10.0F)
+        && mc_packet_i32(&position, flags)
+        && mc_client_send_named(peer, "position", position.data,
+            position.length, error, error_size) == 0;
+}
+
+/* 26.3: the clientbound known-packs ID moved (POST_EFFECTS inserted) and
+ * teleport_confirm carries the accepted position, with relative axes resolved
+ * against the previous absolute position. */
+static int run_server_777(McServer *server)
+{
+    ServerObservation observation = {.protocol = 777, .valid = true};
+    const McCallbacks callbacks = {.on_packet = observe_serverbound};
+    McClient *peer = NULL;
+    McHandshake handshake = {0};
+    char error[256] = {0};
+    unsigned char storage[128];
+    McPacket success;
+    mc_packet_init(&success, storage, sizeof(storage));
+    if (mc_server_accept(server, 5000U, &callbacks, &observation, &peer,
+            &handshake, error, sizeof(error)) != 1
+        || handshake.protocol != 777 || handshake.next_state != MC_STATE_LOGIN
+        || poll_until(peer, &observation.login_start, error, sizeof(error)) != 0
+        || !mc_packet_uuid(&success, &PROFILE_ID)
+        || !mc_packet_string(&success, "ProfileClient")
+        || !mc_packet_varint(&success, 0)
+        || mc_client_send_named(peer, "success", success.data, success.length,
+            error, sizeof(error)) != 0
+        || poll_until(peer, &observation.login_acknowledged,
+            error, sizeof(error)) != 0
+        || mc_client_set_state(peer, MC_STATE_CONFIGURATION,
+            error, sizeof(error)) != 0
+        || mc_packet_id(777, MC_STATE_CONFIGURATION, MC_PACKET_CLIENTBOUND,
+            "select_known_packs") != 0x0f
+        || mc_client_send_named(peer, "select_known_packs", KNOWN_PACKS,
+            sizeof(KNOWN_PACKS), error, sizeof(error)) != 0
+        || poll_until(peer, &observation.known_packs_echoed,
+            error, sizeof(error)) != 0
+        || mc_client_send_named(peer, "finish_configuration", NULL, 0U,
+            error, sizeof(error)) != 0
+        || poll_until(peer, &observation.configuration_finished,
+            error, sizeof(error)) != 0
+        || !observation.settings
+        || mc_client_set_state(peer, MC_STATE_PLAY, error, sizeof(error)) != 0
+        || !send_position(peer, 7, 3.5, 90.0F, 0, error, sizeof(error))) {
+        fprintf(stderr, "777 profile server failed: %s\n", error);
+        mc_client_destroy(peer);
+        return EXIT_FAILURE;
+    }
+    bool first = false;
+    for (int attempt = 0; attempt < 100 && observation.teleport_confirms < 1; ++attempt) {
+        if (mc_client_poll(peer, 50, error, sizeof(error)) < 0) break;
+    }
+    first = observation.valid && observation.teleport_confirms == 1
+        && observation.confirmed_x == 3.5 && observation.confirmed_yaw == 90.0F;
+    /* Relative X (bit 0) and yaw (bit 3): the client must echo absolutes. */
+    if (!first || !send_position(peer, 8, 2.0, 5.0F, 0x01 | 0x08,
+            error, sizeof(error))) {
+        fprintf(stderr, "777 first teleport failed: %s\n", error);
+        mc_client_destroy(peer);
+        return EXIT_FAILURE;
+    }
+    for (int attempt = 0; attempt < 100 && observation.teleport_confirms < 2; ++attempt) {
+        if (mc_client_poll(peer, 50, error, sizeof(error)) < 0) break;
+    }
+    bool ok = observation.valid && observation.teleport_confirms == 2
+        && observation.confirmed_x == 5.5 && observation.confirmed_y == 70.0
+        && observation.confirmed_yaw == 95.0F;
+    /* Plugins send silent client-only corrections with negative IDs; vanilla
+     * accepts and echoes them, so the client must not drop the connection. */
+    if (ok && !send_position(peer, -9, 1.0, 45.0F, 0, error, sizeof(error))) ok = false;
+    for (int attempt = 0; ok && attempt < 100 && observation.teleport_confirms < 3; ++attempt) {
+        if (mc_client_poll(peer, 50, error, sizeof(error)) < 0) break;
+    }
+    ok = ok && observation.valid && observation.teleport_confirms == 3
+        && observation.confirmed_x == 1.0 && observation.confirmed_yaw == 45.0F;
+    mc_client_destroy(peer);
+    if (!ok) fprintf(stderr, "777 relative or negative-ID teleport failed\n");
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
 static int run_server(McServer *server)
 {
-    ServerObservation observation = {.valid = true};
+    ServerObservation observation = {.protocol = 776, .valid = true};
     const McCallbacks callbacks = {.on_packet = observe_serverbound};
     McClient *peer = NULL;
     McHandshake handshake = {0};
@@ -387,8 +519,32 @@ int main(void)
     assert(waitpid(status_child, &status, 0) == status_child);
     assert(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
 
+    server = mc_server_create("127.0.0.1", 0U, 1, error, sizeof(error));
+    assert(server != NULL);
+    const uint16_t port_777 = mc_server_port(server);
+    const pid_t child_777 = fork();
+    assert(child_777 >= 0);
+    if (child_777 == 0) {
+        const int result = run_server_777(server);
+        mc_server_destroy(server);
+        _exit(result);
+    }
+    McClient *client_777 = mc_client_create(777, NULL, NULL, error, sizeof(error));
+    assert(client_777 != NULL);
+    assert(mc_client_connect_profile(client_777, "127.0.0.1", port_777,
+        "ProfileClient", &PROFILE_ID, &information, error, sizeof(error)) == 0);
+    assert(mc_client_state(client_777) == MC_STATE_PLAY);
+    /* Serve the two Player Position packets until the peer closes. */
+    for (int attempt = 0; attempt < 200; ++attempt) {
+        if (mc_client_poll(client_777, 25, error, sizeof(error)) < 0) break;
+    }
+    mc_client_destroy(client_777);
+    mc_server_destroy(server);
+    assert(waitpid(child_777, &status, 0) == child_777);
+    assert(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
+
     check_local_address();
 
-    puts("PASS explicit profile connect, status nonce and local source bind");
+    puts("PASS explicit profile connect (776, 777), status nonce and local source bind");
     return EXIT_SUCCESS;
 }

@@ -589,6 +589,12 @@ typedef struct {
     bool has_always_show;
     bool double_precision_position;
     bool particle_after_common_fields;
+    /* Protocol 777+: maximum speed per axis (speed is the X axis), the count
+     * becomes a VarInt and a randomization mode (0 default) follows it. */
+    float speed_y;
+    float speed_z;
+    int32_t randomization;
+    bool has_axis_speed;
 } McClientboundWorldParticles;
 
 /* Block Event uses signed i32/i16/i32 coordinates on 1.7 and release-aware
@@ -726,6 +732,8 @@ typedef struct {
     bool has_position;
     bool has_rotation;
     bool has_on_ground;
+    /* Protocol 777+: number of stepped deltas summed into delta_* (0 = linear). */
+    uint32_t step_count;
 } McClientboundEntityMovement;
 
 typedef struct {
@@ -999,6 +1007,13 @@ typedef struct {
 
 typedef struct {
     int32_t teleport_id;
+    /* Protocol 777+ echoes the absolute position the client accepted. */
+    double x;
+    double y;
+    double z;
+    float yaw;
+    float pitch;
+    bool has_position;
 } McTeleportConfirmPacket;
 
 typedef struct {
@@ -1039,6 +1054,9 @@ typedef struct {
     float pitch;
     bool on_ground;
     uint32_t presence;
+    /* Protocol 777+: stepped deltas summed into delta_* (0 = linear). The
+     * int16 raw fields saturate if the sum exceeds one wire short. */
+    uint32_t step_count;
 } McEntityMovePacket;
 
 typedef struct {
@@ -1055,6 +1073,9 @@ typedef struct {
     float pitch;
     bool on_ground;
     uint32_t presence;
+    /* Protocol 777+ sync_entity_position: 0 = linear path, otherwise the
+     * number of stepped points; x/y/z hold the final point. */
+    uint32_t step_count;
 } McEntityTeleportPacket;
 
 typedef struct {

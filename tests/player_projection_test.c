@@ -78,7 +78,7 @@ static void player_info_is_normalized_for_every_protocol(void)
     size_t count = 0U;
     const int *protocols = mc_supported_protocols(&count);
     const McUuid uuid = sample_uuid();
-    assert(protocols != NULL && count == 51U);
+    assert(protocols != NULL && count == 52U);
     for (size_t index = 0U; index < count; ++index) {
         const int protocol = protocols[index];
         unsigned char storage[512] = {0};
@@ -159,6 +159,29 @@ static void append_entity_movement(McPacket *packet, int protocol,
 {
     if (protocol <= 5) assert(mc_packet_i32(packet, 42));
     else assert(mc_packet_varint(packet, 42));
+    if (protocol >= 777) {
+        /* 26.3: onGround moves into the VecDelta properties (position
+         * packets, here two steps summing to the same delta) or before the
+         * rotation bytes (entity_look). */
+        if (position) {
+            assert(mc_packet_varint(packet, (2 << 1) | 1));
+            assert(mc_packet_varint(packet, 1));
+            assert(mc_packet_i16(packet, 3072));
+            assert(mc_packet_i16(packet, -2048));
+            assert(mc_packet_i16(packet, 0));
+            assert(mc_packet_varint(packet, 2));
+            assert(mc_packet_i16(packet, 1024));
+            assert(mc_packet_i16(packet, 0));
+            assert(mc_packet_i16(packet, 0));
+        } else {
+            assert(mc_packet_bool(packet, true));
+        }
+        if (rotation) {
+            assert(mc_packet_u8(packet, 64U));
+            assert(mc_packet_u8(packet, 32U));
+        }
+        return;
+    }
     if (position && protocol <= 47) {
         assert(mc_packet_i8(packet, 32));
         assert(mc_packet_i8(packet, -16));
@@ -184,6 +207,7 @@ static void assert_movement(const McClientboundEntityMovement *movement,
     assert(movement->has_on_ground == (protocol > 5));
     if (protocol > 5) assert(movement->on_ground);
     if (position) {
+        assert(movement->step_count == (protocol >= 777 ? 2U : 0U));
         assert(fabs(movement->delta_x - 1.0) < 1.0e-12);
         assert(fabs(movement->delta_y + 0.5) < 1.0e-12);
         assert(fabs(movement->delta_z) < 1.0e-12);
@@ -198,13 +222,13 @@ static void relative_movement_is_normalized_for_every_protocol(void)
 {
     size_t count = 0U;
     const int *protocols = mc_supported_protocols(&count);
-    assert(protocols != NULL && count == 51U);
+    assert(protocols != NULL && count == 52U);
     for (size_t index = 0U; index < count; ++index) {
         const int protocol = protocols[index];
         for (unsigned int kind = 0U; kind < 3U; ++kind) {
             const bool position = kind != 2U;
             const bool rotation = kind != 0U;
-            unsigned char storage[32] = {0};
+            unsigned char storage[48] = {0};
             McPacket body;
             mc_packet_init(&body, storage, sizeof(storage));
             append_entity_movement(&body, protocol, position, rotation);
@@ -232,7 +256,7 @@ static void system_chat_is_normalized_for_every_protocol(void)
     size_t count = 0U;
     const int *protocols = mc_supported_protocols(&count);
     const McUuid sender = sample_uuid();
-    assert(protocols != NULL && count == 51U);
+    assert(protocols != NULL && count == 52U);
     for (size_t index = 0U; index < count; ++index) {
         const int protocol = protocols[index];
         unsigned char storage[128] = {0};
@@ -287,7 +311,7 @@ static void living_spawn_is_normalized_for_every_applicable_protocol(void)
     const int *protocols = mc_supported_protocols(&count);
     const McUuid uuid = sample_uuid();
     size_t applicable = 0U;
-    assert(protocols != NULL && count == 51U);
+    assert(protocols != NULL && count == 52U);
     for (size_t index = 0U; index < count; ++index) {
         const int protocol = protocols[index];
         if (protocol > 758) continue;

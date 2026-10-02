@@ -392,7 +392,10 @@ static void block_changes_are_versioned(void)
 static void clientbound_block_events_are_versioned(void)
 {
     /* Independent golden bodies derived from the archived packet serializers;
-     * provenance and SHA-256 hashes are in fixtures/block_event_sources.tsv. */
+     * provenance and SHA-256 hashes are in fixtures/block_event_sources.tsv.
+     * Protocol 777 (26.3) has no archived client sources: ViaVersion 5.12.0
+     * only re-IDs this packet, so its body keeps the 776 packed_xzy layout
+     * (schema/derived/26.3-wire-delta.md, "Packet bodies that changed"). */
     static const unsigned char legacy[] = {
         0xffU,0xffU,0xffU,0xf7U,0x00U,0x40U,0x00U,0x00U,0x00U,0x08U,
         0xfeU,0xffU,0xc9U,0x01U,
@@ -407,7 +410,7 @@ static void clientbound_block_events_are_versioned(void)
     };
     size_t protocol_count = 0U;
     const int *protocols = mc_supported_protocols(&protocol_count);
-    assert(protocols != NULL && protocol_count == 51U);
+    assert(protocols != NULL && protocol_count == 52U);
     for (size_t index = 0U; index < protocol_count; ++index) {
         const int protocol = protocols[index];
         const unsigned char *body = protocol <= 5 ? legacy
@@ -475,12 +478,14 @@ static void clientbound_block_events_are_versioned(void)
 static void container_data_bodies_are_versioned(void)
 {
     /* Independent signed-short/unsigned-ID golden bodies. The archived
-     * sources and buffer hashes are in fixtures/container_data_sources.tsv. */
+     * sources and buffer hashes are in fixtures/container_data_sources.tsv.
+     * Protocol 777 (26.3) only re-IDs this packet in ViaVersion 5.12.0, so it
+     * keeps the 776 VarInt container ID (schema/derived/26.3-wire-delta.md). */
     static const unsigned char byte_id[] = {0xc8U,0xffU,0xfeU,0x80U,0x00U};
     static const unsigned char varint_id[] = {0xc8U,0x01U,0xffU,0xfeU,0x80U,0x00U};
     size_t count = 0U;
     const int *protocols = mc_supported_protocols(&count);
-    assert(protocols != NULL && count == 51U);
+    assert(protocols != NULL && count == 52U);
     for (size_t index = 0U; index < count; ++index) {
         const int protocol = protocols[index];
         const unsigned char *body = protocol >= 768 ? varint_id : byte_id;
@@ -837,8 +842,12 @@ static void build_clientbound_respawn_body(McPacket *packet, int protocol,
         assert(mc_packet_varint(packet, 0));
         assert(mc_packet_string(packet, "minecraft:overworld"));
         assert(mc_packet_i64(packet, INT64_C(123456789)));
-        assert(mc_packet_u8(packet, 0U));
-        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_u8(packet, 0U)); /* 777: VarInt 0, the same byte. */
+        if (protocol >= 777) {
+            assert(mc_packet_varint(packet, 0)); /* OptVarInt: no previous mode. */
+        } else {
+            assert(mc_packet_i8(packet, -1));
+        }
         assert(mc_packet_bool(packet, false));
         assert(mc_packet_bool(packet, true));
         assert(mc_packet_bool(packet, false));
@@ -1020,6 +1029,25 @@ static void build_clientbound_object_spawn_body(McPacket *packet,
 static void build_clientbound_world_particles_body(McPacket *packet,
     int protocol)
 {
+    if (protocol >= 777) {
+        /* 26.3: particle first, per-axis maximum speed, VarInt count and a
+         * trailing randomization mode. */
+        assert(mc_packet_varint(packet, 0));
+        assert(mc_packet_bool(packet, false));
+        assert(mc_packet_bool(packet, true));
+        assert(mc_packet_double(packet, 12.5));
+        assert(mc_packet_double(packet, 64.0));
+        assert(mc_packet_double(packet, -3.25));
+        assert(mc_packet_float(packet, 0.125F));
+        assert(mc_packet_float(packet, 0.25F));
+        assert(mc_packet_float(packet, 0.5F));
+        assert(mc_packet_float(packet, 1.0F));
+        assert(mc_packet_float(packet, 2.0F));
+        assert(mc_packet_float(packet, 3.0F));
+        assert(mc_packet_varint(packet, 0));
+        assert(mc_packet_varint(packet, 1));
+        return;
+    }
     if (protocol <= 5) {
         assert(mc_packet_string(packet, "note"));
     } else if (protocol < 766) {
@@ -1163,7 +1191,13 @@ static void clientbound_entity_lifecycle_is_versioned(void)
         assert(decoded_particle.double_precision_position
             == (protocol >= 573));
         assert(decoded_particle.particle_after_common_fields
-            == (protocol >= 766));
+            == (protocol >= 766 && protocol < 777));
+        assert(decoded_particle.has_axis_speed == (protocol >= 777));
+        if (protocol >= 777) {
+            assert(decoded_particle.speed_y == 2.0F);
+            assert(decoded_particle.speed_z == 3.0F);
+            assert(decoded_particle.randomization == 1);
+        }
         assert(!decoded_particle.long_distance);
         assert(decoded_particle.always_show == (protocol >= 769));
         assert(fabs(decoded_particle.x - 12.5) < 1.0e-12);
@@ -1327,8 +1361,12 @@ static void build_clientbound_join_game_body(McPacket *packet, int protocol)
         }
         assert(mc_packet_string(packet, "minecraft:overworld"));
         assert(mc_packet_i64(packet, INT64_C(123456789)));
-        assert(mc_packet_u8(packet, 1U));
-        assert(mc_packet_i8(packet, -1));
+        assert(mc_packet_u8(packet, 1U)); /* 777: VarInt 1, the same byte. */
+        if (protocol >= 777) {
+            assert(mc_packet_varint(packet, 0)); /* OptVarInt: no previous mode. */
+        } else {
+            assert(mc_packet_i8(packet, -1));
+        }
         assert(mc_packet_bool(packet, false));
         assert(mc_packet_bool(packet, true));
         assert(mc_packet_bool(packet, false));
@@ -1478,7 +1516,7 @@ static void entity_equipment_bodies_are_versioned(void)
 {
     size_t protocol_count = 0U;
     const int *protocols = mc_supported_protocols(&protocol_count);
-    assert(protocols != NULL && protocol_count == 51U);
+    assert(protocols != NULL && protocol_count == 52U);
     for (size_t index = 0U; index < protocol_count; ++index) {
         const int protocol = protocols[index];
         assert(mc_entity_equipment_slot_supported(
@@ -1587,7 +1625,7 @@ static void entity_hand_use_metadata_is_versioned(void)
 {
     size_t protocol_count = 0U;
     const int *protocols = mc_supported_protocols(&protocol_count);
-    assert(protocols != NULL && protocol_count == 51U);
+    assert(protocols != NULL && protocol_count == 52U);
     for (size_t index = 0U; index < protocol_count; ++index) {
         const int protocol = protocols[index];
         unsigned char storage[32] = {0};
@@ -2413,6 +2451,124 @@ static void dump_player_abilities(int protocol)
     putchar('\n');
 }
 
+/* Protocol 777 (26.3) payloads that differ from 776, from
+ * schema/derived/26.3-wire-delta.md: component IDs and codecs, metadata
+ * serializers 41-43, BitSet light masks, renumbered digging statuses and the
+ * stepped entity position path. */
+static void protocol_777_payloads_are_decoded(void)
+{
+    unsigned char storage[512];
+    McPacket packet;
+    McReader reader;
+    McItemStackView item;
+
+    /* Stack: attack_animation(40) whack/6, waxed(120), cushion/color(121)=red,
+     * pot_decorations(76) with only the front side, custom_name(6) kept at 6. */
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_varint(&packet, 1));       /* count */
+    assert(mc_packet_varint(&packet, 42));      /* item id */
+    assert(mc_packet_varint(&packet, 5));       /* added */
+    assert(mc_packet_varint(&packet, 1));       /* removed */
+    assert(mc_packet_varint(&packet, 40));
+    assert(mc_packet_varint(&packet, 1));
+    assert(mc_packet_varint(&packet, 6));
+    assert(mc_packet_varint(&packet, 120));
+    assert(mc_packet_varint(&packet, 121));
+    assert(mc_packet_varint(&packet, 14));
+    assert(mc_packet_varint(&packet, 76));
+    assert(mc_packet_bool(&packet, false));
+    assert(mc_packet_bool(&packet, false));
+    assert(mc_packet_bool(&packet, false));
+    assert(mc_packet_bool(&packet, true));
+    assert(mc_packet_varint(&packet, 900));     /* template: id first */
+    assert(mc_packet_varint(&packet, 1));       /* then count */
+    assert(mc_packet_varint(&packet, 0));
+    assert(mc_packet_varint(&packet, 0));
+    assert(mc_packet_varint(&packet, 6));
+    assert(mc_packet_u8(&packet, 8U));          /* NBT string tag name */
+    assert(mc_packet_u16(&packet, 3U));
+    assert(mc_packet_bytes(&packet, "Pot", 3U));
+    assert(mc_packet_varint(&packet, 45));      /* removed: map_color id in 26.2 */
+    assert(!packet.failed);
+    mc_reader_init_mode(&reader, packet.data, packet.length, MC_DECODE_STRICT, NULL);
+    assert(mc_reader_item_stack(&reader, 777, MC_ITEM_WIRE_FULL, &item));
+    assert(mc_reader_finish(&reader));
+    assert(item.added_component_count == 5U && item.removed_component_count == 1U);
+
+    /* 26.2 had no component 121: the 776 validator must reject it. */
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_varint(&packet, 1) && mc_packet_varint(&packet, 42)
+        && mc_packet_varint(&packet, 1) && mc_packet_varint(&packet, 0)
+        && mc_packet_varint(&packet, 121) && mc_packet_varint(&packet, 14));
+    mc_reader_init_mode(&reader, packet.data, packet.length, MC_DECODE_STRICT, NULL);
+    assert(!mc_reader_item_stack(&reader, 776, MC_ITEM_WIRE_FULL, &item));
+    mc_reader_init_mode(&reader, packet.data, packet.length, MC_DECODE_STRICT, NULL);
+    assert(mc_reader_item_stack(&reader, 777, MC_ITEM_WIRE_FULL, &item)
+        && mc_reader_finish(&reader));
+
+    /* Entity metadata: 43 dye_color and 42 humanoid_arm are VarInts in 777. */
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_varint(&packet, 12));
+    assert(mc_packet_u8(&packet, 17U) && mc_packet_varint(&packet, 43) && mc_packet_varint(&packet, 4));
+    assert(mc_packet_u8(&packet, 18U) && mc_packet_varint(&packet, 42) && mc_packet_varint(&packet, 1));
+    assert(mc_packet_u8(&packet, UINT8_MAX));
+    {
+        McEntityMetadataPacket metadata;
+        McPacketFamily family = MC_FAMILY_UNKNOWN;
+        McError error;
+        const int32_t id = mc_packet_id(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, "entity_metadata");
+        assert(id >= 0);
+        assert(mc_decode_packet(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, id,
+            packet.data, packet.length, MC_DECODE_STRICT, &metadata,
+            sizeof(metadata), &family, &error) == 0);
+        assert(family == MC_FAMILY_ENTITY_METADATA && metadata.entry_count == 2U);
+        const int32_t old_id = mc_packet_id(776, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, "entity_metadata");
+        assert(mc_decode_packet(776, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, old_id,
+            packet.data, packet.length, MC_DECODE_STRICT, &metadata,
+            sizeof(metadata), &family, &error) != 0);
+    }
+
+    /* Digging: logical CANCEL (1) is wire 2 on 777 and 1 on 776. */
+    const McBlockDig cancel = {.status = 1, .location = {1, 64, 2}, .face = 1, .sequence = 3};
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_block_dig(&packet, 777, &cancel) && packet.data[0] == 2U);
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_block_dig(&packet, 776, &cancel) && packet.data[0] == 1U);
+
+    /* Stepped sync_entity_position: x/y/z hold the last point. */
+    mc_packet_init(&packet, storage, sizeof(storage));
+    assert(mc_packet_varint(&packet, 5) && mc_packet_varint(&packet, 1)
+        && mc_packet_varint(&packet, 2));
+    assert(mc_packet_double(&packet, 1.0) && mc_packet_double(&packet, 2.0)
+        && mc_packet_double(&packet, 3.0) && mc_packet_varint(&packet, 1));
+    assert(mc_packet_double(&packet, 4.0) && mc_packet_double(&packet, 5.0)
+        && mc_packet_double(&packet, 6.0) && mc_packet_varint(&packet, 2));
+    assert(mc_packet_float(&packet, 0.0F) && mc_packet_float(&packet, 0.0F)
+        && mc_packet_bool(&packet, false));
+    {
+        McEntityTeleportPacket teleport;
+        McPacketFamily family = MC_FAMILY_UNKNOWN;
+        McError error;
+        const int32_t id = mc_packet_id(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, "sync_entity_position");
+        assert(mc_decode_packet(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, id,
+            packet.data, packet.length, MC_DECODE_STRICT, &teleport,
+            sizeof(teleport), &family, &error) == 0);
+        assert(teleport.step_count == 2U && teleport.x == 4.0 && teleport.z == 6.0);
+        /* A third path type does not exist. */
+        packet.data[1] = 2U;
+        assert(mc_decode_packet(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, id,
+            packet.data, packet.length, MC_DECODE_STRICT, &teleport,
+            sizeof(teleport), &family, &error) != 0);
+    }
+
+    /* Packet tables: inserted clientbound packets shift the join-game ID. */
+    assert(mc_packet_id(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, "login") == 0x32);
+    assert(mc_packet_id(777, MC_STATE_PLAY, MC_PACKET_CLIENTBOUND, "swing_animation") == 123);
+    assert(mc_packet_id(777, MC_STATE_PLAY, MC_PACKET_SERVERBOUND, "punch") == 46);
+    assert(mc_packet_id(777, MC_STATE_PLAY, MC_PACKET_SERVERBOUND, "arm_animation") < 0);
+    assert(strcmp(mc_protocol_name(777), "26.3") == 0);
+}
+
 int main(int argc, char **argv)
 {
     const int boundary_protocols[] = {4, 578, 735, 758, 759, 760, 761, 765, 766, 776};
@@ -2468,6 +2624,7 @@ int main(int argc, char **argv)
     creative_slots_match_node_release_boundaries();
     inventory_slot_updates_are_versioned();
     container_open_and_content_are_versioned();
+    protocol_777_payloads_are_decoded();
     puts("PASS command, client information, movement, player actions, abilities, block actions, hotbar, inventory, component items, combat, entity lifecycle, respawn, NBT and buffer codecs");
     return 0;
 }

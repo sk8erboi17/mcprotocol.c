@@ -146,11 +146,11 @@ int main(void)
 {
     size_t count = 0U;
     const int *protocols = mc_supported_protocols(&count);
-    assert(protocols != NULL && count == 51U);
+    assert(protocols != NULL && count == 52U);
     for (size_t index = 0U; index < count; ++index) {
         test_protocol(protocols[index]);
     }
     test_malformed();
-    puts("PASS scoreboard readers across 51 protocols");
+    puts("PASS scoreboard readers across 52 protocols");
     return 0;
 }

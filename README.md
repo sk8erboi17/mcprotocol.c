@@ -12,7 +12,7 @@ crafting and combat belong to the application.
 
 ## Features
 
-- 51 protocol revisions from protocol 4 through 776 (Minecraft 1.7–26.2);
+- 52 protocol revisions from protocol 4 through 777 (Minecraft 1.7–26.3);
 - offline client login, raw custom login, server-list status and raw server
   accept/handshake;
 - complete versioned packet name/ID catalogs plus allocation-free C readers and
@@ -111,7 +111,9 @@ cc -std=c11 client.c -L. -lmcprotocol -lz -o client
 ```
 
 Keep-alive, teleport, player-loaded and chunk-batch acknowledgements are
-automatic by default. During modern CONFIGURATION, `mc_client_connect` also
+automatic by default. Teleport IDs are echoed exactly as vanilla does,
+including the negative IDs that server plugins use for silent client-only
+corrections. During modern CONFIGURATION, `mc_client_connect` also
 sends conservative Client Information defaults; older PLAY clients can send
 their desired values with `mc_client_send_client_information`. A raw
 application can disable all or selected replies before connecting:
@@ -229,6 +231,15 @@ cover every component wire profile from protocol 766 through 776, and the
 schema-compiled typed slice includes the 26.2 `use_item` and `block_dig`
 packets. Family-based codecs cover the declared cross-version Tier A/Tier B
 surface without adding another production source file.
+
+Protocol 777 (26.3) has no minecraft-data schema yet. Its packet tables and
+hand-written codec branches follow the cited ViaVersion 5.12.0/PacketEvents
+2.14.0 delta in `schema/derived/26.3-wire-delta.md`; its Slot validator is
+compiled by the same `ComponentValidatorCompiler` from
+`schema/derived/777-protocol.json` and lives just after the generated region,
+so the 776 manifest hashes stay meaningful. The same evidence corrected the
+776 particle IDs (26.2 inserted seven particles); the 776 Slot validator
+still reuses the 26.1 component list and misses 26.2's `sulfur_cube_content`.
 
 With `minecraft-data` checked out next to this repository:
 
@@ -453,7 +464,7 @@ if (mc_decode_packet(protocol, MC_STATE_PLAY, MC_PACKET_SERVERBOUND,
 
 Typed families cover movement, actions, combat, block interaction, inventory,
 entity movement and the bounded Tier B envelopes declared in `api.h` across
-all 51 supported protocols. Inventory items, metadata, chunk sections and
+all 52 supported protocols. Inventory items, metadata, chunk sections and
 large lists are borrowed views or iterators; normal packet decode does not
 allocate.
 

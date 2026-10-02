@@ -15,3 +15,6 @@ __pycache__/
 *.pyc
 build/
 benchmark/node_modules/
+tests/connect_profile_test
+tests/player_projection_test
+tests/scoreboard_test
