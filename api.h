@@ -791,6 +791,14 @@ typedef struct {
     bool has_entity_id;
 } McContainerOpen;
 
+/* Clientbound craft_progress_bar/container_set_data: an unsigned byte menu
+ * ID through 1.21.1, VarInt from 1.21.2, and two signed short data fields. */
+typedef struct {
+    int32_t window_id;
+    int16_t property;
+    int16_t value;
+} McContainerData;
+
 #define MC_CONTAINER_CONTENT_MAX_SLOTS 128U
 
 typedef struct {
@@ -1866,6 +1874,10 @@ bool mc_reader_inventory_slot_update(McReader *reader, int protocol,
  * is excluded. encoded_title and named_menu_type borrow from reader storage. */
 bool mc_reader_container_open(McReader *reader, int protocol,
     McContainerOpen *value);
+/* Decodes one release-aware container data body without its packet ID.
+ * Output is unchanged on failure; mc_reader_finish enforces exact consumption. */
+bool mc_reader_container_data(McReader *reader, int protocol,
+    McContainerData *value);
 /* Decodes one bounded release-aware window_items/container_set_content body.
  * The packet ID is excluded; callers may require zero bytes remaining. */
 bool mc_reader_container_content(McReader *reader, int protocol,

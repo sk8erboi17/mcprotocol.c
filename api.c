@@ -4794,6 +4794,38 @@ bool mc_reader_container_open(McReader *reader, int protocol,
     return true;
 }
 
+bool mc_reader_container_data(McReader *reader, int protocol,
+    McContainerData *value)
+{
+    McContainerData decoded = {0};
+    if (reader == NULL) return false;
+    if (reader->failed) return false;
+    if (value == NULL) {
+        return reader_fail(reader, MC_ERROR_INVALID_ARGUMENT, reader->offset);
+    }
+    if (!mc_protocol_supported(protocol)) {
+        return reader_fail_protocol(reader, MC_ERROR_UNSUPPORTED_PROTOCOL,
+            reader->offset, protocol);
+    }
+    if (protocol >= 768) {
+        if (!mc_reader_varint(reader, &decoded.window_id)) return false;
+        if (decoded.window_id < 0) {
+            return reader_fail_protocol(reader, MC_ERROR_INVALID_PACKET_BODY,
+                reader->offset, protocol);
+        }
+    } else {
+        uint8_t window_id = 0U;
+        if (!mc_reader_u8(reader, &window_id)) return false;
+        decoded.window_id = (int32_t)window_id;
+    }
+    if (!mc_reader_i16(reader, &decoded.property)
+        || !mc_reader_i16(reader, &decoded.value)) {
+        return false;
+    }
+    *value = decoded;
+    return true;
+}
+
 bool mc_reader_container_content(McReader *reader, int protocol,
     McContainerContent *value)
 {

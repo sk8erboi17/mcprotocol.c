@@ -472,6 +472,54 @@ static void clientbound_block_events_are_versioned(void)
     assert(reader.failed);
 }
 
+static void container_data_bodies_are_versioned(void)
+{
+    /* Independent signed-short/unsigned-ID golden bodies. The archived
+     * sources and buffer hashes are in fixtures/container_data_sources.tsv. */
+    static const unsigned char byte_id[] = {0xc8U,0xffU,0xfeU,0x80U,0x00U};
+    static const unsigned char varint_id[] = {0xc8U,0x01U,0xffU,0xfeU,0x80U,0x00U};
+    size_t count = 0U;
+    const int *protocols = mc_supported_protocols(&count);
+    assert(protocols != NULL && count == 51U);
+    for (size_t index = 0U; index < count; ++index) {
+        const int protocol = protocols[index];
+        const unsigned char *body = protocol >= 768 ? varint_id : byte_id;
+        const size_t size = protocol >= 768 ? sizeof(varint_id) : sizeof(byte_id);
+        McReader reader;
+        McContainerData decoded = {0};
+        mc_reader_init_mode(&reader, body, size, MC_DECODE_STRICT, NULL);
+        assert(mc_reader_container_data(&reader, protocol, &decoded));
+        assert(mc_reader_finish(&reader));
+        assert(decoded.window_id == 200 && decoded.property == -2 && decoded.value == INT16_MIN);
+        for (size_t length = 0U; length < size; ++length) {
+            decoded = (McContainerData){42, 13, 14};
+            mc_reader_init_mode(&reader, body, length, MC_DECODE_STRICT, NULL);
+            assert(!mc_reader_container_data(&reader, protocol, &decoded));
+            assert(reader.failed);
+            assert(decoded.window_id == 42 && decoded.property == 13 && decoded.value == 14);
+        }
+        unsigned char trailing[sizeof(varint_id) + 1U];
+        memcpy(trailing, body, size);
+        trailing[size] = 0U;
+        mc_reader_init_mode(&reader, trailing, size + 1U, MC_DECODE_STRICT, NULL);
+        assert(mc_reader_container_data(&reader, protocol, &decoded));
+        assert(!mc_reader_finish(&reader));
+    }
+    static const unsigned char negative_id[] = {0xffU,0xffU,0xffU,0xffU,0x0fU,0U,0U,0U,0U};
+    McReader reader;
+    McContainerData decoded = {0};
+    mc_reader_init_mode(&reader, negative_id, sizeof(negative_id), MC_DECODE_STRICT, NULL);
+    assert(!mc_reader_container_data(&reader, 768, &decoded));
+    assert(reader.failed);
+    assert(!mc_reader_container_data(NULL, 776, &decoded));
+    mc_reader_init(&reader, varint_id, sizeof(varint_id));
+    assert(!mc_reader_container_data(&reader, 999, &decoded));
+    assert(reader.failed);
+    mc_reader_init(&reader, varint_id, sizeof(varint_id));
+    assert(!mc_reader_container_data(&reader, 776, NULL));
+    assert(reader.failed);
+}
+
 static void client_information_bodies_match_node(void)
 {
     /* Bodies exclude the packet ID. They were serialized by the historical
@@ -2399,6 +2447,7 @@ int main(int argc, char **argv)
     block_dig_bodies_are_versioned();
     block_changes_are_versioned();
     clientbound_block_events_are_versioned();
+    container_data_bodies_are_versioned();
     client_information_bodies_match_node();
     player_action_bodies_match_node();
     player_positions_are_versioned();

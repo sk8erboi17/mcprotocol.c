@@ -192,6 +192,7 @@ Available symmetric field codecs are:
 | `plain_item` | Release-aware metadata-free ItemStack | empty slots and simple inventory values |
 | `inventory_slot_update` | Normalized container-slot or dedicated player-inventory update | observing authoritative main/off-hand inventory reconciliation |
 | `container_open` | Bounded legacy/namespaced/registry menu identity and borrowed title | observing release-aware menu creation without allocations |
+| `container_data` | Release-aware menu ID with signed property/value shorts | observing furnace progress and other synchronized menu data |
 | `container_content` | Bounded metadata-free slot array with state and carried-item fields | inspecting complete Vanilla container snapshots safely |
 | `scoreboard_objective`, `scoreboard_display`, `scoreboard_score`, `scoreboard_reset` | Allocation-free normalized clientbound scoreboard views, including legacy removals and modern optional components/number formats | observing sidebar lifecycle and score updates across releases |
 | `entity_equipment` | Bounded release-aware equipment body with normalized legacy slots and modern continuation lists | observing main/off-hand, armor, body and saddle projection |
