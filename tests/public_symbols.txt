@@ -64,6 +64,8 @@ mc_entity_metadata_iterator_next
 mc_entity_equipment_slot_supported
 mc_error_clear
 mc_error_name
+mc_item_component_iterator_next
+mc_item_components_iterator
 mc_item_iterator_next
 mc_multi_block_change_iterator
 mc_offline_uuid

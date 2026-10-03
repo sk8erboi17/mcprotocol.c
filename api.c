@@ -22734,6 +22734,78 @@ bool mc_item_iterator_next(McItemIterator *iterator, McItemStackView *item)
     return true;
 }
 
+bool mc_item_components_iterator(const McItemStackView *item,
+    int protocol, McItemComponentIterator *iterator)
+{
+    if (item == NULL || iterator == NULL || protocol < 766
+        || !mc_protocol_supported(protocol)
+        || (item->wire_kind != MC_ITEM_WIRE_FULL
+            && item->wire_kind != MC_ITEM_WIRE_UNTRUSTED)
+        || (item->wire_kind == MC_ITEM_WIRE_UNTRUSTED && protocol < 770)
+        || item->added_component_count > MC_MAX_ITEM_COMPONENT_COUNT
+        || item->removed_component_count > MC_MAX_ITEM_COMPONENT_COUNT
+        || item->added_component_count + item->removed_component_count
+            > MC_MAX_ITEM_COMPONENT_COUNT
+        || (item->components.size != 0U && item->components.data == NULL)
+        || (item->added_component_count == 0U
+            && item->removed_component_count == 0U && item->components.size != 0U)
+        || (item->wire_kind == MC_ITEM_WIRE_FULL
+            && item->component_values_length_prefixed)
+        || (item->wire_kind == MC_ITEM_WIRE_UNTRUSTED
+            && item->added_component_count != 0U
+            && !item->component_values_length_prefixed)) {
+        return false;
+    }
+    McItemComponentIterator decoded = {
+        .protocol = protocol,
+        .remaining_added = item->added_component_count,
+        .remaining_removed = item->removed_component_count,
+        .values_length_prefixed = item->component_values_length_prefixed,
+    };
+    mc_reader_init_mode(&decoded.reader, item->components.data,
+        item->components.size, MC_DECODE_STRICT, NULL);
+    *iterator = decoded;
+    return true;
+}
+
+bool mc_item_component_iterator_next(McItemComponentIterator *iterator,
+    McItemComponentView *component)
+{
+    if (iterator == NULL || component == NULL || iterator->reader.failed
+        || (iterator->remaining_added == 0U && iterator->remaining_removed == 0U)) {
+        return false;
+    }
+    McItemComponentView decoded = {.removed = iterator->remaining_added == 0U};
+    McReader type = iterator->reader;
+    if (!mc_reader_varint(&type, &decoded.type_id)) {
+        iterator->reader = type;
+        return false;
+    }
+    if (decoded.removed || iterator->values_length_prefixed) {
+        if (!typed_read_component_type(&iterator->reader, iterator->protocol)) {
+            return false;
+        }
+        if (!decoded.removed
+            && !mc_reader_buffer_varint(&iterator->reader, &decoded.data)) {
+            return false;
+        }
+    } else {
+        if (!skip_slot_component(&iterator->reader, iterator->protocol, 0U)) {
+            return false;
+        }
+        decoded.data = (McBytes){iterator->reader.data + type.offset,
+            iterator->reader.offset - type.offset};
+    }
+    if (iterator->remaining_added + iterator->remaining_removed == 1U
+        && mc_reader_remaining(&iterator->reader) != 0U) {
+        return typed_invalid(&iterator->reader);
+    }
+    if (decoded.removed) --iterator->remaining_removed;
+    else --iterator->remaining_added;
+    *component = decoded;
+    return true;
+}
+
 static int32_t typed_sign_extend(uint64_t value, unsigned int bits)
 {
     const uint64_t sign = UINT64_C(1) << (bits - 1U);

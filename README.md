@@ -295,6 +295,14 @@ palettes, and deliberately accepts only an empty block-entity array. Plain-item
 manifest projections remain metadata-free. Runtime typed inventory codecs
 instead validate NBT and every component value before publishing a borrowed
 `McItemStackView`; they never accept an unchecked opaque component tail.
+`mc_item_components_iterator` exposes bounded borrowed patch entries for
+protocols 766 through 777 without allocating or copying. Each entry preserves
+its release-specific type ID and exact value bytes, excluding the type and
+UNTRUSTED length prefix; removals are explicit empty-value entries. FULL values
+reuse the release validators. UNTRUSTED values keep the bounded opaque payload
+contract of the item decoder. Legacy NBT and HASHED items are rejected rather
+than interpreted as values. See `schema/derived/item-component-iteration.tsv`
+for the archived client/server framing comparison.
 
 ### Send a command or chat packet
 

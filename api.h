@@ -1113,6 +1113,23 @@ typedef struct {
     McBytes encoded;
 } McItemStackView;
 
+/* One borrowed patch entry. Removed entries have no value bytes. `data`
+ * excludes the type ID and any UNTRUSTED length prefix; it uses the selected
+ * release's component codec and remains valid only with the original item. */
+typedef struct {
+    int32_t type_id;
+    McBytes data;
+    bool removed;
+} McItemComponentView;
+
+typedef struct {
+    McReader reader;
+    int protocol;
+    uint32_t remaining_added;
+    uint32_t remaining_removed;
+    bool values_length_prefixed;
+} McItemComponentIterator;
+
 typedef struct {
     int32_t window_id;
     int32_t state_id;
@@ -1608,6 +1625,16 @@ bool mc_reader_item_stack(McReader *reader, int protocol,
 bool mc_window_items_iterator(const McWindowItemsPacket *packet,
     int protocol, McItemIterator *iterator);
 bool mc_item_iterator_next(McItemIterator *iterator, McItemStackView *item);
+/* Component patches start at protocol 766. FULL values are validated with
+ * the release codec; UNTRUSTED values retain the decoder's bounded opaque
+ * value envelope (770+). Legacy NBT and HASHED items are not component values.
+ * Entries preserve wire order: additions first, removals second. Exhaustion
+ * returns false; reader.failed distinguishes invalid input. Output is unchanged
+ * on failure. No allocation occurs. */
+bool mc_item_components_iterator(const McItemStackView *item,
+    int protocol, McItemComponentIterator *iterator);
+bool mc_item_component_iterator_next(McItemComponentIterator *iterator,
+    McItemComponentView *component);
 /* Iterates the already-validated borrowed attribute envelope. Keys are strings
  * through 1.20.4 and registry IDs from 1.20.5 onward. Modifier bytes remain a
  * borrowed exact view; their count and complete wire form are validated. */

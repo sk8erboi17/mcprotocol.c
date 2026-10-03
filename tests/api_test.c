@@ -2000,6 +2000,146 @@ static void untrusted_component_items_match_node(void)
         NULL, 776, 937, 1, &enchantment, 1U, NULL, 0U));
 }
 
+static void expect_component(McItemComponentIterator *iterator, int32_t type_id,
+    const unsigned char *data, size_t size, bool removed)
+{
+    McItemComponentView value = {0};
+    assert(mc_item_component_iterator_next(iterator, &value));
+    assert(value.type_id == type_id && value.removed == removed);
+    assert(value.data.size == size);
+    if (removed) assert(value.data.data == NULL);
+    else if (size != 0U) assert(value.data.data == iterator->reader.data + iterator->reader.offset - size);
+    if (size != 0U) assert(memcmp(value.data.data, data, size) == 0);
+}
+
+static void item_components_are_bounded_borrowed_views(void)
+{
+    /* Independent wire bytes: damage=1500, max_damage=1561, empty network
+     * compound custom_data, removed max_stack_size. No library encoder. */
+    static const unsigned char full[] = {
+        1U, 1U, 3U, 1U, 3U, 0xdcU, 0x0bU, 2U, 0x99U, 0x0cU,
+        0U, 0x0aU, 0U, 1U,
+    };
+    static const unsigned char untrusted[] = {
+        1U, 1U, 3U, 1U, 3U, 2U, 0xdcU, 0x0bU, 2U, 2U, 0x99U, 0x0cU,
+        0U, 2U, 0x0aU, 0U, 1U,
+    };
+    static const unsigned char damage[] = {0xdcU, 0x0bU};
+    static const unsigned char maximum[] = {0x99U, 0x0cU};
+    static const unsigned char nbt[] = {0x0aU, 0U};
+    const McItemComponentView sentinel = {
+        .type_id = 900, .data = {NULL, 17U}, .removed = true,
+    };
+    size_t profiles = 0U;
+    for (int protocol = 766; protocol <= 777; ++protocol) {
+        assert(mc_protocol_supported(protocol));
+        ++profiles;
+        for (int kind = 0; kind < 2; ++kind) {
+            if (kind == 1 && protocol < 770) continue;
+            const unsigned char *bytes = kind == 0 ? full : untrusted;
+            const size_t size = kind == 0 ? sizeof(full) : sizeof(untrusted);
+            McReader reader;
+            McItemStackView item;
+            mc_reader_init(&reader, bytes, size);
+            assert(mc_reader_item_stack(&reader, protocol,
+                kind == 0 ? MC_ITEM_WIRE_FULL : MC_ITEM_WIRE_UNTRUSTED, &item));
+            assert(mc_reader_finish(&reader));
+            McItemComponentIterator iterator;
+            assert(mc_item_components_iterator(&item, protocol, &iterator));
+            assert(iterator.remaining_added == 3U && iterator.remaining_removed == 1U);
+            expect_component(&iterator, 3, damage, sizeof(damage), false);
+            expect_component(&iterator, 2, maximum, sizeof(maximum), false);
+            expect_component(&iterator, 0, nbt, sizeof(nbt), false);
+            expect_component(&iterator, 1, NULL, 0U, true);
+            McItemComponentView untouched = sentinel;
+            assert(!mc_item_component_iterator_next(&iterator, &untouched));
+            assert(untouched.type_id == sentinel.type_id
+                && untouched.data.data == NULL && untouched.data.size == 17U
+                && untouched.removed);
+            assert(!iterator.reader.failed && mc_reader_finish(&iterator.reader));
+
+            /* The view cannot outlive or manufacture extra component bytes.
+             * Every bounded truncation fails without publishing a partial value. */
+            for (size_t length = 0U; length < item.components.size; ++length) {
+                McItemStackView short_item = item;
+                short_item.components.size = length;
+                assert(mc_item_components_iterator(&short_item, protocol, &iterator));
+                for (unsigned int entry = 0U; entry < 4U; ++entry) {
+                    untouched = sentinel;
+                    if (!mc_item_component_iterator_next(&iterator, &untouched)) break;
+                }
+                assert(iterator.reader.failed);
+                assert(untouched.type_id == 900 && untouched.data.size == 17U
+                    && untouched.data.data == NULL && untouched.removed);
+            }
+            /* Fewer declared entries must not publish the last value with
+             * a trailing patch entry still inside the borrowed envelope. */
+            McItemStackView trailing = item;
+            trailing.removed_component_count = 0U;
+            assert(mc_item_components_iterator(&trailing, protocol, &iterator));
+            expect_component(&iterator, 3, damage, sizeof(damage), false);
+            expect_component(&iterator, 2, maximum, sizeof(maximum), false);
+            untouched = sentinel;
+            assert(!mc_item_component_iterator_next(&iterator, &untouched));
+            assert(iterator.reader.failed && untouched.type_id == 900);
+        }
+        /* UNBREAKABLE became a unit component in 1.21.5. Its FULL value is
+         * one boolean before that boundary and zero bytes after it. */
+        static const unsigned char unit[] = {1U, 1U, 1U, 0U, 4U, 0U};
+        McReader reader;
+        McItemStackView item;
+        McItemComponentIterator iterator;
+        mc_reader_init(&reader, unit, protocol < 770 ? sizeof(unit) : sizeof(unit) - 1U);
+        assert(mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_FULL, &item));
+        assert(mc_reader_finish(&reader));
+        assert(mc_item_components_iterator(&item, protocol, &iterator));
+        expect_component(&iterator, 4, unit + 5U, protocol < 770 ? 1U : 0U, false);
+        assert(!iterator.reader.failed);
+        if (protocol >= 770) {
+            mc_reader_init(&reader, unit, sizeof(unit));
+            assert(mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_UNTRUSTED, &item));
+            assert(mc_reader_finish(&reader));
+            assert(mc_item_components_iterator(&item, protocol, &iterator));
+            expect_component(&iterator, 4, NULL, 0U, false);
+        }
+    }
+    assert(profiles == 12U);
+    McItemStackView item = {.wire_kind = MC_ITEM_WIRE_FULL};
+    McItemComponentIterator iterator = {.protocol = 123};
+    assert(mc_item_components_iterator(&item, 776, &iterator));
+    McItemComponentView untouched = sentinel;
+    assert(!mc_item_component_iterator_next(&iterator, &untouched));
+    assert(!iterator.reader.failed && untouched.type_id == 900);
+    assert(!mc_item_components_iterator(NULL, 776, &iterator));
+    assert(!mc_item_components_iterator(&item, 776, NULL));
+    assert(!mc_item_components_iterator(&item, 765, &iterator));
+    assert(!mc_item_components_iterator(&item, 778, &iterator));
+    item.wire_kind = MC_ITEM_WIRE_HASHED;
+    assert(!mc_item_components_iterator(&item, 776, &iterator));
+    item.wire_kind = MC_ITEM_WIRE_UNTRUSTED;
+    assert(!mc_item_components_iterator(&item, 769, &iterator));
+    item.wire_kind = MC_ITEM_WIRE_FULL;
+    item.component_values_length_prefixed = true;
+    assert(!mc_item_components_iterator(&item, 776, &iterator));
+    item.component_values_length_prefixed = false;
+    item.added_component_count = MC_MAX_ITEM_COMPONENT_COUNT + 1U;
+    assert(!mc_item_components_iterator(&item, 776, &iterator));
+    item.added_component_count = MC_MAX_ITEM_COMPONENT_COUNT;
+    item.removed_component_count = 1U;
+    assert(!mc_item_components_iterator(&item, 776, &iterator));
+    item.added_component_count = 0U;
+    item.removed_component_count = 0U;
+    item.components = (McBytes){full, 1U};
+    assert(!mc_item_components_iterator(&item, 776, &iterator));
+    item.components = (McBytes){NULL, 1U};
+    assert(!mc_item_components_iterator(&item, 776, &iterator));
+    const McItemComponentIterator unchanged = iterator;
+    assert(!mc_item_components_iterator(&item, 776, &iterator));
+    assert(memcmp(&iterator, &unchanged, sizeof(iterator)) == 0);
+    assert(!mc_item_component_iterator_next(NULL, &untouched));
+    assert(!mc_item_component_iterator_next(&iterator, NULL));
+}
+
 static void empty_window_clicks_are_versioned(void)
 {
     static const struct {
@@ -2617,6 +2757,7 @@ int main(int argc, char **argv)
     block_place_bodies_are_versioned();
     use_item_bodies_match_node();
     untrusted_component_items_match_node();
+    item_components_are_bounded_borrowed_views();
     empty_window_clicks_are_versioned();
     legacy_window_clicks_include_predicted_stacks();
     container_buttons_match_node_and_source();
