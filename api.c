@@ -23433,8 +23433,24 @@ static bool typed_skip_modern_particle_value(McReader *reader, int protocol,
         return mc_reader_varint(reader, &value) && value >= 0
             ? true : typed_invalid(reader);
     }
-    if (particle == profile.dust) return typed_skip_floats(reader, 4U);
-    if (particle == profile.transition) return typed_skip_floats(reader, 7U);
+    /* 1.21.2 (768) packed the dust colours: DustParticleOptions is an RGB
+     * int and a float scale, DustColorTransitionOptions two RGB ints and a
+     * float scale (ByteBufCodecs.INT/FLOAT in the 1.21.11 and 26.2 jars,
+     * ViaVersion's DUST1_21_2/DUST_TRANSITION1_21_2). Before it they were
+     * float triples plus the scale. minecraft-data still lists the floats
+     * for every release, so this is not generated. */
+    if (particle == profile.dust) {
+        if (protocol < 768) return typed_skip_floats(reader, 4U);
+        int32_t color = 0;
+        return mc_reader_i32(reader, &color) && typed_skip_floats(reader, 1U);
+    }
+    if (particle == profile.transition) {
+        if (protocol < 768) return typed_skip_floats(reader, 7U);
+        int32_t from = 0;
+        int32_t to = 0;
+        return mc_reader_i32(reader, &from) && mc_reader_i32(reader, &to)
+            && typed_skip_floats(reader, 1U);
+    }
     if (particle == profile.entity_effect || particle == profile.tinted_leaves
         || particle == profile.flash) {
         int32_t color = 0;

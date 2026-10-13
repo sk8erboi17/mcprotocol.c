@@ -1076,6 +1076,90 @@ static void build_clientbound_world_particles_body(McPacket *packet,
     if (protocol >= 766) assert(mc_packet_varint(packet, 0));
 }
 
+/* A world_particles body carrying `particle` with `data`, written by hand
+ * from each release's ClientboundLevelParticlesPacket layout. */
+static void build_particle_with_data(McPacket *packet, int protocol,
+    int32_t particle, const McPacket *data)
+{
+    if (protocol >= 777) {
+        assert(mc_packet_varint(packet, particle));
+        assert(mc_packet_bytes(packet, data->data, data->length));
+    }
+    assert(mc_packet_bool(packet, false));
+    if (protocol >= 769) assert(mc_packet_bool(packet, true));
+    assert(mc_packet_double(packet, 12.5));
+    assert(mc_packet_double(packet, 64.0));
+    assert(mc_packet_double(packet, -3.25));
+    for (int axis = 0; axis < (protocol >= 777 ? 6 : 4); ++axis) {
+        assert(mc_packet_float(packet, 0.25F));
+    }
+    if (protocol >= 777) {
+        assert(mc_packet_varint(packet, 1));
+        assert(mc_packet_varint(packet, 0));
+        return;
+    }
+    assert(mc_packet_i32(packet, 1));
+    assert(mc_packet_varint(packet, particle));
+    assert(mc_packet_bytes(packet, data->data, data->length));
+}
+
+/* DUST and DUST_COLOR_TRANSITION since 1.21.2 (768): an RGB int and a float
+ * scale, and two RGB ints and a float scale (DustParticleOptions /
+ * DustColorTransitionOptions STREAM_CODEC in the 1.21.11 and 26.2 jars).
+ * 766/767 keep the float triples. Reading floats at 768+ consumed the next
+ * field's bytes and refused every dust particle a 26.2 server sends. */
+static void dust_particle_options_are_versioned(void)
+{
+    for (int protocol = 766; protocol <= 777; ++protocol) {
+        const int32_t dust = protocol < 773 ? 13 : protocol < 776 ? 14 : 21;
+        for (int transition = 0; transition < 2; ++transition) {
+            unsigned char data_storage[32];
+            McPacket data;
+            mc_packet_init(&data, data_storage, sizeof(data_storage));
+            if (protocol >= 768) {
+                assert(mc_packet_i32(&data, 0x00f1c975));
+                if (transition) assert(mc_packet_i32(&data, 0x0088c0e8));
+                assert(mc_packet_float(&data, 1.5F));
+            } else {
+                for (int value = 0; value < (transition ? 7 : 4); ++value) {
+                    assert(mc_packet_float(&data, 0.5F));
+                }
+            }
+            unsigned char storage[128];
+            McPacket packet;
+            mc_packet_init(&packet, storage, sizeof(storage));
+            build_particle_with_data(&packet, protocol, dust + transition, &data);
+            assert(!packet.failed && !data.failed);
+            McReader reader;
+            McClientboundWorldParticles decoded = {0};
+            mc_reader_init_mode(&reader, packet.data, packet.length,
+                MC_DECODE_STRICT, NULL);
+            assert(mc_reader_clientbound_world_particles(&reader, protocol, &decoded));
+            assert(mc_reader_finish(&reader));
+            assert(decoded.particle_id == dust + transition);
+            assert(decoded.particle_data.size == data.length);
+            assert(memcmp(decoded.particle_data.data, data.data, data.length) == 0);
+            assert(decoded.count == 1);
+
+            /* The pre-768 float layout is not a 768+ dust particle. */
+            if (protocol >= 768) {
+                mc_packet_init(&data, data_storage, sizeof(data_storage));
+                for (int value = 0; value < (transition ? 7 : 4); ++value) {
+                    assert(mc_packet_float(&data, 0.5F));
+                }
+                mc_packet_init(&packet, storage, sizeof(storage));
+                build_particle_with_data(&packet, protocol, dust + transition, &data);
+                mc_reader_init_mode(&reader, packet.data, packet.length,
+                    MC_DECODE_STRICT, NULL);
+                memset(&decoded, 0, sizeof(decoded));
+                assert(!mc_reader_clientbound_world_particles(&reader, protocol, &decoded)
+                    || !mc_reader_finish(&reader)
+                    || decoded.particle_data.size != data.length);
+            }
+        }
+    }
+}
+
 static void clientbound_entity_lifecycle_is_versioned(void)
 {
     size_t protocol_count = 0U;
@@ -2809,6 +2893,7 @@ int main(int argc, char **argv)
     clientbound_join_games_are_versioned();
     clientbound_respawns_are_versioned();
     clientbound_entity_lifecycle_is_versioned();
+    dust_particle_options_are_versioned();
     entity_equipment_bodies_are_versioned();
     entity_hand_use_metadata_is_versioned();
     movement_and_hotbar_bodies_match_node();
