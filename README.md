@@ -226,6 +226,12 @@ the validated borrowed-NBT codec; the latter preserves the root `END` marker
 used for an absent value. Because the pinned `minecraft-data` checkout
 currently inherits 26.2 protocol data from 26.1, the reviewed wire-only delta
 is explicit in `schema/overlays/776.json`; it cannot become gameplay state.
+The same overlay carries `component_schema_corrections`: a component schema
+that minecraft-data gets wrong for a release (1.21.11 `attribute_modifiers`,
+whose display belongs to every entry) is replaced by the vanilla codec only
+while the shipped schema still matches the recorded one exactly, and the
+report names each corrected component. A ProtoDef `switch` without a
+`default` reads nothing for the values it does not list.
 The embedded catalog covers protocol 776, the source-compiled Slot validators
 cover every component wire profile from protocol 766 through 776, and the
 schema-compiled typed slice includes the 26.2 `use_item` and `block_dig`

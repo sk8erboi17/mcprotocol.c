@@ -1356,6 +1356,138 @@ def main() -> None:
     else:
         raise AssertionError("unused component overlay rename was accepted")
 
+    # ProtoDef: a switch without "default" is void for the values it does not
+    # list. Shaped like the attribute modifier display: only OVERRIDE (2) has
+    # data, DEFAULT (0) and HIDDEN (1) are units, 3 is refused by the mapper.
+    display_entry = [
+        "container",
+        [
+            {"name": "typeId", "type": "varint"},
+            {
+                "name": "display",
+                "type": [
+                    "container",
+                    [
+                        {
+                            "name": "type",
+                            "type": [
+                                "mapper",
+                                {
+                                    "type": "varint",
+                                    "mappings": {
+                                        "0": "default",
+                                        "1": "hidden",
+                                        "2": "override",
+                                    },
+                                },
+                            ],
+                        },
+                        {
+                            "name": "component",
+                            "type": [
+                                "switch",
+                                {
+                                    "compareTo": "type",
+                                    "fields": {"override": "anonymousNbt"},
+                                },
+                            ],
+                        },
+                    ],
+                ],
+            },
+        ],
+    ]
+    display_document = copy.deepcopy(component_document)
+    display_fields = display_document["types"]["SlotComponent"][1][1]["type"][1]["fields"]
+    display_fields["fixed"] = ["array", {"countType": "varint", "type": display_entry}]
+    display_source, _ = COMPILER.generated_component_validators(
+        [(902, json.dumps(display_document).encode("utf-8"))], component_overlay
+    )
+    display_lines = display_source.splitlines()
+    branch = next(
+        index for index, line in enumerate(display_lines)
+        if line.strip().startswith("if (mc_type_") and line.strip().endswith("== 2) {")
+    )
+    assert "mc_reader_nbt" in display_lines[branch + 1]
+    assert display_lines[branch + 2].strip() == "}"
+    assert not display_lines[branch + 3].strip().startswith("else"), \
+        "DEFAULT/HIDDEN displays must read nothing, not fail"
+    mapper = next(
+        index for index, line in enumerate(display_lines)
+        if line.strip().startswith("if (mc_type_") and "!= 2) {" in line
+    )
+    assert "MC_ERROR_INVALID_PACKET_BODY" in display_lines[mapper + 1]
+
+    # Component schema corrections replace a known-wrong minecraft-data
+    # component only on an exact match, and say so in the report.
+    wrong_layout = ["container", [
+        {"name": "attributes", "type": ["array", {
+            "countType": "varint", "type": "varint"}]},
+        {"name": "display", "type": "varint"},
+    ]]
+    right_layout = ["array", {"countType": "varint", "type": display_entry}]
+    wrong_document = copy.deepcopy(component_document)
+    wrong_fields = wrong_document["types"]["SlotComponent"][1][1]["type"][1]["fields"]
+    wrong_fields["fixed"] = wrong_layout
+    wrong_raw = json.dumps(wrong_document).encode("utf-8")
+    correction = {
+        "protocols": [903],
+        "component": "fixed",
+        "reason": "synthetic: display belongs to every entry",
+        "expect": wrong_layout,
+        "replace": right_layout,
+    }
+    corrected_source, corrected_report = COMPILER.generated_component_validators(
+        [(903, wrong_raw), (904, wrong_raw)],
+        dict(component_overlay, component_schema_corrections=[correction]),
+    )
+    assert corrected_report[0] == {
+        "protocol": 903,
+        "schema_corrections": ["fixed"],
+        "source_sha256": corrected_report[0]["source_sha256"],
+    }
+    assert "schema_corrections" not in corrected_report[1]
+    assert corrected_report[0]["source_sha256"] == corrected_report[1]["source_sha256"]
+    # Same source bytes, different corrections: two validators, not one.
+    assert "case 903: return mc_generated_903_component_slot_component" in corrected_source
+    assert "case 904: return mc_generated_904_component_slot_component" in corrected_source
+    def slot_validator(source: str, protocol: int) -> str:
+        head = (f"static bool mc_generated_{protocol}_component_slot_component"
+                "(McReader *reader, unsigned int depth)\n{")
+        body = source[source.index(head):]
+        return body[:body.index("\n}\n")]
+
+    assert "mc_reader_nbt" in slot_validator(corrected_source, 903)
+    assert "mc_reader_nbt" not in slot_validator(corrected_source, 904)
+    for overlay, message in (
+        ({"component_schema_corrections": [dict(correction, expect="varint")]},
+         "no longer matches"),
+        ({"component_schema_corrections": [dict(correction, protocols=[905])]},
+         "without a profile"),
+        ({"component_schema_corrections": [dict(correction, component="absent")]},
+         "unknown component"),
+        ({"component_schema_corrections": [dict(correction, reason="")]},
+         "needs exactly"),
+    ):
+        try:
+            COMPILER.generated_component_validators(
+                [(903, wrong_raw)], dict(component_overlay, **overlay))
+        except ValueError as error:
+            assert message in str(error), (message, error)
+        else:
+            raise AssertionError(f"accepted a bad correction ({message})")
+
+    # The 777 validator lives outside the generated region (minecraft-data has
+    # no 26.3 schema) but must still be exactly what this compiler emits for
+    # schema/derived/777-protocol.json, or a compiler fix never reaches it.
+    derived = COMPILER.ComponentValidatorCompiler(
+        json.loads((ROOT / "schema" / "derived" / "777-protocol.json").read_text(
+            encoding="utf-8")),
+        777,
+    ).render().replace("mc_generated_777", "mc_derived_777")
+    assert derived in (ROOT / "api.c").read_text(encoding="utf-8"), \
+        "api.c's 777 Slot validator is stale: regenerate it from 777-protocol.json"
+
     embedded_header = """/* Generated from minecraft-data; do not edit. */
 #ifndef MC_PROTOCOL_GENERATED_999_H
 #define MC_PROTOCOL_GENERATED_999_H

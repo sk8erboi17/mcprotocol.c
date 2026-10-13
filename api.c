@@ -5773,9 +5773,6 @@ static bool mc_generated_768_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -5838,9 +5835,6 @@ static bool mc_generated_768_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_768_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -6538,9 +6532,6 @@ static bool mc_generated_768_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_768_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
         bool mc_show_in_tooltip_153 = false;
         if (!mc_reader_bool(reader, &mc_show_in_tooltip_153)) return false;
     }
@@ -6689,9 +6680,6 @@ static bool mc_generated_768_component_slot_component(McReader *reader, unsigned
     }
     else if (mc_type_1 == 66) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -7075,9 +7063,6 @@ static bool mc_generated_774_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -7140,9 +7125,6 @@ static bool mc_generated_774_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_774_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -7392,9 +7374,6 @@ static bool mc_generated_774_component_resolvable_profile(McReader *reader, unsi
     else if (mc_type_1 == 1) {
         if (!mc_generated_774_component_game_profile(reader, depth + 1U)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     if (!mc_generated_774_component_player_skin_patch(reader, depth + 1U)) return false;
     return true;
 }
@@ -7464,9 +7443,6 @@ static bool mc_generated_774_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_774_component_damage_type_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 9) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
@@ -7534,14 +7510,14 @@ static bool mc_generated_774_component_slot_component(McReader *reader, unsigned
         }
     }
     else if (mc_type_1 == 16) {
-        int32_t mc_attributes_count_33 = 0;
-        if (!mc_reader_varint(reader, &mc_attributes_count_33)) return false;
-        if (mc_attributes_count_33 < 0
-            || (uint64_t)mc_attributes_count_33 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_data_branch_16_count_33 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_16_count_33)) return false;
+        if (mc_data_branch_16_count_33 < 0
+            || (uint64_t)mc_data_branch_16_count_33 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_attributes_bounded_count_34 = (uint32_t)mc_attributes_count_33;
-        for (uint32_t mc_attributes_index_35 = 0U; mc_attributes_index_35 < mc_attributes_bounded_count_34; ++mc_attributes_index_35) {
+        const uint32_t mc_data_branch_16_bounded_count_34 = (uint32_t)mc_data_branch_16_count_33;
+        for (uint32_t mc_data_branch_16_index_35 = 0U; mc_data_branch_16_index_35 < mc_data_branch_16_bounded_count_34; ++mc_data_branch_16_index_35) {
             int32_t mc_type_id_36 = 0;
             if (!mc_reader_varint(reader, &mc_type_id_36)) return false;
             McBytes mc_name_37;
@@ -7561,17 +7537,14 @@ static bool mc_generated_774_component_slot_component(McReader *reader, unsigned
             if (mc_slot_40 != 0 && mc_slot_40 != 1 && mc_slot_40 != 2 && mc_slot_40 != 3 && mc_slot_40 != 4 && mc_slot_40 != 5 && mc_slot_40 != 6 && mc_slot_40 != 7 && mc_slot_40 != 8 && mc_slot_40 != 9 && mc_slot_40 != 10) {
                 return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
-        }
-        int32_t mc_type_41 = 0;
-        if (!mc_reader_varint(reader, &mc_type_41)) return false;
-        if (mc_type_41 != 0 && mc_type_41 != 1 && mc_type_41 != 2) {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
-        if (mc_type_41 == 2) {
-            if (!mc_reader_nbt(reader, false, NULL)) return false;
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            int32_t mc_type_41 = 0;
+            if (!mc_reader_varint(reader, &mc_type_41)) return false;
+            if (mc_type_41 != 0 && mc_type_41 != 1 && mc_type_41 != 2) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            if (mc_type_41 == 2) {
+                if (!mc_reader_nbt(reader, false, NULL)) return false;
+            }
         }
     }
     else if (mc_type_1 == 17) {
@@ -8178,9 +8151,6 @@ static bool mc_generated_774_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_774_component_instrument_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 60) {
         bool mc_has_holder_201 = false;
@@ -8197,9 +8167,6 @@ static bool mc_generated_774_component_slot_component(McReader *reader, unsigned
             if (mc_material_branch_1_holder_203 == 0) {
                 if (!mc_generated_774_component_armor_trim_material(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 61) {
@@ -8221,9 +8188,6 @@ static bool mc_generated_774_component_slot_component(McReader *reader, unsigned
             if (mc_song_branch_1_holder_207 == 0) {
                 if (!mc_generated_774_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 63) {
@@ -8463,9 +8427,6 @@ static bool mc_generated_774_component_slot_component(McReader *reader, unsigned
     else if (mc_type_1 == 103) {
         int32_t mc_data_branch_103_267 = 0;
         if (!mc_reader_varint(reader, &mc_data_branch_103_267)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -8756,9 +8717,6 @@ static bool mc_generated_770_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -8821,9 +8779,6 @@ static bool mc_generated_770_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_770_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -9594,9 +9549,6 @@ static bool mc_generated_770_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_770_component_instrument_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 53) {
         bool mc_has_holder_168 = false;
@@ -9613,9 +9565,6 @@ static bool mc_generated_770_component_slot_component(McReader *reader, unsigned
             if (mc_material_branch_1_holder_170 == 0) {
                 if (!mc_generated_770_component_armor_trim_material(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 54) {
@@ -9637,9 +9586,6 @@ static bool mc_generated_770_component_slot_component(McReader *reader, unsigned
             if (mc_song_branch_1_holder_174 == 0) {
                 if (!mc_generated_770_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 56) {
@@ -9902,9 +9848,6 @@ static bool mc_generated_770_component_slot_component(McReader *reader, unsigned
         int32_t mc_data_branch_95_245 = 0;
         if (!mc_reader_varint(reader, &mc_data_branch_95_245)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -10129,9 +10072,6 @@ static bool mc_generated_769_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -10194,9 +10134,6 @@ static bool mc_generated_769_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_769_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -10894,9 +10831,6 @@ static bool mc_generated_769_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_769_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
         bool mc_show_in_tooltip_153 = false;
         if (!mc_reader_bool(reader, &mc_show_in_tooltip_153)) return false;
     }
@@ -11045,9 +10979,6 @@ static bool mc_generated_769_component_slot_component(McReader *reader, unsigned
     }
     else if (mc_type_1 == 66) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -11398,9 +11329,6 @@ static bool mc_generated_773_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -11463,9 +11391,6 @@ static bool mc_generated_773_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_773_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -11694,9 +11619,6 @@ static bool mc_generated_773_component_resolvable_profile(McReader *reader, unsi
     else if (mc_type_1 == 1) {
         if (!mc_generated_773_component_game_profile(reader, depth + 1U)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     if (!mc_generated_773_component_player_skin_patch(reader, depth + 1U)) return false;
     return true;
 }
@@ -11832,9 +11754,6 @@ static bool mc_generated_773_component_slot_component(McReader *reader, unsigned
             }
             if (mc_type_34 == 2) {
                 if (!mc_reader_nbt(reader, false, NULL)) return false;
-            }
-            else {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
         }
     }
@@ -12344,9 +12263,6 @@ static bool mc_generated_773_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_773_component_instrument_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 53) {
         bool mc_has_holder_173 = false;
@@ -12363,9 +12279,6 @@ static bool mc_generated_773_component_slot_component(McReader *reader, unsigned
             if (mc_material_branch_1_holder_175 == 0) {
                 if (!mc_generated_773_component_armor_trim_material(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 54) {
@@ -12387,9 +12300,6 @@ static bool mc_generated_773_component_slot_component(McReader *reader, unsigned
             if (mc_song_branch_1_holder_179 == 0) {
                 if (!mc_generated_773_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 56) {
@@ -12620,9 +12530,6 @@ static bool mc_generated_773_component_slot_component(McReader *reader, unsigned
         int32_t mc_data_branch_95_237 = 0;
         if (!mc_reader_varint(reader, &mc_data_branch_95_237)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -12845,9 +12752,6 @@ static bool mc_generated_767_component_item_block_property(McReader *reader, uns
     else if (mc_is_exact_match_2 == 1) {
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -13436,9 +13340,6 @@ static bool mc_generated_767_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_767_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
         bool mc_show_in_tooltip_119 = false;
         if (!mc_reader_bool(reader, &mc_show_in_tooltip_119)) return false;
     }
@@ -13587,9 +13488,6 @@ static bool mc_generated_767_component_slot_component(McReader *reader, unsigned
     }
     else if (mc_type_1 == 56) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -13988,9 +13886,6 @@ static bool mc_generated_775_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -14053,9 +13948,6 @@ static bool mc_generated_775_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -14305,9 +14197,6 @@ static bool mc_generated_775_component_resolvable_profile(McReader *reader, unsi
     else if (mc_type_1 == 1) {
         if (!mc_generated_775_component_game_profile(reader, depth + 1U)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     if (!mc_generated_775_component_player_skin_patch(reader, depth + 1U)) return false;
     return true;
 }
@@ -14376,9 +14265,6 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
             if (mc_damage_type_branch_1_holder_14 == 0) {
                 if (!mc_generated_775_component_damage_type_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 9) {
@@ -14481,9 +14367,6 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
             }
             if (mc_type_41 == 2) {
                 if (!mc_reader_nbt(reader, false, NULL)) return false;
-            }
-            else {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
         }
     }
@@ -15098,9 +14981,6 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_775_component_instrument_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 62) {
         bool mc_has_holder_202 = false;
@@ -15117,9 +14997,6 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
             if (mc_material_branch_1_holder_204 == 0) {
                 if (!mc_generated_775_component_armor_trim_material(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 63) {
@@ -15141,9 +15018,6 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
             if (mc_song_branch_1_holder_208 == 0) {
                 if (!mc_generated_775_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 65) {
@@ -15398,9 +15272,6 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
     }
     else if (mc_type_1 == 109) {
         if (!mc_generated_775_component_dye_color(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -15691,9 +15562,6 @@ static bool mc_generated_772_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -15756,9 +15624,6 @@ static bool mc_generated_772_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_772_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -16035,9 +15900,6 @@ static bool mc_generated_772_component_slot_component(McReader *reader, unsigned
             }
             if (mc_type_34 == 2) {
                 if (!mc_reader_nbt(reader, false, NULL)) return false;
-            }
-            else {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
         }
     }
@@ -16543,9 +16405,6 @@ static bool mc_generated_772_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_772_component_instrument_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 53) {
         bool mc_has_holder_171 = false;
@@ -16562,9 +16421,6 @@ static bool mc_generated_772_component_slot_component(McReader *reader, unsigned
             if (mc_material_branch_1_holder_173 == 0) {
                 if (!mc_generated_772_component_armor_trim_material(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 54) {
@@ -16586,9 +16442,6 @@ static bool mc_generated_772_component_slot_component(McReader *reader, unsigned
             if (mc_song_branch_1_holder_177 == 0) {
                 if (!mc_generated_772_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 56) {
@@ -16850,9 +16703,6 @@ static bool mc_generated_772_component_slot_component(McReader *reader, unsigned
     else if (mc_type_1 == 95) {
         int32_t mc_data_branch_95_248 = 0;
         if (!mc_reader_varint(reader, &mc_data_branch_95_248)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -17143,9 +16993,6 @@ static bool mc_generated_771_component_item_block_property(McReader *reader, uns
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -17208,9 +17055,6 @@ static bool mc_generated_771_component_item_consume_effect(McReader *reader, uns
     }
     else if (mc_type_1 == 4) {
         if (!mc_generated_771_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -17487,9 +17331,6 @@ static bool mc_generated_771_component_slot_component(McReader *reader, unsigned
             }
             if (mc_type_34 == 2) {
                 if (!mc_reader_nbt(reader, false, NULL)) return false;
-            }
-            else {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
         }
     }
@@ -17995,9 +17836,6 @@ static bool mc_generated_771_component_slot_component(McReader *reader, unsigned
                 if (!mc_generated_771_component_instrument_data(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 53) {
         bool mc_has_holder_171 = false;
@@ -18014,9 +17852,6 @@ static bool mc_generated_771_component_slot_component(McReader *reader, unsigned
             if (mc_material_branch_1_holder_173 == 0) {
                 if (!mc_generated_771_component_armor_trim_material(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 54) {
@@ -18038,9 +17873,6 @@ static bool mc_generated_771_component_slot_component(McReader *reader, unsigned
             if (mc_song_branch_1_holder_177 == 0) {
                 if (!mc_generated_771_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 56) {
@@ -18303,9 +18135,6 @@ static bool mc_generated_771_component_slot_component(McReader *reader, unsigned
         int32_t mc_data_branch_95_248 = 0;
         if (!mc_reader_varint(reader, &mc_data_branch_95_248)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -18527,9 +18356,6 @@ static bool mc_generated_766_component_item_block_property(McReader *reader, uns
     else if (mc_is_exact_match_2 == 1) {
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -19231,9 +19057,6 @@ static bool mc_generated_766_component_slot_component(McReader *reader, unsigned
     else if (mc_type_1 == 55) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -19680,9 +19503,6 @@ static bool mc_derived_777_component_item_block_property(McReader *reader, unsig
         McBytes mc_exact_value_5;
         if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -19747,9 +19567,6 @@ static bool mc_derived_777_component_item_consume_effect26_3(McReader *reader, u
     }
     else if (mc_type_1 == 4) {
         if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -20034,9 +19851,6 @@ static bool mc_derived_777_component_resolvable_float(McReader *reader, unsigned
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-    }
     return true;
 }
 
@@ -20055,9 +19869,6 @@ static bool mc_derived_777_component_resolvable_int(McReader *reader, unsigned i
     else if (mc_is_value_1 == 1) {
         int32_t mc_value_branch_1_3 = 0;
         if (!mc_reader_i32(reader, &mc_value_branch_1_3)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }
@@ -20078,9 +19889,6 @@ static bool mc_derived_777_component_resolvable_profile(McReader *reader, unsign
     }
     else if (mc_type_1 == 1) {
         if (!mc_derived_777_component_game_profile(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     if (!mc_derived_777_component_player_skin_patch(reader, depth + 1U)) return false;
     return true;
@@ -20150,9 +19958,6 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
             if (mc_damage_type_branch_1_holder_14 == 0) {
                 if (!mc_derived_777_component_damage_type_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 9) {
@@ -20255,9 +20060,6 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
             }
             if (mc_type_41 == 2) {
                 if (!mc_reader_nbt(reader, false, NULL)) return false;
-            }
-            else {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
         }
     }
@@ -20886,9 +20688,6 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
                 if (!mc_derived_777_component_instrument_data26_3(reader, depth + 1U)) return false;
             }
         }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-        }
     }
     else if (mc_type_1 == 64) {
         bool mc_has_holder_205 = false;
@@ -20905,9 +20704,6 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
             if (mc_material_branch_1_holder_207 == 0) {
                 if (!mc_derived_777_component_armor_trim_material26_3(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 65) {
@@ -20929,9 +20725,6 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
             if (mc_song_branch_1_holder_211 == 0) {
                 if (!mc_derived_777_component_jukebox_song_data(reader, depth + 1U)) return false;
             }
-        }
-        else {
-            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 67) {
@@ -21264,9 +21057,6 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
     }
     else if (mc_type_1 == 121) {
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
-    }
-    else {
-        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
 }

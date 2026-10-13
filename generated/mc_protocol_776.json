@@ -35,6 +35,9 @@
     },
     {
       "protocol": 774,
+      "schema_corrections": [
+        "attribute_modifiers"
+      ],
       "source_sha256": "4562ba6f519a698f0eddb64cae1b938570eba3a3a0c6ccf0d53e057abded7a81"
     },
     {
@@ -47,7 +50,7 @@
     }
   ],
   "embedded_outputs": {
-    "api.c": "b50c5c27a5be035870b74cfeb83fed5c32d16f43df301882cfa7fb7b278547cc",
+    "api.c": "1be7d81e7d46baff4b44df3baa5944149285bea6fcb254c9ea0eebf1ebf6acb2",
     "api.h": "e0f03c3acdd1dcf164ca77a84b736d2ea602739104c03455f09d5f0f1be94aa4"
   },
   "generated_packets": [
@@ -63,7 +66,7 @@
     }
   ],
   "generator_version": 2,
-  "overlay_sha256": "593b71076bcc2f1cc5fca98c866971ae0e457f4caa9597c3c4898672e5d0839a",
+  "overlay_sha256": "dc439940a5363ef0442db7d9869e7886c05977a13d2094d7e97bcc06078ede07",
   "packet_id_count": 257,
   "protocol": 776,
   "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"

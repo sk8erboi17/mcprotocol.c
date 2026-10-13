@@ -8,6 +8,7 @@ must never guess a field layout or silently expose an opaque remainder.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import re
@@ -440,16 +441,17 @@ class ComponentValidatorCompiler:
                     f"{label}_branch_{raw}")
                 lines.extend(nested)
                 lines.append(f"{indent}}}")
+            # ProtoDef: a switch without "default" is void for every value it
+            # does not list. The selector's own mapper has already refused
+            # values outside its mappings, so the unlisted ones that reach
+            # here are valid and carry no payload, e.g. the DEFAULT and
+            # HIDDEN attribute modifier displays (only OVERRIDE has data).
             if "default" in options:
                 lines.append(f"{indent}else {{")
                 nested, _ = self._node(
                     options["default"], indent + "    ", environment,
                     f"{label}_default")
                 lines.extend(nested)
-                lines.append(f"{indent}}}")
-            else:
-                lines.append(f"{indent}else {{")
-                lines.append(self._invalid(indent + "    "))
                 lines.append(f"{indent}}}")
             return lines, None
         if kind == "registryEntryHolder":
@@ -533,6 +535,78 @@ class ComponentValidatorCompiler:
         return "\n".join(lines).rstrip() + "\n"
 
 
+def slot_component_branches(document: dict[str, Any],
+                            protocol: int) -> dict[str, Any]:
+    """Return the SlotComponent data switch: component name -> value schema."""
+    root = document.get("types", {}).get("SlotComponent")
+    if isinstance(root, list) and len(root) == 2 and root[0] == "container" \
+            and isinstance(root[1], list):
+        for field in root[1]:
+            schema = field.get("type") if isinstance(field, dict) else None
+            if field.get("name") == "data" and isinstance(schema, list) \
+                    and len(schema) == 2 and schema[0] == "switch" \
+                    and isinstance(schema[1], dict) \
+                    and isinstance(schema[1].get("fields"), dict):
+                return schema[1]["fields"]
+    raise ValueError(f"protocol {protocol}: SlotComponent has no data switch")
+
+
+def apply_component_schema_corrections(
+    document: dict[str, Any], protocol: int, corrections: list[Any],
+) -> list[str]:
+    """Replace known-wrong minecraft-data component schemas, in place.
+
+    A correction names the protocols it fixes, the component, the exact schema
+    minecraft-data ships ("expect") and the vanilla one ("replace"). It applies
+    only on an exact match, so a corrected upstream release (or any other edit
+    of that component) fails generation instead of being silently overwritten:
+    then re-read the vanilla codec and drop or update the correction.
+    Returns the names of the components corrected for this protocol.
+    """
+    applied: list[str] = []
+    for correction in corrections:
+        if protocol not in correction["protocols"]:
+            continue
+        name = correction["component"]
+        branches = slot_component_branches(document, protocol)
+        if name not in branches:
+            raise ValueError(
+                f"protocol {protocol}: component schema correction for "
+                f"unknown component {name}"
+            )
+        if branches[name] != correction["expect"]:
+            raise ValueError(
+                f"protocol {protocol}: minecraft-data {name} no longer matches "
+                "the schema its correction expects; re-check the vanilla codec "
+                "and update or remove the correction"
+            )
+        branches[name] = copy.deepcopy(correction["replace"])
+        applied.append(name)
+    return applied
+
+
+def component_schema_corrections(overlay: dict[str, Any] | None) -> list[Any]:
+    corrections = (overlay or {}).get("component_schema_corrections", [])
+    if not isinstance(corrections, list):
+        raise ValueError("component_schema_corrections must be a list")
+    for correction in corrections:
+        if not isinstance(correction, dict) \
+                or set(correction) != {
+                    "protocols", "component", "reason", "expect", "replace"} \
+                or not isinstance(correction["protocols"], list) \
+                or not correction["protocols"] \
+                or not all(isinstance(value, int)
+                           for value in correction["protocols"]) \
+                or not isinstance(correction["component"], str) \
+                or not isinstance(correction["reason"], str) \
+                or not correction["reason"]:
+            raise ValueError(
+                "a component schema correction needs exactly protocols "
+                "(non-empty int list), component, reason, expect and replace"
+            )
+    return corrections
+
+
 def generated_component_validators(
     specifications: list[tuple[int, bytes]],
     overlay: dict[str, Any] | None = None,
@@ -546,7 +620,9 @@ def generated_component_validators(
     renames = (overlay or {}).get("component_type_renames", {})
     if not isinstance(renames, dict):
         raise ValueError("component_type_renames must be an object")
+    corrections = component_schema_corrections(overlay)
     applied_renames: set[str] = set()
+    corrected_protocols: set[int] = set()
     for protocol, raw in sorted(specifications):
         digest = hashlib.sha256(raw).hexdigest()
         document = json.loads(raw)
@@ -558,16 +634,35 @@ def generated_component_validators(
                 if name in renames:
                     mappings[1]["mappings"][raw_id] = renames[name]
                     applied_renames.add(name)
-        if digest not in by_hash:
-            by_hash[digest] = (protocol, document)
-        representative = by_hash[digest][0]
+        corrected = apply_component_schema_corrections(
+            document, protocol, corrections)
+        if corrected:
+            corrected_protocols.add(protocol)
+        # Two protocols share one validator only when both the source bytes
+        # and the corrections applied to them are the same.
+        key = digest + "".join(f"+{name}" for name in corrected)
+        if key not in by_hash:
+            by_hash[key] = (protocol, document)
+        representative = by_hash[key][0]
         protocol_to_representative[protocol] = representative
-        report.append({"protocol": protocol, "source_sha256": digest})
+        entry: dict[str, Any] = {"protocol": protocol, "source_sha256": digest}
+        if corrected:
+            entry["schema_corrections"] = corrected
+        report.append(entry)
     missing_renames = set(renames) - applied_renames
     if missing_renames:
         raise ValueError(
             "component type rename source not found: "
             + ", ".join(sorted(missing_renames))
+        )
+    unused = sorted({
+        protocol for correction in corrections
+        for protocol in correction["protocols"]
+    } - corrected_protocols)
+    if unused:
+        raise ValueError(
+            "component schema correction names protocols without a profile: "
+            + ", ".join(str(protocol) for protocol in unused)
         )
 
     sections = [

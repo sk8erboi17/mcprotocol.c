@@ -2012,6 +2012,64 @@ static void expect_component(McItemComponentIterator *iterator, int32_t type_id,
     if (size != 0U) assert(memcmp(value.data.data, data, size) == 0);
 }
 
+/* ATTRIBUTE_MODIFIERS since 1.21.6 (771). The vanilla codec is
+ * ItemAttributeModifiers.STREAM_CODEC = list(Entry.STREAM_CODEC) with
+ * Entry = attribute holder id (VarInt), modifier id (String), amount (f64),
+ * operation (VarInt), slot group (VarInt), display (VarInt type, then the text
+ * component NBT only for OVERRIDE = 2; DEFAULT = 0 and HIDDEN = 1 are units).
+ * minecraft-data 1.21.11 writes the display once after the list, and a ProtoDef
+ * switch without a default must read nothing for the unlisted types; both
+ * errors made a real 1.21.11 server's sword unreadable. The bytes below are
+ * written by hand from that codec, independent of the library encoder. */
+static void attribute_modifier_display_is_per_entry(void)
+{
+    static const unsigned char entries[] = {
+        3U,
+        /* attack_damage, "a:b", +4.0, add, mainhand, DEFAULT */
+        1U, 3U, 'a', ':', 'b', 0x40U, 0x10U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 1U, 0U,
+        /* attack_speed, "a:c", -2.4, add, mainhand, HIDDEN */
+        4U, 3U, 'a', ':', 'c', 0xc0U, 0x03U, 0x33U, 0x33U, 0x33U, 0x33U, 0x33U,
+        0x33U, 0U, 1U, 1U,
+        /* armor, "a:d", +2.0, multiply_total, chest, OVERRIDE "hi" (NBT string) */
+        0U, 3U, 'a', ':', 'd', 0x40U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 2U, 6U, 2U,
+        0x08U, 0U, 2U, 'h', 'i',
+    };
+    for (int protocol = 771; protocol <= 777; ++protocol) {
+        /* 1.21.11 inserted use_effects, minimum_attack_charge and damage_type
+         * before it: ID 13 up to 1.21.9, 16 from 1.21.11. */
+        const unsigned char type = protocol <= 773 ? 13U : 16U;
+        unsigned char wire[8U + sizeof(entries) + 1U];
+        const unsigned char header[] = {1U, 0x99U, 0x07U, 1U, 0U, type};
+        memcpy(wire, header, sizeof(header));
+        memcpy(wire + sizeof(header), entries, sizeof(entries));
+        const size_t size = sizeof(header) + sizeof(entries);
+        McReader reader;
+        McItemStackView item;
+        mc_reader_init(&reader, wire, size);
+        assert(mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_FULL, &item));
+        assert(mc_reader_finish(&reader));
+        McItemComponentIterator iterator;
+        assert(mc_item_components_iterator(&item, protocol, &iterator));
+        expect_component(&iterator, type, entries, sizeof(entries), false);
+        assert(!iterator.reader.failed && mc_reader_finish(&iterator.reader));
+
+        /* An empty list is the whole value: no trailing display follows it. */
+        const unsigned char empty[] = {1U, 0x99U, 0x07U, 1U, 0U, type, 0U};
+        mc_reader_init(&reader, empty, sizeof(empty));
+        assert(mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_FULL, &item));
+        assert(mc_reader_finish(&reader));
+
+        /* Every display type outside DEFAULT/HIDDEN/OVERRIDE is still refused,
+         * and so is an OVERRIDE whose text component is missing. */
+        wire[sizeof(header) + 16U] = 3U;
+        mc_reader_init(&reader, wire, size);
+        assert(!mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_FULL, &item));
+        wire[sizeof(header) + 16U] = 0U;
+        mc_reader_init(&reader, wire, size - 5U);
+        assert(!mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_FULL, &item));
+    }
+}
+
 static void item_components_are_bounded_borrowed_views(void)
 {
     /* Independent wire bytes: damage=1500, max_damage=1561, empty network
@@ -2758,6 +2816,7 @@ int main(int argc, char **argv)
     use_item_bodies_match_node();
     untrusted_component_items_match_node();
     item_components_are_bounded_borrowed_views();
+    attribute_modifier_display_is_per_entry();
     empty_window_clicks_are_versioned();
     legacy_window_clicks_include_predicted_stacks();
     container_buttons_match_node_and_source();
