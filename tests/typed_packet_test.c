@@ -969,6 +969,38 @@ static void test_metadata_serializer_removal(void)
         "entity_metadata", captured, sizeof(captured));
 }
 
+static void test_signed_entity_spawn(void)
+{
+    /* Actual 26.2 AddEntity for a virtual HUD entity: id -1400000000.
+     * Its coordinates, velocity, angles and object data must still decode
+     * exactly, and accepting signed ids must not weaken truncation checks. */
+    static const unsigned char captured[] =
+        "\x80\xe4\xb6\xe4\x0a\xe1\x7a\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        "\x00\xac\x8d\xb2\x00\x84\x01\xbf\xeb\x89\xc0\x00\x00\x00\x00\x40"
+        "\x53\xb3\x33\x33\x00\x00\x00\xbf\xe1\x56\xa0\x00\x00\x00\x00\x00"
+        "\x00\x00\x00\x00";
+    static const int protocols[] = {774, 775, 776, 777};
+    const size_t length = sizeof(captured) - 1U;
+    assert(length == 52U);
+    for (size_t p = 0; p < sizeof(protocols) / sizeof(protocols[0]); p++) {
+        McReader reader;
+        McClientboundEntitySpawn spawn = {0};
+        mc_reader_init(&reader, captured, length);
+        assert(mc_reader_clientbound_entity_spawn(&reader, protocols[p], &spawn));
+        assert(spawn.entity_id == -1400000000);
+        assert(spawn.entity_type == 132);
+        assert(spawn.x < 0.0 && spawn.y > 78.0 && spawn.y < 79.0 && spawn.z < 0.0);
+        assert(spawn.velocity_x == 0.0 && spawn.velocity_y == 0.0 && spawn.velocity_z == 0.0);
+        assert(mc_reader_remaining(&reader) == 0U);
+        for (size_t n = 0; n < length; n++) {
+            spawn.entity_id = 123;
+            mc_reader_init(&reader, captured, n);
+            assert(!mc_reader_clientbound_entity_spawn(&reader, protocols[p], &spawn));
+            assert(spawn.entity_id == 123);
+        }
+    }
+}
+
 static void test_dispatch_errors(void)
 {
     TestDecoded decoded;
@@ -992,6 +1024,7 @@ int main(void)
     test_clientbound_tier_a();
     test_inventory_and_multi_block();
     test_metadata_serializer_removal();
+    test_signed_entity_spawn();
     test_dispatch_errors();
     puts("PASS typed packet families, exact decoding and cross-version Tier A core");
     return 0;

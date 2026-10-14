@@ -23952,8 +23952,9 @@ bool mc_reader_clientbound_entity_spawn(McReader *reader, int protocol,
         if (reader != NULL) reader->failed = true;
         return false;
     }
-    if (!mc_reader_varint(reader, &decoded.entity_id)
-        || decoded.entity_id < 0) {
+    /* Entity identifiers are signed VarInts, including virtual client-side
+     * entities. Registry ids below remain non-negative. */
+    if (!mc_reader_varint(reader, &decoded.entity_id)) {
         return typed_invalid(reader);
     }
 
