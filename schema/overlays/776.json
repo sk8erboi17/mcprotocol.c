@@ -201,6 +201,416 @@
           ]
         }
       ]
+    },
+    {
+      "protocols": [
+        775,
+        776
+      ],
+      "component": "instrument",
+      "reason": "Official 26.1.2/26.2 instrument STREAM_CODEC uses Holder directly, without the EitherHolder Bool used by 1.21.11. Confirmed against official ItemData.java streams and the release decompiled codec.",
+      "expect": [
+        "container",
+        [
+          {
+            "name": "hasHolder",
+            "type": "bool"
+          },
+          {
+            "name": "data",
+            "type": [
+              "switch",
+              {
+                "compareTo": "hasHolder",
+                "fields": {
+                  "true": [
+                    "registryEntryHolder",
+                    {
+                      "baseName": "instrumentId",
+                      "otherwise": {
+                        "name": "data",
+                        "type": "InstrumentData"
+                      }
+                    }
+                  ],
+                  "false": "string"
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "replace": [
+        "registryEntryHolder",
+        {
+          "baseName": "instrumentId",
+          "otherwise": {
+            "name": "data",
+            "type": "InstrumentData"
+          }
+        }
+      ]
+    },
+    {
+      "protocols": [
+        775,
+        776
+      ],
+      "component": "provides_trim_material",
+      "reason": "Official 26.1.2/26.2 provides_trim_material STREAM_CODEC uses Holder directly, without the EitherHolder Bool used by 1.21.11. Confirmed against official ItemData.java streams and the release decompiled codec.",
+      "expect": [
+        "container",
+        [
+          {
+            "name": "hasHolder",
+            "type": "bool"
+          },
+          {
+            "name": "material",
+            "type": [
+              "switch",
+              {
+                "compareTo": "hasHolder",
+                "fields": {
+                  "true": [
+                    "registryEntryHolder",
+                    {
+                      "baseName": "materialId",
+                      "otherwise": {
+                        "name": "data",
+                        "type": "ArmorTrimMaterial"
+                      }
+                    }
+                  ],
+                  "false": "string"
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "replace": [
+        "registryEntryHolder",
+        {
+          "baseName": "materialId",
+          "otherwise": {
+            "name": "data",
+            "type": "ArmorTrimMaterial"
+          }
+        }
+      ]
+    },
+    {
+      "protocols": [
+        775,
+        776
+      ],
+      "component": "jukebox_playable",
+      "reason": "Official 26.1.2/26.2 jukebox_playable STREAM_CODEC uses Holder directly, without the EitherHolder Bool used by 1.21.11. Confirmed against official ItemData.java streams and the release decompiled codec.",
+      "expect": [
+        "container",
+        [
+          {
+            "name": "hasHolder",
+            "type": "bool"
+          },
+          {
+            "name": "song",
+            "type": [
+              "switch",
+              {
+                "compareTo": "hasHolder",
+                "fields": {
+                  "true": [
+                    "registryEntryHolder",
+                    {
+                      "baseName": "songId",
+                      "otherwise": {
+                        "name": "data",
+                        "type": "JukeboxSongData"
+                      }
+                    }
+                  ],
+                  "false": "string"
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "replace": [
+        "registryEntryHolder",
+        {
+          "baseName": "songId",
+          "otherwise": {
+            "name": "data",
+            "type": "JukeboxSongData"
+          }
+        }
+      ]
+    },
+    {
+      "protocols": [
+        775,
+        776
+      ],
+      "component": "use_remainder",
+      "reason": "Official 26.1.2/26.2 use_remainder STREAM_CODEC uses ItemStackTemplate: item ID, count and patch. Container entries are optional templates with a Bool, not optional ItemStack with a zero count.",
+      "expect": "Slot",
+      "replace": [
+        "container",
+        [
+          {
+            "name": "itemId",
+            "type": "varint"
+          },
+          {
+            "name": "itemCount",
+            "type": "varint"
+          },
+          {
+            "name": "addedComponentCount",
+            "type": "varint"
+          },
+          {
+            "name": "removedComponentCount",
+            "type": "varint"
+          },
+          {
+            "name": "components",
+            "type": [
+              "array",
+              {
+                "count": "addedComponentCount",
+                "type": "SlotComponent"
+              }
+            ]
+          },
+          {
+            "name": "removeComponents",
+            "type": [
+              "array",
+              {
+                "count": "removedComponentCount",
+                "type": "SlotComponentType"
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "protocols": [
+        775,
+        776
+      ],
+      "component": "charged_projectiles",
+      "reason": "Official 26.1.2/26.2 charged_projectiles STREAM_CODEC uses ItemStackTemplate: item ID, count and patch. Container entries are optional templates with a Bool, not optional ItemStack with a zero count.",
+      "expect": [
+        "container",
+        [
+          {
+            "name": "projectiles",
+            "type": [
+              "array",
+              {
+                "countType": "varint",
+                "type": "Slot"
+              }
+            ]
+          }
+        ]
+      ],
+      "replace": [
+        "array",
+        {
+          "countType": "varint",
+          "type": [
+            "container",
+            [
+              {
+                "name": "itemId",
+                "type": "varint"
+              },
+              {
+                "name": "itemCount",
+                "type": "varint"
+              },
+              {
+                "name": "addedComponentCount",
+                "type": "varint"
+              },
+              {
+                "name": "removedComponentCount",
+                "type": "varint"
+              },
+              {
+                "name": "components",
+                "type": [
+                  "array",
+                  {
+                    "count": "addedComponentCount",
+                    "type": "SlotComponent"
+                  }
+                ]
+              },
+              {
+                "name": "removeComponents",
+                "type": [
+                  "array",
+                  {
+                    "count": "removedComponentCount",
+                    "type": "SlotComponentType"
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "protocols": [
+        775,
+        776
+      ],
+      "component": "bundle_contents",
+      "reason": "Official 26.1.2/26.2 bundle_contents STREAM_CODEC uses ItemStackTemplate: item ID, count and patch. Container entries are optional templates with a Bool, not optional ItemStack with a zero count.",
+      "expect": [
+        "container",
+        [
+          {
+            "name": "contents",
+            "type": [
+              "array",
+              {
+                "countType": "varint",
+                "type": "Slot"
+              }
+            ]
+          }
+        ]
+      ],
+      "replace": [
+        "array",
+        {
+          "countType": "varint",
+          "type": [
+            "container",
+            [
+              {
+                "name": "itemId",
+                "type": "varint"
+              },
+              {
+                "name": "itemCount",
+                "type": "varint"
+              },
+              {
+                "name": "addedComponentCount",
+                "type": "varint"
+              },
+              {
+                "name": "removedComponentCount",
+                "type": "varint"
+              },
+              {
+                "name": "components",
+                "type": [
+                  "array",
+                  {
+                    "count": "addedComponentCount",
+                    "type": "SlotComponent"
+                  }
+                ]
+              },
+              {
+                "name": "removeComponents",
+                "type": [
+                  "array",
+                  {
+                    "count": "removedComponentCount",
+                    "type": "SlotComponentType"
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "protocols": [
+        775,
+        776
+      ],
+      "component": "container",
+      "reason": "Official 26.1.2/26.2 container STREAM_CODEC uses ItemStackTemplate: item ID, count and patch. Container entries are optional templates with a Bool, not optional ItemStack with a zero count.",
+      "expect": [
+        "container",
+        [
+          {
+            "name": "contents",
+            "type": [
+              "array",
+              {
+                "countType": "varint",
+                "type": "Slot"
+              }
+            ]
+          }
+        ]
+      ],
+      "replace": [
+        "array",
+        {
+          "countType": "varint",
+          "type": [
+            "option",
+            [
+              "container",
+              [
+                {
+                  "name": "itemId",
+                  "type": "varint"
+                },
+                {
+                  "name": "itemCount",
+                  "type": "varint"
+                },
+                {
+                  "name": "addedComponentCount",
+                  "type": "varint"
+                },
+                {
+                  "name": "removedComponentCount",
+                  "type": "varint"
+                },
+                {
+                  "name": "components",
+                  "type": [
+                    "array",
+                    {
+                      "count": "addedComponentCount",
+                      "type": "SlotComponent"
+                    }
+                  ]
+                },
+                {
+                  "name": "removeComponents",
+                  "type": [
+                    "array",
+                    {
+                      "count": "removedComponentCount",
+                      "type": "SlotComponentType"
+                    }
+                  ]
+                }
+              ]
+            ]
+          ]
+        }
+      ]
     }
   ],
   "component_type_renames": {
@@ -209,5 +619,54 @@
   "packet_renames": {
     "play:serverbound:spectate_entity": "spectator_action"
   },
-  "release": "26.2"
+  "release": "26.2",
+  "component_registry_insertions": [
+    {
+      "protocol": 776,
+      "id": 78,
+      "name": "sulfur_cube_content",
+      "before": "lock",
+      "schema": [
+        "container",
+        [
+          {
+            "name": "itemId",
+            "type": "varint"
+          },
+          {
+            "name": "itemCount",
+            "type": "varint"
+          },
+          {
+            "name": "addedComponentCount",
+            "type": "varint"
+          },
+          {
+            "name": "removedComponentCount",
+            "type": "varint"
+          },
+          {
+            "name": "components",
+            "type": [
+              "array",
+              {
+                "count": "addedComponentCount",
+                "type": "SlotComponent"
+              }
+            ]
+          },
+          {
+            "name": "removeComponents",
+            "type": [
+              "array",
+              {
+                "count": "removedComponentCount",
+                "type": "SlotComponentType"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  ]
 }

@@ -1477,6 +1477,39 @@ def main() -> None:
         else:
             raise AssertionError(f"accepted a bad correction ({message})")
 
+    # A new component shifts only the selected release, and only while the
+    # pinned base still has the recorded entry at that position. Sharing the
+    # source bytes must not deduplicate the changed 776 profile with 775.
+    insertion = {
+        "protocol": 900, "id": 2, "name": "inserted", "before": "holder",
+        "schema": "varint",
+    }
+    inserted_source, inserted_report = COMPILER.generated_component_validators(
+        [(900, component_raw), (901, component_raw)],
+        dict(component_overlay, component_registry_insertions=[insertion]),
+    )
+    assert inserted_report[0]["registry_insertions"] == ["inserted"]
+    assert "registry_insertions" not in inserted_report[1]
+    assert "case 900: return mc_generated_900_component_slot_component" in inserted_source
+    assert "case 901: return mc_generated_901_component_slot_component" in inserted_source
+    already_corrected = copy.deepcopy(component_document)
+    COMPILER.apply_component_registry_insertions(already_corrected, 900, [insertion])
+    try:
+        COMPILER.apply_component_registry_insertions(already_corrected, 900, [insertion])
+    except ValueError as error:
+        assert "no longer matches its pinned base" in str(error)
+    else:
+        raise AssertionError("an already inserted component was shifted a second time")
+    try:
+        COMPILER.generated_component_validators(
+            [(901, component_raw)],
+            dict(component_overlay, component_registry_insertions=[insertion]),
+        )
+    except ValueError as error:
+        assert "without a profile" in str(error)
+    else:
+        raise AssertionError("unused registry insertion was accepted")
+
     # The 777 validator lives outside the generated region (minecraft-data has
     # no 26.3 schema) but must still be exactly what this compiler emits for
     # schema/derived/777-protocol.json, or a compiler fix never reaches it.

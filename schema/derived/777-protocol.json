@@ -9558,19 +9558,51 @@
         ],
         "bucket_entity_data": "anonymousNbt",
         "bundle_contents": [
-         "container",
-         [
-          {
-           "name": "contents",
-           "type": [
-            "array",
+         "array",
+         {
+          "countType": "varint",
+          "type": [
+           "container",
+           [
             {
-             "countType": "varint",
-             "type": "ItemStackTemplate"
+             "name": "itemId",
+             "type": "varint"
+            },
+            {
+             "name": "itemCount",
+             "type": "varint"
+            },
+            {
+             "name": "addedComponentCount",
+             "type": "varint"
+            },
+            {
+             "name": "removedComponentCount",
+             "type": "varint"
+            },
+            {
+             "name": "components",
+             "type": [
+              "array",
+              {
+               "count": "addedComponentCount",
+               "type": "SlotComponent"
+              }
+             ]
+            },
+            {
+             "name": "removeComponents",
+             "type": [
+              "array",
+              {
+               "count": "removedComponentCount",
+               "type": "SlotComponentType"
+              }
+             ]
             }
            ]
-          }
-         ]
+          ]
+         }
         ],
         "can_break": [
          "container",
@@ -9606,19 +9638,51 @@
         "cat/sound_variant": "varint",
         "cat/variant": "varint",
         "charged_projectiles": [
-         "container",
-         [
-          {
-           "name": "projectiles",
-           "type": [
-            "array",
+         "array",
+         {
+          "countType": "varint",
+          "type": [
+           "container",
+           [
             {
-             "countType": "varint",
-             "type": "ItemStackTemplate"
+             "name": "itemId",
+             "type": "varint"
+            },
+            {
+             "name": "itemCount",
+             "type": "varint"
+            },
+            {
+             "name": "addedComponentCount",
+             "type": "varint"
+            },
+            {
+             "name": "removedComponentCount",
+             "type": "varint"
+            },
+            {
+             "name": "components",
+             "type": [
+              "array",
+              {
+               "count": "addedComponentCount",
+               "type": "SlotComponent"
+              }
+             ]
+            },
+            {
+             "name": "removeComponents",
+             "type": [
+              "array",
+              {
+               "count": "removedComponentCount",
+               "type": "SlotComponentType"
+              }
+             ]
             }
            ]
-          }
-         ]
+          ]
+         }
         ],
         "chicken/sound_variant": [
          "registryEntryHolder",
@@ -9699,22 +9763,54 @@
          ]
         ],
         "container": [
-         "container",
-         [
-          {
-           "name": "contents",
-           "type": [
-            "array",
-            {
-             "countType": "varint",
-             "type": [
-              "option",
-              "ItemStackTemplate"
-             ]
-            }
+         "array",
+         {
+          "countType": "varint",
+          "type": [
+           "option",
+           [
+            "container",
+            [
+             {
+              "name": "itemId",
+              "type": "varint"
+             },
+             {
+              "name": "itemCount",
+              "type": "varint"
+             },
+             {
+              "name": "addedComponentCount",
+              "type": "varint"
+             },
+             {
+              "name": "removedComponentCount",
+              "type": "varint"
+             },
+             {
+              "name": "components",
+              "type": [
+               "array",
+               {
+                "count": "addedComponentCount",
+                "type": "SlotComponent"
+               }
+              ]
+             },
+             {
+              "name": "removeComponents",
+              "type": [
+               "array",
+               {
+                "count": "removedComponentCount",
+                "type": "SlotComponentType"
+               }
+              ]
+             }
+            ]
            ]
-          }
-         ]
+          ]
+         }
         ],
         "container_loot": "anonymousNbt",
         "cooking_fuel": [
@@ -9989,35 +10085,14 @@
         "glider": "void",
         "horse/variant": "varint",
         "instrument": [
-         "container",
-         [
-          {
-           "name": "hasHolder",
-           "type": "bool"
-          },
-          {
+         "registryEntryHolder",
+         {
+          "baseName": "instrumentId",
+          "otherwise": {
            "name": "data",
-           "type": [
-            "switch",
-            {
-             "compareTo": "hasHolder",
-             "fields": {
-              "false": "string",
-              "true": [
-               "registryEntryHolder",
-               {
-                "baseName": "instrumentId",
-                "otherwise": {
-                 "name": "data",
-                 "type": "InstrumentData26_3"
-                }
-               }
-              ]
-             }
-            }
-           ]
+           "type": "InstrumentData26_3"
           }
-         ]
+         }
         ],
         "intangible_projectile": "anonymousNbt",
         "interact_animation": [
@@ -10046,35 +10121,14 @@
         "item_model": "string",
         "item_name": "anonymousNbt",
         "jukebox_playable": [
-         "container",
-         [
-          {
-           "name": "hasHolder",
-           "type": "bool"
-          },
-          {
-           "name": "song",
-           "type": [
-            "switch",
-            {
-             "compareTo": "hasHolder",
-             "fields": {
-              "false": "string",
-              "true": [
-               "registryEntryHolder",
-               {
-                "baseName": "songId",
-                "otherwise": {
-                 "name": "data",
-                 "type": "JukeboxSongData"
-                }
-               }
-              ]
-             }
-            }
-           ]
+         "registryEntryHolder",
+         {
+          "baseName": "songId",
+          "otherwise": {
+           "name": "data",
+           "type": "JukeboxSongData"
           }
-         ]
+         }
         ],
         "kinetic_weapon": [
          "container",
@@ -10293,35 +10347,14 @@
         "provides_banner_patterns": "string",
         "provides_pottery_pattern": "varint",
         "provides_trim_material": [
-         "container",
-         [
-          {
-           "name": "hasHolder",
-           "type": "bool"
-          },
-          {
-           "name": "material",
-           "type": [
-            "switch",
-            {
-             "compareTo": "hasHolder",
-             "fields": {
-              "false": "string",
-              "true": [
-               "registryEntryHolder",
-               {
-                "baseName": "materialId",
-                "otherwise": {
-                 "name": "data",
-                 "type": "ArmorTrimMaterial26_3"
-                }
-               }
-              ]
-             }
-            }
-           ]
+         "registryEntryHolder",
+         {
+          "baseName": "materialId",
+          "otherwise": {
+           "name": "data",
+           "type": "ArmorTrimMaterial26_3"
           }
-         ]
+         }
         ],
         "rabbit/variant": "varint",
         "rarity": [
@@ -10505,7 +10538,47 @@
           }
          ]
         ],
-        "sulfur_cube_content": "Slot",
+        "sulfur_cube_content": [
+         "container",
+         [
+          {
+           "name": "itemId",
+           "type": "varint"
+          },
+          {
+           "name": "itemCount",
+           "type": "varint"
+          },
+          {
+           "name": "addedComponentCount",
+           "type": "varint"
+          },
+          {
+           "name": "removedComponentCount",
+           "type": "varint"
+          },
+          {
+           "name": "components",
+           "type": [
+            "array",
+            {
+             "count": "addedComponentCount",
+             "type": "SlotComponent"
+            }
+           ]
+          },
+          {
+           "name": "removeComponents",
+           "type": [
+            "array",
+            {
+             "count": "removedComponentCount",
+             "type": "SlotComponentType"
+            }
+           ]
+          }
+         ]
+        ],
         "suspicious_stew_effects": [
          "container",
          [
@@ -10670,7 +10743,47 @@
           }
          ]
         ],
-        "use_remainder": "ItemStackTemplate",
+        "use_remainder": [
+         "container",
+         [
+          {
+           "name": "itemId",
+           "type": "varint"
+          },
+          {
+           "name": "itemCount",
+           "type": "varint"
+          },
+          {
+           "name": "addedComponentCount",
+           "type": "varint"
+          },
+          {
+           "name": "removedComponentCount",
+           "type": "varint"
+          },
+          {
+           "name": "components",
+           "type": [
+            "array",
+            {
+             "count": "addedComponentCount",
+             "type": "SlotComponent"
+            }
+           ]
+          },
+          {
+           "name": "removeComponents",
+           "type": [
+            "array",
+            {
+             "count": "removedComponentCount",
+             "type": "SlotComponentType"
+            }
+           ]
+          }
+         ]
+        ],
         "villager/variant": "varint",
         "villager_food": "varint",
         "waxed": "void",

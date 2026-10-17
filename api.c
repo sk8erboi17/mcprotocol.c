@@ -14483,140 +14483,163 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
         }
     }
     else if (mc_type_1 == 25) {
-        if (!typed_skip_nested_item_stack(reader, 775, depth + 1U)) return false;
+        int32_t mc_item_id_77 = 0;
+        if (!mc_reader_varint(reader, &mc_item_id_77)) return false;
+        int32_t mc_item_count_78 = 0;
+        if (!mc_reader_varint(reader, &mc_item_count_78)) return false;
+        int32_t mc_added_component_count_79 = 0;
+        if (!mc_reader_varint(reader, &mc_added_component_count_79)) return false;
+        int32_t mc_removed_component_count_80 = 0;
+        if (!mc_reader_varint(reader, &mc_removed_component_count_80)) return false;
+        if (mc_added_component_count_79 < 0
+            || (uint64_t)mc_added_component_count_79 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_components_bounded_count_81 = (uint32_t)mc_added_component_count_79;
+        for (uint32_t mc_components_index_82 = 0U; mc_components_index_82 < mc_components_bounded_count_81; ++mc_components_index_82) {
+            if (!mc_generated_775_component_slot_component(reader, depth + 1U)) return false;
+        }
+        if (mc_removed_component_count_80 < 0
+            || (uint64_t)mc_removed_component_count_80 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_remove_components_bounded_count_83 = (uint32_t)mc_removed_component_count_80;
+        for (uint32_t mc_remove_components_index_84 = 0U; mc_remove_components_index_84 < mc_remove_components_bounded_count_83; ++mc_remove_components_index_84) {
+            if (!mc_generated_775_component_slot_component_type(reader, depth + 1U)) return false;
+        }
     }
     else if (mc_type_1 == 26) {
-        float mc_seconds_77 = 0;
-        if (!mc_reader_float(reader, &mc_seconds_77)) return false;
-        if (!isfinite(mc_seconds_77)) {
+        float mc_seconds_85 = 0;
+        if (!mc_reader_float(reader, &mc_seconds_85)) return false;
+        if (!isfinite(mc_seconds_85)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        bool mc_cooldown_group_present_78 = false;
-        if (!mc_reader_bool(reader, &mc_cooldown_group_present_78)) return false;
-        if (mc_cooldown_group_present_78) {
-            McBytes mc_cooldown_group_value_79;
-            if (!mc_reader_string(reader, &mc_cooldown_group_value_79)) return false;
+        bool mc_cooldown_group_present_86 = false;
+        if (!mc_reader_bool(reader, &mc_cooldown_group_present_86)) return false;
+        if (mc_cooldown_group_present_86) {
+            McBytes mc_cooldown_group_value_87;
+            if (!mc_reader_string(reader, &mc_cooldown_group_value_87)) return false;
         }
     }
     else if (mc_type_1 == 27) {
-        McBytes mc_data_branch_27_80;
-        if (!mc_reader_string(reader, &mc_data_branch_27_80)) return false;
+        McBytes mc_data_branch_27_88;
+        if (!mc_reader_string(reader, &mc_data_branch_27_88)) return false;
     }
     else if (mc_type_1 == 28) {
-        int32_t mc_rules_count_81 = 0;
-        if (!mc_reader_varint(reader, &mc_rules_count_81)) return false;
-        if (mc_rules_count_81 < 0
-            || (uint64_t)mc_rules_count_81 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_rules_count_89 = 0;
+        if (!mc_reader_varint(reader, &mc_rules_count_89)) return false;
+        if (mc_rules_count_89 < 0
+            || (uint64_t)mc_rules_count_89 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_rules_bounded_count_82 = (uint32_t)mc_rules_count_81;
-        for (uint32_t mc_rules_index_83 = 0U; mc_rules_index_83 < mc_rules_bounded_count_82; ++mc_rules_index_83) {
+        const uint32_t mc_rules_bounded_count_90 = (uint32_t)mc_rules_count_89;
+        for (uint32_t mc_rules_index_91 = 0U; mc_rules_index_91 < mc_rules_bounded_count_90; ++mc_rules_index_91) {
             if (!mc_generated_775_component_idset(reader, depth + 1U)) return false;
-            bool mc_speed_present_84 = false;
-            if (!mc_reader_bool(reader, &mc_speed_present_84)) return false;
-            if (mc_speed_present_84) {
-                float mc_speed_value_85 = 0;
-                if (!mc_reader_float(reader, &mc_speed_value_85)) return false;
-                if (!isfinite(mc_speed_value_85)) {
+            bool mc_speed_present_92 = false;
+            if (!mc_reader_bool(reader, &mc_speed_present_92)) return false;
+            if (mc_speed_present_92) {
+                float mc_speed_value_93 = 0;
+                if (!mc_reader_float(reader, &mc_speed_value_93)) return false;
+                if (!isfinite(mc_speed_value_93)) {
                     return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
                 }
             }
-            bool mc_correct_drop_for_blocks_present_86 = false;
-            if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_present_86)) return false;
-            if (mc_correct_drop_for_blocks_present_86) {
-                bool mc_correct_drop_for_blocks_value_87 = false;
-                if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_value_87)) return false;
+            bool mc_correct_drop_for_blocks_present_94 = false;
+            if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_present_94)) return false;
+            if (mc_correct_drop_for_blocks_present_94) {
+                bool mc_correct_drop_for_blocks_value_95 = false;
+                if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_value_95)) return false;
             }
         }
-        float mc_default_mining_speed_88 = 0;
-        if (!mc_reader_float(reader, &mc_default_mining_speed_88)) return false;
-        if (!isfinite(mc_default_mining_speed_88)) {
+        float mc_default_mining_speed_96 = 0;
+        if (!mc_reader_float(reader, &mc_default_mining_speed_96)) return false;
+        if (!isfinite(mc_default_mining_speed_96)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        int32_t mc_damage_per_block_89 = 0;
-        if (!mc_reader_varint(reader, &mc_damage_per_block_89)) return false;
-        bool mc_can_destroy_blocks_in_creative_90 = false;
-        if (!mc_reader_bool(reader, &mc_can_destroy_blocks_in_creative_90)) return false;
+        int32_t mc_damage_per_block_97 = 0;
+        if (!mc_reader_varint(reader, &mc_damage_per_block_97)) return false;
+        bool mc_can_destroy_blocks_in_creative_98 = false;
+        if (!mc_reader_bool(reader, &mc_can_destroy_blocks_in_creative_98)) return false;
     }
     else if (mc_type_1 == 29) {
-        int32_t mc_item_damage_per_attack_91 = 0;
-        if (!mc_reader_varint(reader, &mc_item_damage_per_attack_91)) return false;
-        float mc_disable_blocking_for_seconds_92 = 0;
-        if (!mc_reader_float(reader, &mc_disable_blocking_for_seconds_92)) return false;
-        if (!isfinite(mc_disable_blocking_for_seconds_92)) {
+        int32_t mc_item_damage_per_attack_99 = 0;
+        if (!mc_reader_varint(reader, &mc_item_damage_per_attack_99)) return false;
+        float mc_disable_blocking_for_seconds_100 = 0;
+        if (!mc_reader_float(reader, &mc_disable_blocking_for_seconds_100)) return false;
+        if (!isfinite(mc_disable_blocking_for_seconds_100)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 30) {
-        float mc_min_range_93 = 0;
-        if (!mc_reader_float(reader, &mc_min_range_93)) return false;
-        if (!isfinite(mc_min_range_93)) {
+        float mc_min_range_101 = 0;
+        if (!mc_reader_float(reader, &mc_min_range_101)) return false;
+        if (!isfinite(mc_min_range_101)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_max_range_94 = 0;
-        if (!mc_reader_float(reader, &mc_max_range_94)) return false;
-        if (!isfinite(mc_max_range_94)) {
+        float mc_max_range_102 = 0;
+        if (!mc_reader_float(reader, &mc_max_range_102)) return false;
+        if (!isfinite(mc_max_range_102)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_min_creative_range_95 = 0;
-        if (!mc_reader_float(reader, &mc_min_creative_range_95)) return false;
-        if (!isfinite(mc_min_creative_range_95)) {
+        float mc_min_creative_range_103 = 0;
+        if (!mc_reader_float(reader, &mc_min_creative_range_103)) return false;
+        if (!isfinite(mc_min_creative_range_103)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_max_creative_range_96 = 0;
-        if (!mc_reader_float(reader, &mc_max_creative_range_96)) return false;
-        if (!isfinite(mc_max_creative_range_96)) {
+        float mc_max_creative_range_104 = 0;
+        if (!mc_reader_float(reader, &mc_max_creative_range_104)) return false;
+        if (!isfinite(mc_max_creative_range_104)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_hitbox_margin_97 = 0;
-        if (!mc_reader_float(reader, &mc_hitbox_margin_97)) return false;
-        if (!isfinite(mc_hitbox_margin_97)) {
+        float mc_hitbox_margin_105 = 0;
+        if (!mc_reader_float(reader, &mc_hitbox_margin_105)) return false;
+        if (!isfinite(mc_hitbox_margin_105)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_mob_factor_98 = 0;
-        if (!mc_reader_float(reader, &mc_mob_factor_98)) return false;
-        if (!isfinite(mc_mob_factor_98)) {
+        float mc_mob_factor_106 = 0;
+        if (!mc_reader_float(reader, &mc_mob_factor_106)) return false;
+        if (!isfinite(mc_mob_factor_106)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 31) {
-        int32_t mc_data_branch_31_99 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_31_99)) return false;
+        int32_t mc_data_branch_31_107 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_31_107)) return false;
     }
     else if (mc_type_1 == 32) {
-        int32_t mc_slot_100 = 0;
-        if (!mc_reader_varint(reader, &mc_slot_100)) return false;
-        if (mc_slot_100 != 0 && mc_slot_100 != 1 && mc_slot_100 != 2 && mc_slot_100 != 3 && mc_slot_100 != 4 && mc_slot_100 != 5 && mc_slot_100 != 6 && mc_slot_100 != 7) {
+        int32_t mc_slot_108 = 0;
+        if (!mc_reader_varint(reader, &mc_slot_108)) return false;
+        if (mc_slot_108 != 0 && mc_slot_108 != 1 && mc_slot_108 != 2 && mc_slot_108 != 3 && mc_slot_108 != 4 && mc_slot_108 != 5 && mc_slot_108 != 6 && mc_slot_108 != 7) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
         if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
-        bool mc_model_present_101 = false;
-        if (!mc_reader_bool(reader, &mc_model_present_101)) return false;
-        if (mc_model_present_101) {
-            McBytes mc_model_value_102;
-            if (!mc_reader_string(reader, &mc_model_value_102)) return false;
+        bool mc_model_present_109 = false;
+        if (!mc_reader_bool(reader, &mc_model_present_109)) return false;
+        if (mc_model_present_109) {
+            McBytes mc_model_value_110;
+            if (!mc_reader_string(reader, &mc_model_value_110)) return false;
         }
-        bool mc_camera_overlay_present_103 = false;
-        if (!mc_reader_bool(reader, &mc_camera_overlay_present_103)) return false;
-        if (mc_camera_overlay_present_103) {
-            McBytes mc_camera_overlay_value_104;
-            if (!mc_reader_string(reader, &mc_camera_overlay_value_104)) return false;
+        bool mc_camera_overlay_present_111 = false;
+        if (!mc_reader_bool(reader, &mc_camera_overlay_present_111)) return false;
+        if (mc_camera_overlay_present_111) {
+            McBytes mc_camera_overlay_value_112;
+            if (!mc_reader_string(reader, &mc_camera_overlay_value_112)) return false;
         }
-        bool mc_allowed_entities_present_105 = false;
-        if (!mc_reader_bool(reader, &mc_allowed_entities_present_105)) return false;
-        if (mc_allowed_entities_present_105) {
+        bool mc_allowed_entities_present_113 = false;
+        if (!mc_reader_bool(reader, &mc_allowed_entities_present_113)) return false;
+        if (mc_allowed_entities_present_113) {
             if (!mc_generated_775_component_idset(reader, depth + 1U)) return false;
         }
-        bool mc_dispensable_106 = false;
-        if (!mc_reader_bool(reader, &mc_dispensable_106)) return false;
-        bool mc_swappable_107 = false;
-        if (!mc_reader_bool(reader, &mc_swappable_107)) return false;
-        bool mc_damageable_108 = false;
-        if (!mc_reader_bool(reader, &mc_damageable_108)) return false;
-        bool mc_equip_on_interact_109 = false;
-        if (!mc_reader_bool(reader, &mc_equip_on_interact_109)) return false;
-        bool mc_shearable_110 = false;
-        if (!mc_reader_bool(reader, &mc_shearable_110)) return false;
+        bool mc_dispensable_114 = false;
+        if (!mc_reader_bool(reader, &mc_dispensable_114)) return false;
+        bool mc_swappable_115 = false;
+        if (!mc_reader_bool(reader, &mc_swappable_115)) return false;
+        bool mc_damageable_116 = false;
+        if (!mc_reader_bool(reader, &mc_damageable_116)) return false;
+        bool mc_equip_on_interact_117 = false;
+        if (!mc_reader_bool(reader, &mc_equip_on_interact_117)) return false;
+        bool mc_shearable_118 = false;
+        if (!mc_reader_bool(reader, &mc_shearable_118)) return false;
         if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 33) {
@@ -14625,327 +14648,373 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
     else if (mc_type_1 == 34) {
     }
     else if (mc_type_1 == 35) {
-        McBytes mc_data_branch_35_112;
-        if (!mc_reader_string(reader, &mc_data_branch_35_112)) return false;
+        McBytes mc_data_branch_35_120;
+        if (!mc_reader_string(reader, &mc_data_branch_35_120)) return false;
     }
     else if (mc_type_1 == 36) {
-        int32_t mc_effects_count_113 = 0;
-        if (!mc_reader_varint(reader, &mc_effects_count_113)) return false;
-        if (mc_effects_count_113 < 0
-            || (uint64_t)mc_effects_count_113 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_effects_count_121 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_121)) return false;
+        if (mc_effects_count_121 < 0
+            || (uint64_t)mc_effects_count_121 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_effects_bounded_count_114 = (uint32_t)mc_effects_count_113;
-        for (uint32_t mc_effects_index_115 = 0U; mc_effects_index_115 < mc_effects_bounded_count_114; ++mc_effects_index_115) {
+        const uint32_t mc_effects_bounded_count_122 = (uint32_t)mc_effects_count_121;
+        for (uint32_t mc_effects_index_123 = 0U; mc_effects_index_123 < mc_effects_bounded_count_122; ++mc_effects_index_123) {
             if (!mc_generated_775_component_item_consume_effect(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 37) {
-        float mc_block_delay_seconds_116 = 0;
-        if (!mc_reader_float(reader, &mc_block_delay_seconds_116)) return false;
-        if (!isfinite(mc_block_delay_seconds_116)) {
+        float mc_block_delay_seconds_124 = 0;
+        if (!mc_reader_float(reader, &mc_block_delay_seconds_124)) return false;
+        if (!isfinite(mc_block_delay_seconds_124)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_disable_cooldown_scale_117 = 0;
-        if (!mc_reader_float(reader, &mc_disable_cooldown_scale_117)) return false;
-        if (!isfinite(mc_disable_cooldown_scale_117)) {
+        float mc_disable_cooldown_scale_125 = 0;
+        if (!mc_reader_float(reader, &mc_disable_cooldown_scale_125)) return false;
+        if (!isfinite(mc_disable_cooldown_scale_125)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        int32_t mc_damage_reductions_count_118 = 0;
-        if (!mc_reader_varint(reader, &mc_damage_reductions_count_118)) return false;
-        if (mc_damage_reductions_count_118 < 0
-            || (uint64_t)mc_damage_reductions_count_118 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_damage_reductions_count_126 = 0;
+        if (!mc_reader_varint(reader, &mc_damage_reductions_count_126)) return false;
+        if (mc_damage_reductions_count_126 < 0
+            || (uint64_t)mc_damage_reductions_count_126 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_damage_reductions_bounded_count_119 = (uint32_t)mc_damage_reductions_count_118;
-        for (uint32_t mc_damage_reductions_index_120 = 0U; mc_damage_reductions_index_120 < mc_damage_reductions_bounded_count_119; ++mc_damage_reductions_index_120) {
-            float mc_horizontal_blocking_angle_121 = 0;
-            if (!mc_reader_float(reader, &mc_horizontal_blocking_angle_121)) return false;
-            if (!isfinite(mc_horizontal_blocking_angle_121)) {
+        const uint32_t mc_damage_reductions_bounded_count_127 = (uint32_t)mc_damage_reductions_count_126;
+        for (uint32_t mc_damage_reductions_index_128 = 0U; mc_damage_reductions_index_128 < mc_damage_reductions_bounded_count_127; ++mc_damage_reductions_index_128) {
+            float mc_horizontal_blocking_angle_129 = 0;
+            if (!mc_reader_float(reader, &mc_horizontal_blocking_angle_129)) return false;
+            if (!isfinite(mc_horizontal_blocking_angle_129)) {
                 return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
-            bool mc_type_present_122 = false;
-            if (!mc_reader_bool(reader, &mc_type_present_122)) return false;
-            if (mc_type_present_122) {
+            bool mc_type_present_130 = false;
+            if (!mc_reader_bool(reader, &mc_type_present_130)) return false;
+            if (mc_type_present_130) {
                 if (!mc_generated_775_component_idset(reader, depth + 1U)) return false;
             }
-            float mc_base_123 = 0;
-            if (!mc_reader_float(reader, &mc_base_123)) return false;
-            if (!isfinite(mc_base_123)) {
+            float mc_base_131 = 0;
+            if (!mc_reader_float(reader, &mc_base_131)) return false;
+            if (!isfinite(mc_base_131)) {
                 return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
-            float mc_factor_124 = 0;
-            if (!mc_reader_float(reader, &mc_factor_124)) return false;
-            if (!isfinite(mc_factor_124)) {
+            float mc_factor_132 = 0;
+            if (!mc_reader_float(reader, &mc_factor_132)) return false;
+            if (!isfinite(mc_factor_132)) {
                 return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
         }
-        float mc_threshold_125 = 0;
-        if (!mc_reader_float(reader, &mc_threshold_125)) return false;
-        if (!isfinite(mc_threshold_125)) {
+        float mc_threshold_133 = 0;
+        if (!mc_reader_float(reader, &mc_threshold_133)) return false;
+        if (!isfinite(mc_threshold_133)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_base_126 = 0;
-        if (!mc_reader_float(reader, &mc_base_126)) return false;
-        if (!isfinite(mc_base_126)) {
+        float mc_base_134 = 0;
+        if (!mc_reader_float(reader, &mc_base_134)) return false;
+        if (!isfinite(mc_base_134)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_factor_127 = 0;
-        if (!mc_reader_float(reader, &mc_factor_127)) return false;
-        if (!isfinite(mc_factor_127)) {
+        float mc_factor_135 = 0;
+        if (!mc_reader_float(reader, &mc_factor_135)) return false;
+        if (!isfinite(mc_factor_135)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        bool mc_bypassed_by_present_128 = false;
-        if (!mc_reader_bool(reader, &mc_bypassed_by_present_128)) return false;
-        if (mc_bypassed_by_present_128) {
-            McBytes mc_bypassed_by_value_129;
-            if (!mc_reader_string(reader, &mc_bypassed_by_value_129)) return false;
+        bool mc_bypassed_by_present_136 = false;
+        if (!mc_reader_bool(reader, &mc_bypassed_by_present_136)) return false;
+        if (mc_bypassed_by_present_136) {
+            McBytes mc_bypassed_by_value_137;
+            if (!mc_reader_string(reader, &mc_bypassed_by_value_137)) return false;
         }
-        bool mc_block_sound_present_130 = false;
-        if (!mc_reader_bool(reader, &mc_block_sound_present_130)) return false;
-        if (mc_block_sound_present_130) {
+        bool mc_block_sound_present_138 = false;
+        if (!mc_reader_bool(reader, &mc_block_sound_present_138)) return false;
+        if (mc_block_sound_present_138) {
             if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
         }
-        bool mc_disable_sound_present_131 = false;
-        if (!mc_reader_bool(reader, &mc_disable_sound_present_131)) return false;
-        if (mc_disable_sound_present_131) {
+        bool mc_disable_sound_present_139 = false;
+        if (!mc_reader_bool(reader, &mc_disable_sound_present_139)) return false;
+        if (mc_disable_sound_present_139) {
             if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 38) {
-        bool mc_deals_knockback_132 = false;
-        if (!mc_reader_bool(reader, &mc_deals_knockback_132)) return false;
-        bool mc_dismounts_133 = false;
-        if (!mc_reader_bool(reader, &mc_dismounts_133)) return false;
-        bool mc_sound_present_134 = false;
-        if (!mc_reader_bool(reader, &mc_sound_present_134)) return false;
-        if (mc_sound_present_134) {
+        bool mc_deals_knockback_140 = false;
+        if (!mc_reader_bool(reader, &mc_deals_knockback_140)) return false;
+        bool mc_dismounts_141 = false;
+        if (!mc_reader_bool(reader, &mc_dismounts_141)) return false;
+        bool mc_sound_present_142 = false;
+        if (!mc_reader_bool(reader, &mc_sound_present_142)) return false;
+        if (mc_sound_present_142) {
             if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
         }
-        bool mc_hit_sound_present_135 = false;
-        if (!mc_reader_bool(reader, &mc_hit_sound_present_135)) return false;
-        if (mc_hit_sound_present_135) {
+        bool mc_hit_sound_present_143 = false;
+        if (!mc_reader_bool(reader, &mc_hit_sound_present_143)) return false;
+        if (mc_hit_sound_present_143) {
             if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 39) {
-        int32_t mc_contact_cooldown_ticks_136 = 0;
-        if (!mc_reader_varint(reader, &mc_contact_cooldown_ticks_136)) return false;
-        int32_t mc_delay_ticks_137 = 0;
-        if (!mc_reader_varint(reader, &mc_delay_ticks_137)) return false;
-        bool mc_dismount_conditions_present_138 = false;
-        if (!mc_reader_bool(reader, &mc_dismount_conditions_present_138)) return false;
-        if (mc_dismount_conditions_present_138) {
+        int32_t mc_contact_cooldown_ticks_144 = 0;
+        if (!mc_reader_varint(reader, &mc_contact_cooldown_ticks_144)) return false;
+        int32_t mc_delay_ticks_145 = 0;
+        if (!mc_reader_varint(reader, &mc_delay_ticks_145)) return false;
+        bool mc_dismount_conditions_present_146 = false;
+        if (!mc_reader_bool(reader, &mc_dismount_conditions_present_146)) return false;
+        if (mc_dismount_conditions_present_146) {
             if (!mc_generated_775_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
         }
-        bool mc_knockback_conditions_present_139 = false;
-        if (!mc_reader_bool(reader, &mc_knockback_conditions_present_139)) return false;
-        if (mc_knockback_conditions_present_139) {
+        bool mc_knockback_conditions_present_147 = false;
+        if (!mc_reader_bool(reader, &mc_knockback_conditions_present_147)) return false;
+        if (mc_knockback_conditions_present_147) {
             if (!mc_generated_775_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
         }
-        bool mc_damage_conditions_present_140 = false;
-        if (!mc_reader_bool(reader, &mc_damage_conditions_present_140)) return false;
-        if (mc_damage_conditions_present_140) {
+        bool mc_damage_conditions_present_148 = false;
+        if (!mc_reader_bool(reader, &mc_damage_conditions_present_148)) return false;
+        if (mc_damage_conditions_present_148) {
             if (!mc_generated_775_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
         }
-        float mc_forward_movement_141 = 0;
-        if (!mc_reader_float(reader, &mc_forward_movement_141)) return false;
-        if (!isfinite(mc_forward_movement_141)) {
+        float mc_forward_movement_149 = 0;
+        if (!mc_reader_float(reader, &mc_forward_movement_149)) return false;
+        if (!isfinite(mc_forward_movement_149)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_damage_multiplier_142 = 0;
-        if (!mc_reader_float(reader, &mc_damage_multiplier_142)) return false;
-        if (!isfinite(mc_damage_multiplier_142)) {
+        float mc_damage_multiplier_150 = 0;
+        if (!mc_reader_float(reader, &mc_damage_multiplier_150)) return false;
+        if (!isfinite(mc_damage_multiplier_150)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        bool mc_sound_present_143 = false;
-        if (!mc_reader_bool(reader, &mc_sound_present_143)) return false;
-        if (mc_sound_present_143) {
+        bool mc_sound_present_151 = false;
+        if (!mc_reader_bool(reader, &mc_sound_present_151)) return false;
+        if (mc_sound_present_151) {
             if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
         }
-        bool mc_hit_sound_present_144 = false;
-        if (!mc_reader_bool(reader, &mc_hit_sound_present_144)) return false;
-        if (mc_hit_sound_present_144) {
+        bool mc_hit_sound_present_152 = false;
+        if (!mc_reader_bool(reader, &mc_hit_sound_present_152)) return false;
+        if (mc_hit_sound_present_152) {
             if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 40) {
-        int32_t mc_type_145 = 0;
-        if (!mc_reader_varint(reader, &mc_type_145)) return false;
-        if (mc_type_145 != 0 && mc_type_145 != 1 && mc_type_145 != 2) {
+        int32_t mc_type_153 = 0;
+        if (!mc_reader_varint(reader, &mc_type_153)) return false;
+        if (mc_type_153 != 0 && mc_type_153 != 1 && mc_type_153 != 2) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        int32_t mc_duration_146 = 0;
-        if (!mc_reader_varint(reader, &mc_duration_146)) return false;
+        int32_t mc_duration_154 = 0;
+        if (!mc_reader_varint(reader, &mc_duration_154)) return false;
     }
     else if (mc_type_1 == 41) {
-        int32_t mc_data_branch_41_147 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_41_147)) return false;
+        int32_t mc_data_branch_41_155 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_41_155)) return false;
     }
     else if (mc_type_1 == 42) {
-        int32_t mc_enchantments_count_148 = 0;
-        if (!mc_reader_varint(reader, &mc_enchantments_count_148)) return false;
-        if (mc_enchantments_count_148 < 0
-            || (uint64_t)mc_enchantments_count_148 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_enchantments_count_156 = 0;
+        if (!mc_reader_varint(reader, &mc_enchantments_count_156)) return false;
+        if (mc_enchantments_count_156 < 0
+            || (uint64_t)mc_enchantments_count_156 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_enchantments_bounded_count_149 = (uint32_t)mc_enchantments_count_148;
-        for (uint32_t mc_enchantments_index_150 = 0U; mc_enchantments_index_150 < mc_enchantments_bounded_count_149; ++mc_enchantments_index_150) {
-            int32_t mc_id_151 = 0;
-            if (!mc_reader_varint(reader, &mc_id_151)) return false;
-            int32_t mc_level_152 = 0;
-            if (!mc_reader_varint(reader, &mc_level_152)) return false;
+        const uint32_t mc_enchantments_bounded_count_157 = (uint32_t)mc_enchantments_count_156;
+        for (uint32_t mc_enchantments_index_158 = 0U; mc_enchantments_index_158 < mc_enchantments_bounded_count_157; ++mc_enchantments_index_158) {
+            int32_t mc_id_159 = 0;
+            if (!mc_reader_varint(reader, &mc_id_159)) return false;
+            int32_t mc_level_160 = 0;
+            if (!mc_reader_varint(reader, &mc_level_160)) return false;
         }
     }
     else if (mc_type_1 == 43) {
         if (!mc_generated_775_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 44) {
-        int32_t mc_data_branch_44_153 = 0;
-        if (!mc_reader_i32(reader, &mc_data_branch_44_153)) return false;
+        int32_t mc_data_branch_44_161 = 0;
+        if (!mc_reader_i32(reader, &mc_data_branch_44_161)) return false;
     }
     else if (mc_type_1 == 45) {
-        int32_t mc_data_branch_45_154 = 0;
-        if (!mc_reader_i32(reader, &mc_data_branch_45_154)) return false;
+        int32_t mc_data_branch_45_162 = 0;
+        if (!mc_reader_i32(reader, &mc_data_branch_45_162)) return false;
     }
     else if (mc_type_1 == 46) {
-        int32_t mc_data_branch_46_155 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_46_155)) return false;
+        int32_t mc_data_branch_46_163 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_46_163)) return false;
     }
     else if (mc_type_1 == 47) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 48) {
-        int32_t mc_data_branch_48_157 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_48_157)) return false;
+        int32_t mc_data_branch_48_165 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_48_165)) return false;
     }
     else if (mc_type_1 == 49) {
-        int32_t mc_projectiles_count_158 = 0;
-        if (!mc_reader_varint(reader, &mc_projectiles_count_158)) return false;
-        if (mc_projectiles_count_158 < 0
-            || (uint64_t)mc_projectiles_count_158 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_data_branch_49_count_166 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_49_count_166)) return false;
+        if (mc_data_branch_49_count_166 < 0
+            || (uint64_t)mc_data_branch_49_count_166 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_projectiles_bounded_count_159 = (uint32_t)mc_projectiles_count_158;
-        for (uint32_t mc_projectiles_index_160 = 0U; mc_projectiles_index_160 < mc_projectiles_bounded_count_159; ++mc_projectiles_index_160) {
-            if (!typed_skip_nested_item_stack(reader, 775, depth + 1U)) return false;
+        const uint32_t mc_data_branch_49_bounded_count_167 = (uint32_t)mc_data_branch_49_count_166;
+        for (uint32_t mc_data_branch_49_index_168 = 0U; mc_data_branch_49_index_168 < mc_data_branch_49_bounded_count_167; ++mc_data_branch_49_index_168) {
+            int32_t mc_item_id_169 = 0;
+            if (!mc_reader_varint(reader, &mc_item_id_169)) return false;
+            int32_t mc_item_count_170 = 0;
+            if (!mc_reader_varint(reader, &mc_item_count_170)) return false;
+            int32_t mc_added_component_count_171 = 0;
+            if (!mc_reader_varint(reader, &mc_added_component_count_171)) return false;
+            int32_t mc_removed_component_count_172 = 0;
+            if (!mc_reader_varint(reader, &mc_removed_component_count_172)) return false;
+            if (mc_added_component_count_171 < 0
+                || (uint64_t)mc_added_component_count_171 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_components_bounded_count_173 = (uint32_t)mc_added_component_count_171;
+            for (uint32_t mc_components_index_174 = 0U; mc_components_index_174 < mc_components_bounded_count_173; ++mc_components_index_174) {
+                if (!mc_generated_775_component_slot_component(reader, depth + 1U)) return false;
+            }
+            if (mc_removed_component_count_172 < 0
+                || (uint64_t)mc_removed_component_count_172 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_remove_components_bounded_count_175 = (uint32_t)mc_removed_component_count_172;
+            for (uint32_t mc_remove_components_index_176 = 0U; mc_remove_components_index_176 < mc_remove_components_bounded_count_175; ++mc_remove_components_index_176) {
+                if (!mc_generated_775_component_slot_component_type(reader, depth + 1U)) return false;
+            }
         }
     }
     else if (mc_type_1 == 50) {
-        int32_t mc_contents_count_161 = 0;
-        if (!mc_reader_varint(reader, &mc_contents_count_161)) return false;
-        if (mc_contents_count_161 < 0
-            || (uint64_t)mc_contents_count_161 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_data_branch_50_count_177 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_50_count_177)) return false;
+        if (mc_data_branch_50_count_177 < 0
+            || (uint64_t)mc_data_branch_50_count_177 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_contents_bounded_count_162 = (uint32_t)mc_contents_count_161;
-        for (uint32_t mc_contents_index_163 = 0U; mc_contents_index_163 < mc_contents_bounded_count_162; ++mc_contents_index_163) {
-            if (!typed_skip_nested_item_stack(reader, 775, depth + 1U)) return false;
+        const uint32_t mc_data_branch_50_bounded_count_178 = (uint32_t)mc_data_branch_50_count_177;
+        for (uint32_t mc_data_branch_50_index_179 = 0U; mc_data_branch_50_index_179 < mc_data_branch_50_bounded_count_178; ++mc_data_branch_50_index_179) {
+            int32_t mc_item_id_180 = 0;
+            if (!mc_reader_varint(reader, &mc_item_id_180)) return false;
+            int32_t mc_item_count_181 = 0;
+            if (!mc_reader_varint(reader, &mc_item_count_181)) return false;
+            int32_t mc_added_component_count_182 = 0;
+            if (!mc_reader_varint(reader, &mc_added_component_count_182)) return false;
+            int32_t mc_removed_component_count_183 = 0;
+            if (!mc_reader_varint(reader, &mc_removed_component_count_183)) return false;
+            if (mc_added_component_count_182 < 0
+                || (uint64_t)mc_added_component_count_182 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_components_bounded_count_184 = (uint32_t)mc_added_component_count_182;
+            for (uint32_t mc_components_index_185 = 0U; mc_components_index_185 < mc_components_bounded_count_184; ++mc_components_index_185) {
+                if (!mc_generated_775_component_slot_component(reader, depth + 1U)) return false;
+            }
+            if (mc_removed_component_count_183 < 0
+                || (uint64_t)mc_removed_component_count_183 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_remove_components_bounded_count_186 = (uint32_t)mc_removed_component_count_183;
+            for (uint32_t mc_remove_components_index_187 = 0U; mc_remove_components_index_187 < mc_remove_components_bounded_count_186; ++mc_remove_components_index_187) {
+                if (!mc_generated_775_component_slot_component_type(reader, depth + 1U)) return false;
+            }
         }
     }
     else if (mc_type_1 == 51) {
-        bool mc_potion_id_present_164 = false;
-        if (!mc_reader_bool(reader, &mc_potion_id_present_164)) return false;
-        if (mc_potion_id_present_164) {
-            int32_t mc_potion_id_value_165 = 0;
-            if (!mc_reader_varint(reader, &mc_potion_id_value_165)) return false;
+        bool mc_potion_id_present_188 = false;
+        if (!mc_reader_bool(reader, &mc_potion_id_present_188)) return false;
+        if (mc_potion_id_present_188) {
+            int32_t mc_potion_id_value_189 = 0;
+            if (!mc_reader_varint(reader, &mc_potion_id_value_189)) return false;
         }
-        bool mc_custom_color_present_166 = false;
-        if (!mc_reader_bool(reader, &mc_custom_color_present_166)) return false;
-        if (mc_custom_color_present_166) {
-            int32_t mc_custom_color_value_167 = 0;
-            if (!mc_reader_i32(reader, &mc_custom_color_value_167)) return false;
+        bool mc_custom_color_present_190 = false;
+        if (!mc_reader_bool(reader, &mc_custom_color_present_190)) return false;
+        if (mc_custom_color_present_190) {
+            int32_t mc_custom_color_value_191 = 0;
+            if (!mc_reader_i32(reader, &mc_custom_color_value_191)) return false;
         }
-        int32_t mc_custom_effects_count_168 = 0;
-        if (!mc_reader_varint(reader, &mc_custom_effects_count_168)) return false;
-        if (mc_custom_effects_count_168 < 0
-            || (uint64_t)mc_custom_effects_count_168 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_custom_effects_count_192 = 0;
+        if (!mc_reader_varint(reader, &mc_custom_effects_count_192)) return false;
+        if (mc_custom_effects_count_192 < 0
+            || (uint64_t)mc_custom_effects_count_192 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_custom_effects_bounded_count_169 = (uint32_t)mc_custom_effects_count_168;
-        for (uint32_t mc_custom_effects_index_170 = 0U; mc_custom_effects_index_170 < mc_custom_effects_bounded_count_169; ++mc_custom_effects_index_170) {
+        const uint32_t mc_custom_effects_bounded_count_193 = (uint32_t)mc_custom_effects_count_192;
+        for (uint32_t mc_custom_effects_index_194 = 0U; mc_custom_effects_index_194 < mc_custom_effects_bounded_count_193; ++mc_custom_effects_index_194) {
             if (!mc_generated_775_component_item_potion_effect(reader, depth + 1U)) return false;
         }
-        bool mc_custom_name_present_171 = false;
-        if (!mc_reader_bool(reader, &mc_custom_name_present_171)) return false;
-        if (mc_custom_name_present_171) {
-            McBytes mc_custom_name_value_172;
-            if (!mc_reader_string(reader, &mc_custom_name_value_172)) return false;
+        bool mc_custom_name_present_195 = false;
+        if (!mc_reader_bool(reader, &mc_custom_name_present_195)) return false;
+        if (mc_custom_name_present_195) {
+            McBytes mc_custom_name_value_196;
+            if (!mc_reader_string(reader, &mc_custom_name_value_196)) return false;
         }
     }
     else if (mc_type_1 == 52) {
-        float mc_data_branch_52_173 = 0;
-        if (!mc_reader_float(reader, &mc_data_branch_52_173)) return false;
-        if (!isfinite(mc_data_branch_52_173)) {
+        float mc_data_branch_52_197 = 0;
+        if (!mc_reader_float(reader, &mc_data_branch_52_197)) return false;
+        if (!isfinite(mc_data_branch_52_197)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 53) {
-        int32_t mc_effects_count_174 = 0;
-        if (!mc_reader_varint(reader, &mc_effects_count_174)) return false;
-        if (mc_effects_count_174 < 0
-            || (uint64_t)mc_effects_count_174 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_effects_count_198 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_198)) return false;
+        if (mc_effects_count_198 < 0
+            || (uint64_t)mc_effects_count_198 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_effects_bounded_count_175 = (uint32_t)mc_effects_count_174;
-        for (uint32_t mc_effects_index_176 = 0U; mc_effects_index_176 < mc_effects_bounded_count_175; ++mc_effects_index_176) {
-            int32_t mc_effect_177 = 0;
-            if (!mc_reader_varint(reader, &mc_effect_177)) return false;
-            int32_t mc_duration_178 = 0;
-            if (!mc_reader_varint(reader, &mc_duration_178)) return false;
+        const uint32_t mc_effects_bounded_count_199 = (uint32_t)mc_effects_count_198;
+        for (uint32_t mc_effects_index_200 = 0U; mc_effects_index_200 < mc_effects_bounded_count_199; ++mc_effects_index_200) {
+            int32_t mc_effect_201 = 0;
+            if (!mc_reader_varint(reader, &mc_effect_201)) return false;
+            int32_t mc_duration_202 = 0;
+            if (!mc_reader_varint(reader, &mc_duration_202)) return false;
         }
     }
     else if (mc_type_1 == 54) {
-        int32_t mc_pages_count_179 = 0;
-        if (!mc_reader_varint(reader, &mc_pages_count_179)) return false;
-        if (mc_pages_count_179 < 0
-            || (uint64_t)mc_pages_count_179 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_pages_count_203 = 0;
+        if (!mc_reader_varint(reader, &mc_pages_count_203)) return false;
+        if (mc_pages_count_203 < 0
+            || (uint64_t)mc_pages_count_203 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_pages_bounded_count_180 = (uint32_t)mc_pages_count_179;
-        for (uint32_t mc_pages_index_181 = 0U; mc_pages_index_181 < mc_pages_bounded_count_180; ++mc_pages_index_181) {
+        const uint32_t mc_pages_bounded_count_204 = (uint32_t)mc_pages_count_203;
+        for (uint32_t mc_pages_index_205 = 0U; mc_pages_index_205 < mc_pages_bounded_count_204; ++mc_pages_index_205) {
             if (!mc_generated_775_component_item_book_page(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 55) {
-        McBytes mc_raw_title_182;
-        if (!mc_reader_string(reader, &mc_raw_title_182)) return false;
-        bool mc_filtered_title_present_183 = false;
-        if (!mc_reader_bool(reader, &mc_filtered_title_present_183)) return false;
-        if (mc_filtered_title_present_183) {
-            McBytes mc_filtered_title_value_184;
-            if (!mc_reader_string(reader, &mc_filtered_title_value_184)) return false;
+        McBytes mc_raw_title_206;
+        if (!mc_reader_string(reader, &mc_raw_title_206)) return false;
+        bool mc_filtered_title_present_207 = false;
+        if (!mc_reader_bool(reader, &mc_filtered_title_present_207)) return false;
+        if (mc_filtered_title_present_207) {
+            McBytes mc_filtered_title_value_208;
+            if (!mc_reader_string(reader, &mc_filtered_title_value_208)) return false;
         }
-        McBytes mc_author_185;
-        if (!mc_reader_string(reader, &mc_author_185)) return false;
-        int32_t mc_generation_186 = 0;
-        if (!mc_reader_varint(reader, &mc_generation_186)) return false;
-        int32_t mc_pages_count_187 = 0;
-        if (!mc_reader_varint(reader, &mc_pages_count_187)) return false;
-        if (mc_pages_count_187 < 0
-            || (uint64_t)mc_pages_count_187 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        McBytes mc_author_209;
+        if (!mc_reader_string(reader, &mc_author_209)) return false;
+        int32_t mc_generation_210 = 0;
+        if (!mc_reader_varint(reader, &mc_generation_210)) return false;
+        int32_t mc_pages_count_211 = 0;
+        if (!mc_reader_varint(reader, &mc_pages_count_211)) return false;
+        if (mc_pages_count_211 < 0
+            || (uint64_t)mc_pages_count_211 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_pages_bounded_count_188 = (uint32_t)mc_pages_count_187;
-        for (uint32_t mc_pages_index_189 = 0U; mc_pages_index_189 < mc_pages_bounded_count_188; ++mc_pages_index_189) {
+        const uint32_t mc_pages_bounded_count_212 = (uint32_t)mc_pages_count_211;
+        for (uint32_t mc_pages_index_213 = 0U; mc_pages_index_213 < mc_pages_bounded_count_212; ++mc_pages_index_213) {
             if (!mc_generated_775_component_item_written_book_page(reader, depth + 1U)) return false;
         }
-        bool mc_resolved_190 = false;
-        if (!mc_reader_bool(reader, &mc_resolved_190)) return false;
+        bool mc_resolved_214 = false;
+        if (!mc_reader_bool(reader, &mc_resolved_214)) return false;
     }
     else if (mc_type_1 == 56) {
-        int32_t mc_material_holder_191 = -1;
-        if (!mc_reader_varint(reader, &mc_material_holder_191) || mc_material_holder_191 < 0) {
+        int32_t mc_material_holder_215 = -1;
+        if (!mc_reader_varint(reader, &mc_material_holder_215) || mc_material_holder_215 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_material_holder_191 == 0) {
+        if (mc_material_holder_215 == 0) {
             if (!mc_generated_775_component_armor_trim_material(reader, depth + 1U)) return false;
         }
-        int32_t mc_pattern_holder_192 = -1;
-        if (!mc_reader_varint(reader, &mc_pattern_holder_192) || mc_pattern_holder_192 < 0) {
+        int32_t mc_pattern_holder_216 = -1;
+        if (!mc_reader_varint(reader, &mc_pattern_holder_216) || mc_pattern_holder_216 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_pattern_holder_192 == 0) {
+        if (mc_pattern_holder_216 == 0) {
             if (!mc_generated_775_component_armor_trim_pattern(reader, depth + 1U)) return false;
         }
     }
@@ -14953,103 +15022,79 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 58) {
-        int32_t mc_type_194 = 0;
-        if (!mc_reader_varint(reader, &mc_type_194)) return false;
+        int32_t mc_type_218 = 0;
+        if (!mc_reader_varint(reader, &mc_type_218)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 59) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 60) {
-        int32_t mc_type_197 = 0;
-        if (!mc_reader_varint(reader, &mc_type_197)) return false;
+        int32_t mc_type_221 = 0;
+        if (!mc_reader_varint(reader, &mc_type_221)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 61) {
-        bool mc_has_holder_199 = false;
-        if (!mc_reader_bool(reader, &mc_has_holder_199)) return false;
-        if (mc_has_holder_199 == 0) {
-            McBytes mc_data_branch_0_200;
-            if (!mc_reader_string(reader, &mc_data_branch_0_200)) return false;
+        int32_t mc_data_branch_61_holder_223 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_61_holder_223) || mc_data_branch_61_holder_223 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        else if (mc_has_holder_199 == 1) {
-            int32_t mc_data_branch_1_holder_201 = -1;
-            if (!mc_reader_varint(reader, &mc_data_branch_1_holder_201) || mc_data_branch_1_holder_201 < 0) {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-            }
-            if (mc_data_branch_1_holder_201 == 0) {
-                if (!mc_generated_775_component_instrument_data(reader, depth + 1U)) return false;
-            }
+        if (mc_data_branch_61_holder_223 == 0) {
+            if (!mc_generated_775_component_instrument_data(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 62) {
-        bool mc_has_holder_202 = false;
-        if (!mc_reader_bool(reader, &mc_has_holder_202)) return false;
-        if (mc_has_holder_202 == 0) {
-            McBytes mc_material_branch_0_203;
-            if (!mc_reader_string(reader, &mc_material_branch_0_203)) return false;
+        int32_t mc_data_branch_62_holder_224 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_62_holder_224) || mc_data_branch_62_holder_224 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        else if (mc_has_holder_202 == 1) {
-            int32_t mc_material_branch_1_holder_204 = -1;
-            if (!mc_reader_varint(reader, &mc_material_branch_1_holder_204) || mc_material_branch_1_holder_204 < 0) {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-            }
-            if (mc_material_branch_1_holder_204 == 0) {
-                if (!mc_generated_775_component_armor_trim_material(reader, depth + 1U)) return false;
-            }
+        if (mc_data_branch_62_holder_224 == 0) {
+            if (!mc_generated_775_component_armor_trim_material(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 63) {
-        int32_t mc_data_branch_63_205 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_63_205)) return false;
+        int32_t mc_data_branch_63_225 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_63_225)) return false;
     }
     else if (mc_type_1 == 64) {
-        bool mc_has_holder_206 = false;
-        if (!mc_reader_bool(reader, &mc_has_holder_206)) return false;
-        if (mc_has_holder_206 == 0) {
-            McBytes mc_song_branch_0_207;
-            if (!mc_reader_string(reader, &mc_song_branch_0_207)) return false;
+        int32_t mc_data_branch_64_holder_226 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_64_holder_226) || mc_data_branch_64_holder_226 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        else if (mc_has_holder_206 == 1) {
-            int32_t mc_song_branch_1_holder_208 = -1;
-            if (!mc_reader_varint(reader, &mc_song_branch_1_holder_208) || mc_song_branch_1_holder_208 < 0) {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-            }
-            if (mc_song_branch_1_holder_208 == 0) {
-                if (!mc_generated_775_component_jukebox_song_data(reader, depth + 1U)) return false;
-            }
+        if (mc_data_branch_64_holder_226 == 0) {
+            if (!mc_generated_775_component_jukebox_song_data(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 65) {
-        McBytes mc_data_branch_65_209;
-        if (!mc_reader_string(reader, &mc_data_branch_65_209)) return false;
+        McBytes mc_data_branch_65_227;
+        if (!mc_reader_string(reader, &mc_data_branch_65_227)) return false;
     }
     else if (mc_type_1 == 66) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 67) {
-        bool mc_global_position_present_211 = false;
-        if (!mc_reader_bool(reader, &mc_global_position_present_211)) return false;
-        if (mc_global_position_present_211) {
+        bool mc_global_position_present_229 = false;
+        if (!mc_reader_bool(reader, &mc_global_position_present_229)) return false;
+        if (mc_global_position_present_229) {
             if (!mc_generated_775_component_global_pos(reader, depth + 1U)) return false;
         }
-        bool mc_tracked_212 = false;
-        if (!mc_reader_bool(reader, &mc_tracked_212)) return false;
+        bool mc_tracked_230 = false;
+        if (!mc_reader_bool(reader, &mc_tracked_230)) return false;
     }
     else if (mc_type_1 == 68) {
         if (!mc_generated_775_component_item_firework_explosion(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 69) {
-        int32_t mc_flight_duration_213 = 0;
-        if (!mc_reader_varint(reader, &mc_flight_duration_213)) return false;
-        int32_t mc_explosions_count_214 = 0;
-        if (!mc_reader_varint(reader, &mc_explosions_count_214)) return false;
-        if (mc_explosions_count_214 < 0
-            || (uint64_t)mc_explosions_count_214 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_flight_duration_231 = 0;
+        if (!mc_reader_varint(reader, &mc_flight_duration_231)) return false;
+        int32_t mc_explosions_count_232 = 0;
+        if (!mc_reader_varint(reader, &mc_explosions_count_232)) return false;
+        if (mc_explosions_count_232 < 0
+            || (uint64_t)mc_explosions_count_232 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_explosions_bounded_count_215 = (uint32_t)mc_explosions_count_214;
-        for (uint32_t mc_explosions_index_216 = 0U; mc_explosions_index_216 < mc_explosions_bounded_count_215; ++mc_explosions_index_216) {
+        const uint32_t mc_explosions_bounded_count_233 = (uint32_t)mc_explosions_count_232;
+        for (uint32_t mc_explosions_index_234 = 0U; mc_explosions_index_234 < mc_explosions_bounded_count_233; ++mc_explosions_index_234) {
             if (!mc_generated_775_component_item_firework_explosion(reader, depth + 1U)) return false;
         }
     }
@@ -15057,18 +15102,18 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
         if (!mc_generated_775_component_resolvable_profile(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 71) {
-        McBytes mc_data_branch_71_217;
-        if (!mc_reader_string(reader, &mc_data_branch_71_217)) return false;
+        McBytes mc_data_branch_71_235;
+        if (!mc_reader_string(reader, &mc_data_branch_71_235)) return false;
     }
     else if (mc_type_1 == 72) {
-        int32_t mc_layers_count_218 = 0;
-        if (!mc_reader_varint(reader, &mc_layers_count_218)) return false;
-        if (mc_layers_count_218 < 0
-            || (uint64_t)mc_layers_count_218 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_layers_count_236 = 0;
+        if (!mc_reader_varint(reader, &mc_layers_count_236)) return false;
+        if (mc_layers_count_236 < 0
+            || (uint64_t)mc_layers_count_236 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_layers_bounded_count_219 = (uint32_t)mc_layers_count_218;
-        for (uint32_t mc_layers_index_220 = 0U; mc_layers_index_220 < mc_layers_bounded_count_219; ++mc_layers_index_220) {
+        const uint32_t mc_layers_bounded_count_237 = (uint32_t)mc_layers_count_236;
+        for (uint32_t mc_layers_index_238 = 0U; mc_layers_index_238 < mc_layers_bounded_count_237; ++mc_layers_index_238) {
             if (!mc_generated_775_component_banner_pattern_layer(reader, depth + 1U)) return false;
         }
     }
@@ -15076,59 +15121,86 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
         if (!mc_generated_775_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 74) {
-        int32_t mc_decorations_count_221 = 0;
-        if (!mc_reader_varint(reader, &mc_decorations_count_221)) return false;
-        if (mc_decorations_count_221 < 0
-            || (uint64_t)mc_decorations_count_221 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_decorations_count_239 = 0;
+        if (!mc_reader_varint(reader, &mc_decorations_count_239)) return false;
+        if (mc_decorations_count_239 < 0
+            || (uint64_t)mc_decorations_count_239 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_decorations_bounded_count_222 = (uint32_t)mc_decorations_count_221;
-        for (uint32_t mc_decorations_index_223 = 0U; mc_decorations_index_223 < mc_decorations_bounded_count_222; ++mc_decorations_index_223) {
-            int32_t mc_decorations_element_224 = 0;
-            if (!mc_reader_varint(reader, &mc_decorations_element_224)) return false;
+        const uint32_t mc_decorations_bounded_count_240 = (uint32_t)mc_decorations_count_239;
+        for (uint32_t mc_decorations_index_241 = 0U; mc_decorations_index_241 < mc_decorations_bounded_count_240; ++mc_decorations_index_241) {
+            int32_t mc_decorations_element_242 = 0;
+            if (!mc_reader_varint(reader, &mc_decorations_element_242)) return false;
         }
     }
     else if (mc_type_1 == 75) {
-        int32_t mc_contents_count_225 = 0;
-        if (!mc_reader_varint(reader, &mc_contents_count_225)) return false;
-        if (mc_contents_count_225 < 0
-            || (uint64_t)mc_contents_count_225 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_data_branch_75_count_243 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_75_count_243)) return false;
+        if (mc_data_branch_75_count_243 < 0
+            || (uint64_t)mc_data_branch_75_count_243 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_contents_bounded_count_226 = (uint32_t)mc_contents_count_225;
-        for (uint32_t mc_contents_index_227 = 0U; mc_contents_index_227 < mc_contents_bounded_count_226; ++mc_contents_index_227) {
-            if (!typed_skip_nested_item_stack(reader, 775, depth + 1U)) return false;
+        const uint32_t mc_data_branch_75_bounded_count_244 = (uint32_t)mc_data_branch_75_count_243;
+        for (uint32_t mc_data_branch_75_index_245 = 0U; mc_data_branch_75_index_245 < mc_data_branch_75_bounded_count_244; ++mc_data_branch_75_index_245) {
+            bool mc_data_branch_75_element_present_246 = false;
+            if (!mc_reader_bool(reader, &mc_data_branch_75_element_present_246)) return false;
+            if (mc_data_branch_75_element_present_246) {
+                int32_t mc_item_id_247 = 0;
+                if (!mc_reader_varint(reader, &mc_item_id_247)) return false;
+                int32_t mc_item_count_248 = 0;
+                if (!mc_reader_varint(reader, &mc_item_count_248)) return false;
+                int32_t mc_added_component_count_249 = 0;
+                if (!mc_reader_varint(reader, &mc_added_component_count_249)) return false;
+                int32_t mc_removed_component_count_250 = 0;
+                if (!mc_reader_varint(reader, &mc_removed_component_count_250)) return false;
+                if (mc_added_component_count_249 < 0
+                    || (uint64_t)mc_added_component_count_249 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                    return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+                }
+                const uint32_t mc_components_bounded_count_251 = (uint32_t)mc_added_component_count_249;
+                for (uint32_t mc_components_index_252 = 0U; mc_components_index_252 < mc_components_bounded_count_251; ++mc_components_index_252) {
+                    if (!mc_generated_775_component_slot_component(reader, depth + 1U)) return false;
+                }
+                if (mc_removed_component_count_250 < 0
+                    || (uint64_t)mc_removed_component_count_250 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                    return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+                }
+                const uint32_t mc_remove_components_bounded_count_253 = (uint32_t)mc_removed_component_count_250;
+                for (uint32_t mc_remove_components_index_254 = 0U; mc_remove_components_index_254 < mc_remove_components_bounded_count_253; ++mc_remove_components_index_254) {
+                    if (!mc_generated_775_component_slot_component_type(reader, depth + 1U)) return false;
+                }
+            }
         }
     }
     else if (mc_type_1 == 76) {
-        int32_t mc_properties_count_228 = 0;
-        if (!mc_reader_varint(reader, &mc_properties_count_228)) return false;
-        if (mc_properties_count_228 < 0
-            || (uint64_t)mc_properties_count_228 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_properties_count_255 = 0;
+        if (!mc_reader_varint(reader, &mc_properties_count_255)) return false;
+        if (mc_properties_count_255 < 0
+            || (uint64_t)mc_properties_count_255 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_properties_bounded_count_229 = (uint32_t)mc_properties_count_228;
-        for (uint32_t mc_properties_index_230 = 0U; mc_properties_index_230 < mc_properties_bounded_count_229; ++mc_properties_index_230) {
-            McBytes mc_name_231;
-            if (!mc_reader_string(reader, &mc_name_231)) return false;
-            McBytes mc_value_232;
-            if (!mc_reader_string(reader, &mc_value_232)) return false;
+        const uint32_t mc_properties_bounded_count_256 = (uint32_t)mc_properties_count_255;
+        for (uint32_t mc_properties_index_257 = 0U; mc_properties_index_257 < mc_properties_bounded_count_256; ++mc_properties_index_257) {
+            McBytes mc_name_258;
+            if (!mc_reader_string(reader, &mc_name_258)) return false;
+            McBytes mc_value_259;
+            if (!mc_reader_string(reader, &mc_value_259)) return false;
         }
     }
     else if (mc_type_1 == 77) {
-        int32_t mc_bees_count_233 = 0;
-        if (!mc_reader_varint(reader, &mc_bees_count_233)) return false;
-        if (mc_bees_count_233 < 0
-            || (uint64_t)mc_bees_count_233 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_bees_count_260 = 0;
+        if (!mc_reader_varint(reader, &mc_bees_count_260)) return false;
+        if (mc_bees_count_260 < 0
+            || (uint64_t)mc_bees_count_260 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_bees_bounded_count_234 = (uint32_t)mc_bees_count_233;
-        for (uint32_t mc_bees_index_235 = 0U; mc_bees_index_235 < mc_bees_bounded_count_234; ++mc_bees_index_235) {
+        const uint32_t mc_bees_bounded_count_261 = (uint32_t)mc_bees_count_260;
+        for (uint32_t mc_bees_index_262 = 0U; mc_bees_index_262 < mc_bees_bounded_count_261; ++mc_bees_index_262) {
             if (!mc_reader_nbt(reader, false, NULL)) return false;
-            int32_t mc_ticks_in_hive_237 = 0;
-            if (!mc_reader_varint(reader, &mc_ticks_in_hive_237)) return false;
-            int32_t mc_min_ticks_in_hive_238 = 0;
-            if (!mc_reader_varint(reader, &mc_min_ticks_in_hive_238)) return false;
+            int32_t mc_ticks_in_hive_264 = 0;
+            if (!mc_reader_varint(reader, &mc_ticks_in_hive_264)) return false;
+            int32_t mc_min_ticks_in_hive_265 = 0;
+            if (!mc_reader_varint(reader, &mc_min_ticks_in_hive_265)) return false;
         }
     }
     else if (mc_type_1 == 78) {
@@ -15141,35 +15213,35 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
         if (!mc_generated_775_component_item_sound_holder(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 81) {
-        int32_t mc_data_branch_81_241 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_81_241)) return false;
+        int32_t mc_data_branch_81_268 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_81_268)) return false;
     }
     else if (mc_type_1 == 82) {
-        int32_t mc_data_branch_82_242 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_82_242)) return false;
+        int32_t mc_data_branch_82_269 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_82_269)) return false;
     }
     else if (mc_type_1 == 83) {
-        int32_t mc_data_branch_83_243 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_83_243)) return false;
+        int32_t mc_data_branch_83_270 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_83_270)) return false;
     }
     else if (mc_type_1 == 84) {
         if (!mc_generated_775_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 85) {
-        int32_t mc_data_branch_85_244 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_85_244)) return false;
+        int32_t mc_data_branch_85_271 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_85_271)) return false;
     }
     else if (mc_type_1 == 86) {
-        int32_t mc_data_branch_86_245 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_86_245)) return false;
+        int32_t mc_data_branch_86_272 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_86_272)) return false;
     }
     else if (mc_type_1 == 87) {
-        int32_t mc_data_branch_87_246 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_87_246)) return false;
+        int32_t mc_data_branch_87_273 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_87_273)) return false;
     }
     else if (mc_type_1 == 88) {
-        int32_t mc_data_branch_88_247 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_88_247)) return false;
+        int32_t mc_data_branch_88_274 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_88_274)) return false;
     }
     else if (mc_type_1 == 89) {
         if (!mc_generated_775_component_dye_color(reader, depth + 1U)) return false;
@@ -15178,91 +15250,91 @@ static bool mc_generated_775_component_slot_component(McReader *reader, unsigned
         if (!mc_generated_775_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 91) {
-        int32_t mc_data_branch_91_248 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_91_248)) return false;
+        int32_t mc_data_branch_91_275 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_91_275)) return false;
     }
     else if (mc_type_1 == 92) {
-        int32_t mc_data_branch_92_249 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_92_249)) return false;
+        int32_t mc_data_branch_92_276 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_92_276)) return false;
     }
     else if (mc_type_1 == 93) {
-        int32_t mc_data_branch_93_250 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_93_250)) return false;
+        int32_t mc_data_branch_93_277 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_93_277)) return false;
     }
     else if (mc_type_1 == 94) {
-        int32_t mc_data_branch_94_251 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_94_251)) return false;
+        int32_t mc_data_branch_94_278 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_94_278)) return false;
     }
     else if (mc_type_1 == 95) {
-        int32_t mc_data_branch_95_252 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_95_252)) return false;
+        int32_t mc_data_branch_95_279 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_95_279)) return false;
     }
     else if (mc_type_1 == 96) {
-        int32_t mc_data_branch_96_253 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_96_253)) return false;
+        int32_t mc_data_branch_96_280 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_96_280)) return false;
     }
     else if (mc_type_1 == 97) {
-        int32_t mc_data_branch_97_holder_254 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_97_holder_254) || mc_data_branch_97_holder_254 < 0) {
+        int32_t mc_data_branch_97_holder_281 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_97_holder_281) || mc_data_branch_97_holder_281 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_97_holder_254 == 0) {
-            McBytes mc_data_branch_97_inline_255;
-            if (!mc_reader_string(reader, &mc_data_branch_97_inline_255)) return false;
+        if (mc_data_branch_97_holder_281 == 0) {
+            McBytes mc_data_branch_97_inline_282;
+            if (!mc_reader_string(reader, &mc_data_branch_97_inline_282)) return false;
         }
     }
     else if (mc_type_1 == 98) {
-        int32_t mc_data_branch_98_holder_256 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_98_holder_256) || mc_data_branch_98_holder_256 < 0) {
+        int32_t mc_data_branch_98_holder_283 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_98_holder_283) || mc_data_branch_98_holder_283 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_98_holder_256 == 0) {
-            McBytes mc_data_branch_98_inline_257;
-            if (!mc_reader_string(reader, &mc_data_branch_98_inline_257)) return false;
+        if (mc_data_branch_98_holder_283 == 0) {
+            McBytes mc_data_branch_98_inline_284;
+            if (!mc_reader_string(reader, &mc_data_branch_98_inline_284)) return false;
         }
     }
     else if (mc_type_1 == 99) {
-        int32_t mc_data_branch_99_holder_258 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_99_holder_258) || mc_data_branch_99_holder_258 < 0) {
+        int32_t mc_data_branch_99_holder_285 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_99_holder_285) || mc_data_branch_99_holder_285 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_99_holder_258 == 0) {
-            McBytes mc_data_branch_99_inline_259;
-            if (!mc_reader_string(reader, &mc_data_branch_99_inline_259)) return false;
+        if (mc_data_branch_99_holder_285 == 0) {
+            McBytes mc_data_branch_99_inline_286;
+            if (!mc_reader_string(reader, &mc_data_branch_99_inline_286)) return false;
         }
     }
     else if (mc_type_1 == 100) {
-        int32_t mc_data_branch_100_260 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_100_260)) return false;
+        int32_t mc_data_branch_100_287 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_100_287)) return false;
     }
     else if (mc_type_1 == 101) {
-        int32_t mc_data_branch_101_261 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_101_261)) return false;
+        int32_t mc_data_branch_101_288 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_101_288)) return false;
     }
     else if (mc_type_1 == 102) {
-        int32_t mc_data_branch_102_holder_262 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_102_holder_262) || mc_data_branch_102_holder_262 < 0) {
+        int32_t mc_data_branch_102_holder_289 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_102_holder_289) || mc_data_branch_102_holder_289 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_102_holder_262 == 0) {
+        if (mc_data_branch_102_holder_289 == 0) {
             if (!mc_generated_775_component_entity_metadata_painting_variant(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 103) {
-        int32_t mc_data_branch_103_263 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_103_263)) return false;
+        int32_t mc_data_branch_103_290 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_103_290)) return false;
     }
     else if (mc_type_1 == 104) {
-        int32_t mc_data_branch_104_264 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_104_264)) return false;
+        int32_t mc_data_branch_104_291 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_104_291)) return false;
     }
     else if (mc_type_1 == 105) {
-        int32_t mc_data_branch_105_265 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_105_265)) return false;
+        int32_t mc_data_branch_105_292 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_105_292)) return false;
     }
     else if (mc_type_1 == 106) {
-        int32_t mc_data_branch_106_266 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_106_266)) return false;
+        int32_t mc_data_branch_106_293 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_106_293)) return false;
     }
     else if (mc_type_1 == 107) {
         if (!mc_generated_775_component_dye_color(reader, depth + 1U)) return false;
@@ -15285,6 +15357,1888 @@ static bool mc_generated_775_component_slot_component_type(McReader *reader, uns
     int32_t mc_slot_component_type_1 = 0;
     if (!mc_reader_varint(reader, &mc_slot_component_type_1)) return false;
     if (mc_slot_component_type_1 != 0 && mc_slot_component_type_1 != 1 && mc_slot_component_type_1 != 2 && mc_slot_component_type_1 != 3 && mc_slot_component_type_1 != 4 && mc_slot_component_type_1 != 5 && mc_slot_component_type_1 != 6 && mc_slot_component_type_1 != 7 && mc_slot_component_type_1 != 8 && mc_slot_component_type_1 != 9 && mc_slot_component_type_1 != 10 && mc_slot_component_type_1 != 11 && mc_slot_component_type_1 != 12 && mc_slot_component_type_1 != 13 && mc_slot_component_type_1 != 14 && mc_slot_component_type_1 != 15 && mc_slot_component_type_1 != 16 && mc_slot_component_type_1 != 17 && mc_slot_component_type_1 != 18 && mc_slot_component_type_1 != 19 && mc_slot_component_type_1 != 20 && mc_slot_component_type_1 != 21 && mc_slot_component_type_1 != 22 && mc_slot_component_type_1 != 23 && mc_slot_component_type_1 != 24 && mc_slot_component_type_1 != 25 && mc_slot_component_type_1 != 26 && mc_slot_component_type_1 != 27 && mc_slot_component_type_1 != 28 && mc_slot_component_type_1 != 29 && mc_slot_component_type_1 != 30 && mc_slot_component_type_1 != 31 && mc_slot_component_type_1 != 32 && mc_slot_component_type_1 != 33 && mc_slot_component_type_1 != 34 && mc_slot_component_type_1 != 35 && mc_slot_component_type_1 != 36 && mc_slot_component_type_1 != 37 && mc_slot_component_type_1 != 38 && mc_slot_component_type_1 != 39 && mc_slot_component_type_1 != 40 && mc_slot_component_type_1 != 41 && mc_slot_component_type_1 != 42 && mc_slot_component_type_1 != 43 && mc_slot_component_type_1 != 44 && mc_slot_component_type_1 != 45 && mc_slot_component_type_1 != 46 && mc_slot_component_type_1 != 47 && mc_slot_component_type_1 != 48 && mc_slot_component_type_1 != 49 && mc_slot_component_type_1 != 50 && mc_slot_component_type_1 != 51 && mc_slot_component_type_1 != 52 && mc_slot_component_type_1 != 53 && mc_slot_component_type_1 != 54 && mc_slot_component_type_1 != 55 && mc_slot_component_type_1 != 56 && mc_slot_component_type_1 != 57 && mc_slot_component_type_1 != 58 && mc_slot_component_type_1 != 59 && mc_slot_component_type_1 != 60 && mc_slot_component_type_1 != 61 && mc_slot_component_type_1 != 62 && mc_slot_component_type_1 != 63 && mc_slot_component_type_1 != 64 && mc_slot_component_type_1 != 65 && mc_slot_component_type_1 != 66 && mc_slot_component_type_1 != 67 && mc_slot_component_type_1 != 68 && mc_slot_component_type_1 != 69 && mc_slot_component_type_1 != 70 && mc_slot_component_type_1 != 71 && mc_slot_component_type_1 != 72 && mc_slot_component_type_1 != 73 && mc_slot_component_type_1 != 74 && mc_slot_component_type_1 != 75 && mc_slot_component_type_1 != 76 && mc_slot_component_type_1 != 77 && mc_slot_component_type_1 != 78 && mc_slot_component_type_1 != 79 && mc_slot_component_type_1 != 80 && mc_slot_component_type_1 != 81 && mc_slot_component_type_1 != 82 && mc_slot_component_type_1 != 83 && mc_slot_component_type_1 != 84 && mc_slot_component_type_1 != 85 && mc_slot_component_type_1 != 86 && mc_slot_component_type_1 != 87 && mc_slot_component_type_1 != 88 && mc_slot_component_type_1 != 89 && mc_slot_component_type_1 != 90 && mc_slot_component_type_1 != 91 && mc_slot_component_type_1 != 92 && mc_slot_component_type_1 != 93 && mc_slot_component_type_1 != 94 && mc_slot_component_type_1 != 95 && mc_slot_component_type_1 != 96 && mc_slot_component_type_1 != 97 && mc_slot_component_type_1 != 98 && mc_slot_component_type_1 != 99 && mc_slot_component_type_1 != 100 && mc_slot_component_type_1 != 101 && mc_slot_component_type_1 != 102 && mc_slot_component_type_1 != 103 && mc_slot_component_type_1 != 104 && mc_slot_component_type_1 != 105 && mc_slot_component_type_1 != 106 && mc_slot_component_type_1 != 107 && mc_slot_component_type_1 != 108 && mc_slot_component_type_1 != 109) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    return true;
+}
+
+/* Complete bounded Slot component validator for protocol 776. */
+static bool mc_generated_776_component_armor_trim_material(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_armor_trim_pattern(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_banner_pattern(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_banner_pattern_layer(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_damage_type_data(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_data_component_matchers(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_dye_color(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_entity_metadata_painting_variant(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_exact_component_matcher(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_game_profile(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_game_profile_property(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_global_pos(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_idset(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_instrument_data(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_block_predicate(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_block_property(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_book_page(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_consume_effect(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_effect_detail(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_firework_explosion(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_potion_effect(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_sound_event(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_sound_holder(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_item_written_book_page(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_jukebox_song_data(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_kinetic_weapon_condition(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_partial_resolvable_profile(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_player_skin_patch(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_resolvable_profile(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_slot_component(McReader *reader, unsigned int depth);
+static bool mc_generated_776_component_slot_component_type(McReader *reader, unsigned int depth);
+
+static bool mc_generated_776_component_armor_trim_material(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_asset_base_1;
+    if (!mc_reader_string(reader, &mc_asset_base_1)) return false;
+    int32_t mc_override_armor_assets_count_2 = 0;
+    if (!mc_reader_varint(reader, &mc_override_armor_assets_count_2)) return false;
+    if (mc_override_armor_assets_count_2 < 0
+        || (uint64_t)mc_override_armor_assets_count_2 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    const uint32_t mc_override_armor_assets_bounded_count_3 = (uint32_t)mc_override_armor_assets_count_2;
+    for (uint32_t mc_override_armor_assets_index_4 = 0U; mc_override_armor_assets_index_4 < mc_override_armor_assets_bounded_count_3; ++mc_override_armor_assets_index_4) {
+        McBytes mc_key_5;
+        if (!mc_reader_string(reader, &mc_key_5)) return false;
+        McBytes mc_value_6;
+        if (!mc_reader_string(reader, &mc_value_6)) return false;
+    }
+    if (!mc_reader_nbt(reader, false, NULL)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_armor_trim_pattern(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_asset_id_1;
+    if (!mc_reader_string(reader, &mc_asset_id_1)) return false;
+    if (!mc_reader_nbt(reader, false, NULL)) return false;
+    bool mc_decal_3 = false;
+    if (!mc_reader_bool(reader, &mc_decal_3)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_banner_pattern(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_asset_id_1;
+    if (!mc_reader_string(reader, &mc_asset_id_1)) return false;
+    McBytes mc_translation_key_2;
+    if (!mc_reader_string(reader, &mc_translation_key_2)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_banner_pattern_layer(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_pattern_holder_1 = -1;
+    if (!mc_reader_varint(reader, &mc_pattern_holder_1) || mc_pattern_holder_1 < 0) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    if (mc_pattern_holder_1 == 0) {
+        if (!mc_generated_776_component_banner_pattern(reader, depth + 1U)) return false;
+    }
+    int32_t mc_color_id_2 = 0;
+    if (!mc_reader_varint(reader, &mc_color_id_2)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_damage_type_data(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_msg_id_1;
+    if (!mc_reader_string(reader, &mc_msg_id_1)) return false;
+    int32_t mc_scaling_2 = 0;
+    if (!mc_reader_varint(reader, &mc_scaling_2)) return false;
+    if (mc_scaling_2 != 0 && mc_scaling_2 != 1 && mc_scaling_2 != 2) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    float mc_exhaustion_3 = 0;
+    if (!mc_reader_float(reader, &mc_exhaustion_3)) return false;
+    if (!isfinite(mc_exhaustion_3)) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    int32_t mc_effects_4 = 0;
+    if (!mc_reader_varint(reader, &mc_effects_4)) return false;
+    if (mc_effects_4 != 0 && mc_effects_4 != 1 && mc_effects_4 != 2 && mc_effects_4 != 3 && mc_effects_4 != 4 && mc_effects_4 != 5) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    int32_t mc_death_message_type_5 = 0;
+    if (!mc_reader_varint(reader, &mc_death_message_type_5)) return false;
+    if (mc_death_message_type_5 != 0 && mc_death_message_type_5 != 1 && mc_death_message_type_5 != 2) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_data_component_matchers(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    if (!mc_generated_776_component_exact_component_matcher(reader, depth + 1U)) return false;
+    int32_t mc_partial_matchers_count_1 = 0;
+    if (!mc_reader_varint(reader, &mc_partial_matchers_count_1)) return false;
+    if (mc_partial_matchers_count_1 < 0
+        || (uint64_t)mc_partial_matchers_count_1 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    const uint32_t mc_partial_matchers_bounded_count_2 = (uint32_t)mc_partial_matchers_count_1;
+    for (uint32_t mc_partial_matchers_index_3 = 0U; mc_partial_matchers_index_3 < mc_partial_matchers_bounded_count_2; ++mc_partial_matchers_index_3) {
+        int32_t mc_partial_matchers_element_4 = 0;
+        if (!mc_reader_varint(reader, &mc_partial_matchers_element_4)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_dye_color(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_dye_color_1 = 0;
+    if (!mc_reader_varint(reader, &mc_dye_color_1)) return false;
+    if (mc_dye_color_1 != 0 && mc_dye_color_1 != 1 && mc_dye_color_1 != 2 && mc_dye_color_1 != 3 && mc_dye_color_1 != 4 && mc_dye_color_1 != 5 && mc_dye_color_1 != 6 && mc_dye_color_1 != 7 && mc_dye_color_1 != 8 && mc_dye_color_1 != 9 && mc_dye_color_1 != 10 && mc_dye_color_1 != 11 && mc_dye_color_1 != 12 && mc_dye_color_1 != 13 && mc_dye_color_1 != 14 && mc_dye_color_1 != 15) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_entity_metadata_painting_variant(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_width_1 = 0;
+    if (!mc_reader_i32(reader, &mc_width_1)) return false;
+    int32_t mc_height_2 = 0;
+    if (!mc_reader_i32(reader, &mc_height_2)) return false;
+    McBytes mc_asset_id_3;
+    if (!mc_reader_string(reader, &mc_asset_id_3)) return false;
+    bool mc_title_present_4 = false;
+    if (!mc_reader_bool(reader, &mc_title_present_4)) return false;
+    if (mc_title_present_4) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    bool mc_author_present_6 = false;
+    if (!mc_reader_bool(reader, &mc_author_present_6)) return false;
+    if (mc_author_present_6) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_exact_component_matcher(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_exact_component_matcher_count_1 = 0;
+    if (!mc_reader_varint(reader, &mc_exact_component_matcher_count_1)) return false;
+    if (mc_exact_component_matcher_count_1 < 0
+        || (uint64_t)mc_exact_component_matcher_count_1 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    const uint32_t mc_exact_component_matcher_bounded_count_2 = (uint32_t)mc_exact_component_matcher_count_1;
+    for (uint32_t mc_exact_component_matcher_index_3 = 0U; mc_exact_component_matcher_index_3 < mc_exact_component_matcher_bounded_count_2; ++mc_exact_component_matcher_index_3) {
+        if (!mc_generated_776_component_slot_component(reader, depth + 1U)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_game_profile(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    if (!mc_reader_skip(reader, 16U)) return false;
+    McBytes mc_name_2;
+    if (!mc_reader_string(reader, &mc_name_2)) return false;
+    int32_t mc_properties_count_3 = 0;
+    if (!mc_reader_varint(reader, &mc_properties_count_3)) return false;
+    if (mc_properties_count_3 < 0
+        || (uint64_t)mc_properties_count_3 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    const uint32_t mc_properties_bounded_count_4 = (uint32_t)mc_properties_count_3;
+    for (uint32_t mc_properties_index_5 = 0U; mc_properties_index_5 < mc_properties_bounded_count_4; ++mc_properties_index_5) {
+        if (!mc_generated_776_component_game_profile_property(reader, depth + 1U)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_game_profile_property(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_name_1;
+    if (!mc_reader_string(reader, &mc_name_1)) return false;
+    McBytes mc_value_2;
+    if (!mc_reader_string(reader, &mc_value_2)) return false;
+    bool mc_signature_present_3 = false;
+    if (!mc_reader_bool(reader, &mc_signature_present_3)) return false;
+    if (mc_signature_present_3) {
+        McBytes mc_signature_value_4;
+        if (!mc_reader_string(reader, &mc_signature_value_4)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_global_pos(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_dimension_name_1;
+    if (!mc_reader_string(reader, &mc_dimension_name_1)) return false;
+    McPosition mc_location_2;
+    if (!mc_reader_position(reader, 776, &mc_location_2)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_idset(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_idset_holder_set_1 = -1;
+    if (!mc_reader_varint(reader, &mc_idset_holder_set_1) || mc_idset_holder_set_1 < 0) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    if (mc_idset_holder_set_1 == 0) {
+        McBytes mc_idset_base_2;
+        if (!mc_reader_string(reader, &mc_idset_base_2)) return false;
+    } else {
+        const uint32_t mc_idset_holder_count_3 = (uint32_t)(mc_idset_holder_set_1 - 1);
+        if (mc_idset_holder_count_3 > MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        for (uint32_t mc_idset_holder_index_4 = 0U; mc_idset_holder_index_4 < mc_idset_holder_count_3; ++mc_idset_holder_index_4) {
+            int32_t mc_idset_holder_member_5 = 0;
+            if (!mc_reader_varint(reader, &mc_idset_holder_member_5)) return false;
+        }
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_instrument_data(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+    float mc_use_duration_1 = 0;
+    if (!mc_reader_float(reader, &mc_use_duration_1)) return false;
+    if (!isfinite(mc_use_duration_1)) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    float mc_range_2 = 0;
+    if (!mc_reader_float(reader, &mc_range_2)) return false;
+    if (!isfinite(mc_range_2)) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    if (!mc_reader_nbt(reader, false, NULL)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_item_block_predicate(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    bool mc_block_set_present_1 = false;
+    if (!mc_reader_bool(reader, &mc_block_set_present_1)) return false;
+    if (mc_block_set_present_1) {
+        int32_t mc_block_set_value_holder_set_2 = -1;
+        if (!mc_reader_varint(reader, &mc_block_set_value_holder_set_2) || mc_block_set_value_holder_set_2 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_block_set_value_holder_set_2 == 0) {
+            McBytes mc_block_set_value_base_3;
+            if (!mc_reader_string(reader, &mc_block_set_value_base_3)) return false;
+        } else {
+            const uint32_t mc_block_set_value_holder_count_4 = (uint32_t)(mc_block_set_value_holder_set_2 - 1);
+            if (mc_block_set_value_holder_count_4 > MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            for (uint32_t mc_block_set_value_holder_index_5 = 0U; mc_block_set_value_holder_index_5 < mc_block_set_value_holder_count_4; ++mc_block_set_value_holder_index_5) {
+                int32_t mc_block_set_value_holder_member_6 = 0;
+                if (!mc_reader_varint(reader, &mc_block_set_value_holder_member_6)) return false;
+            }
+        }
+    }
+    bool mc_properties_present_7 = false;
+    if (!mc_reader_bool(reader, &mc_properties_present_7)) return false;
+    if (mc_properties_present_7) {
+        int32_t mc_properties_value_count_8 = 0;
+        if (!mc_reader_varint(reader, &mc_properties_value_count_8)) return false;
+        if (mc_properties_value_count_8 < 0
+            || (uint64_t)mc_properties_value_count_8 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_properties_value_bounded_count_9 = (uint32_t)mc_properties_value_count_8;
+        for (uint32_t mc_properties_value_index_10 = 0U; mc_properties_value_index_10 < mc_properties_value_bounded_count_9; ++mc_properties_value_index_10) {
+            if (!mc_generated_776_component_item_block_property(reader, depth + 1U)) return false;
+        }
+    }
+    if (!mc_reader_nbt(reader, false, NULL)) return false;
+    if (!mc_generated_776_component_data_component_matchers(reader, depth + 1U)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_item_block_property(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_name_1;
+    if (!mc_reader_string(reader, &mc_name_1)) return false;
+    bool mc_is_exact_match_2 = false;
+    if (!mc_reader_bool(reader, &mc_is_exact_match_2)) return false;
+    if (mc_is_exact_match_2 == 0) {
+        McBytes mc_min_value_3;
+        if (!mc_reader_string(reader, &mc_min_value_3)) return false;
+        McBytes mc_max_value_4;
+        if (!mc_reader_string(reader, &mc_max_value_4)) return false;
+    }
+    else if (mc_is_exact_match_2 == 1) {
+        McBytes mc_exact_value_5;
+        if (!mc_reader_string(reader, &mc_exact_value_5)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_item_book_page(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_content_1;
+    if (!mc_reader_string(reader, &mc_content_1)) return false;
+    bool mc_filtered_content_present_2 = false;
+    if (!mc_reader_bool(reader, &mc_filtered_content_present_2)) return false;
+    if (mc_filtered_content_present_2) {
+        McBytes mc_filtered_content_value_3;
+        if (!mc_reader_string(reader, &mc_filtered_content_value_3)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_item_consume_effect(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_type_1 = 0;
+    if (!mc_reader_varint(reader, &mc_type_1)) return false;
+    if (mc_type_1 != 0 && mc_type_1 != 1 && mc_type_1 != 2 && mc_type_1 != 3 && mc_type_1 != 4) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    if (mc_type_1 == 0) {
+        int32_t mc_effects_count_2 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_2)) return false;
+        if (mc_effects_count_2 < 0
+            || (uint64_t)mc_effects_count_2 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_effects_bounded_count_3 = (uint32_t)mc_effects_count_2;
+        for (uint32_t mc_effects_index_4 = 0U; mc_effects_index_4 < mc_effects_bounded_count_3; ++mc_effects_index_4) {
+            if (!mc_generated_776_component_item_potion_effect(reader, depth + 1U)) return false;
+        }
+        float mc_probability_5 = 0;
+        if (!mc_reader_float(reader, &mc_probability_5)) return false;
+        if (!isfinite(mc_probability_5)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 1) {
+        if (!mc_generated_776_component_idset(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 2) {
+    }
+    else if (mc_type_1 == 3) {
+        float mc_diameter_7 = 0;
+        if (!mc_reader_float(reader, &mc_diameter_7)) return false;
+        if (!isfinite(mc_diameter_7)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 4) {
+        if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_item_effect_detail(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_amplifier_1 = 0;
+    if (!mc_reader_varint(reader, &mc_amplifier_1)) return false;
+    int32_t mc_duration_2 = 0;
+    if (!mc_reader_varint(reader, &mc_duration_2)) return false;
+    bool mc_ambient_3 = false;
+    if (!mc_reader_bool(reader, &mc_ambient_3)) return false;
+    bool mc_show_particles_4 = false;
+    if (!mc_reader_bool(reader, &mc_show_particles_4)) return false;
+    bool mc_show_icon_5 = false;
+    if (!mc_reader_bool(reader, &mc_show_icon_5)) return false;
+    bool mc_hidden_effect_present_6 = false;
+    if (!mc_reader_bool(reader, &mc_hidden_effect_present_6)) return false;
+    if (mc_hidden_effect_present_6) {
+        if (!mc_generated_776_component_item_effect_detail(reader, depth + 1U)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_item_firework_explosion(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_shape_1 = 0;
+    if (!mc_reader_varint(reader, &mc_shape_1)) return false;
+    if (mc_shape_1 != 0 && mc_shape_1 != 1 && mc_shape_1 != 2 && mc_shape_1 != 3 && mc_shape_1 != 4) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    int32_t mc_colors_count_2 = 0;
+    if (!mc_reader_varint(reader, &mc_colors_count_2)) return false;
+    if (mc_colors_count_2 < 0
+        || (uint64_t)mc_colors_count_2 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    const uint32_t mc_colors_bounded_count_3 = (uint32_t)mc_colors_count_2;
+    for (uint32_t mc_colors_index_4 = 0U; mc_colors_index_4 < mc_colors_bounded_count_3; ++mc_colors_index_4) {
+        int32_t mc_colors_element_5 = 0;
+        if (!mc_reader_i32(reader, &mc_colors_element_5)) return false;
+    }
+    int32_t mc_fade_colors_count_6 = 0;
+    if (!mc_reader_varint(reader, &mc_fade_colors_count_6)) return false;
+    if (mc_fade_colors_count_6 < 0
+        || (uint64_t)mc_fade_colors_count_6 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    const uint32_t mc_fade_colors_bounded_count_7 = (uint32_t)mc_fade_colors_count_6;
+    for (uint32_t mc_fade_colors_index_8 = 0U; mc_fade_colors_index_8 < mc_fade_colors_bounded_count_7; ++mc_fade_colors_index_8) {
+        int32_t mc_fade_colors_element_9 = 0;
+        if (!mc_reader_i32(reader, &mc_fade_colors_element_9)) return false;
+    }
+    bool mc_has_trail_10 = false;
+    if (!mc_reader_bool(reader, &mc_has_trail_10)) return false;
+    bool mc_has_twinkle_11 = false;
+    if (!mc_reader_bool(reader, &mc_has_twinkle_11)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_item_potion_effect(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_id_1 = 0;
+    if (!mc_reader_varint(reader, &mc_id_1)) return false;
+    if (!mc_generated_776_component_item_effect_detail(reader, depth + 1U)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_item_sound_event(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    McBytes mc_sound_name_1;
+    if (!mc_reader_string(reader, &mc_sound_name_1)) return false;
+    bool mc_fixed_range_present_2 = false;
+    if (!mc_reader_bool(reader, &mc_fixed_range_present_2)) return false;
+    if (mc_fixed_range_present_2) {
+        float mc_fixed_range_value_3 = 0;
+        if (!mc_reader_float(reader, &mc_fixed_range_value_3)) return false;
+        if (!isfinite(mc_fixed_range_value_3)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_item_sound_holder(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_item_sound_holder_holder_1 = -1;
+    if (!mc_reader_varint(reader, &mc_item_sound_holder_holder_1) || mc_item_sound_holder_holder_1 < 0) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    if (mc_item_sound_holder_holder_1 == 0) {
+        if (!mc_generated_776_component_item_sound_event(reader, depth + 1U)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_item_written_book_page(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    if (!mc_reader_nbt(reader, false, NULL)) return false;
+    if (!mc_reader_nbt(reader, false, NULL)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_jukebox_song_data(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+    if (!mc_reader_nbt(reader, false, NULL)) return false;
+    float mc_length_in_seconds_2 = 0;
+    if (!mc_reader_float(reader, &mc_length_in_seconds_2)) return false;
+    if (!isfinite(mc_length_in_seconds_2)) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    int32_t mc_comparator_output_3 = 0;
+    if (!mc_reader_varint(reader, &mc_comparator_output_3)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_kinetic_weapon_condition(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_max_duration_ticks_1 = 0;
+    if (!mc_reader_varint(reader, &mc_max_duration_ticks_1)) return false;
+    float mc_min_speed_2 = 0;
+    if (!mc_reader_float(reader, &mc_min_speed_2)) return false;
+    if (!isfinite(mc_min_speed_2)) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    float mc_min_relative_speed_3 = 0;
+    if (!mc_reader_float(reader, &mc_min_relative_speed_3)) return false;
+    if (!isfinite(mc_min_relative_speed_3)) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_partial_resolvable_profile(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    bool mc_name_present_1 = false;
+    if (!mc_reader_bool(reader, &mc_name_present_1)) return false;
+    if (mc_name_present_1) {
+        McBytes mc_name_value_2;
+        if (!mc_reader_string(reader, &mc_name_value_2)) return false;
+    }
+    bool mc_uuid_present_3 = false;
+    if (!mc_reader_bool(reader, &mc_uuid_present_3)) return false;
+    if (mc_uuid_present_3) {
+        if (!mc_reader_skip(reader, 16U)) return false;
+    }
+    int32_t mc_properties_count_5 = 0;
+    if (!mc_reader_varint(reader, &mc_properties_count_5)) return false;
+    if (mc_properties_count_5 < 0
+        || (uint64_t)mc_properties_count_5 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    const uint32_t mc_properties_bounded_count_6 = (uint32_t)mc_properties_count_5;
+    for (uint32_t mc_properties_index_7 = 0U; mc_properties_index_7 < mc_properties_bounded_count_6; ++mc_properties_index_7) {
+        if (!mc_generated_776_component_game_profile_property(reader, depth + 1U)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_player_skin_patch(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    bool mc_body_present_1 = false;
+    if (!mc_reader_bool(reader, &mc_body_present_1)) return false;
+    if (mc_body_present_1) {
+        McBytes mc_body_value_2;
+        if (!mc_reader_string(reader, &mc_body_value_2)) return false;
+    }
+    bool mc_cape_present_3 = false;
+    if (!mc_reader_bool(reader, &mc_cape_present_3)) return false;
+    if (mc_cape_present_3) {
+        McBytes mc_cape_value_4;
+        if (!mc_reader_string(reader, &mc_cape_value_4)) return false;
+    }
+    bool mc_elytra_present_5 = false;
+    if (!mc_reader_bool(reader, &mc_elytra_present_5)) return false;
+    if (mc_elytra_present_5) {
+        McBytes mc_elytra_value_6;
+        if (!mc_reader_string(reader, &mc_elytra_value_6)) return false;
+    }
+    bool mc_model_present_7 = false;
+    if (!mc_reader_bool(reader, &mc_model_present_7)) return false;
+    if (mc_model_present_7) {
+        int32_t mc_model_value_8 = 0;
+        if (!mc_reader_varint(reader, &mc_model_value_8)) return false;
+        if (mc_model_value_8 != 0 && mc_model_value_8 != 1) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_resolvable_profile(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_type_1 = 0;
+    if (!mc_reader_varint(reader, &mc_type_1)) return false;
+    if (mc_type_1 != 0 && mc_type_1 != 1) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    if (mc_type_1 == 0) {
+        if (!mc_generated_776_component_partial_resolvable_profile(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 1) {
+        if (!mc_generated_776_component_game_profile(reader, depth + 1U)) return false;
+    }
+    if (!mc_generated_776_component_player_skin_patch(reader, depth + 1U)) return false;
+    return true;
+}
+
+static bool mc_generated_776_component_slot_component(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_type_1 = 0;
+    if (!mc_reader_varint(reader, &mc_type_1)) return false;
+    if (mc_type_1 != 0 && mc_type_1 != 1 && mc_type_1 != 2 && mc_type_1 != 3 && mc_type_1 != 4 && mc_type_1 != 5 && mc_type_1 != 6 && mc_type_1 != 7 && mc_type_1 != 8 && mc_type_1 != 9 && mc_type_1 != 10 && mc_type_1 != 11 && mc_type_1 != 12 && mc_type_1 != 13 && mc_type_1 != 14 && mc_type_1 != 15 && mc_type_1 != 16 && mc_type_1 != 17 && mc_type_1 != 18 && mc_type_1 != 19 && mc_type_1 != 20 && mc_type_1 != 21 && mc_type_1 != 22 && mc_type_1 != 23 && mc_type_1 != 24 && mc_type_1 != 25 && mc_type_1 != 26 && mc_type_1 != 27 && mc_type_1 != 28 && mc_type_1 != 29 && mc_type_1 != 30 && mc_type_1 != 31 && mc_type_1 != 32 && mc_type_1 != 33 && mc_type_1 != 34 && mc_type_1 != 35 && mc_type_1 != 36 && mc_type_1 != 37 && mc_type_1 != 38 && mc_type_1 != 39 && mc_type_1 != 40 && mc_type_1 != 41 && mc_type_1 != 42 && mc_type_1 != 43 && mc_type_1 != 44 && mc_type_1 != 45 && mc_type_1 != 46 && mc_type_1 != 47 && mc_type_1 != 48 && mc_type_1 != 49 && mc_type_1 != 50 && mc_type_1 != 51 && mc_type_1 != 52 && mc_type_1 != 53 && mc_type_1 != 54 && mc_type_1 != 55 && mc_type_1 != 56 && mc_type_1 != 57 && mc_type_1 != 58 && mc_type_1 != 59 && mc_type_1 != 60 && mc_type_1 != 61 && mc_type_1 != 62 && mc_type_1 != 63 && mc_type_1 != 64 && mc_type_1 != 65 && mc_type_1 != 66 && mc_type_1 != 67 && mc_type_1 != 68 && mc_type_1 != 69 && mc_type_1 != 70 && mc_type_1 != 71 && mc_type_1 != 72 && mc_type_1 != 73 && mc_type_1 != 74 && mc_type_1 != 75 && mc_type_1 != 76 && mc_type_1 != 77 && mc_type_1 != 78 && mc_type_1 != 79 && mc_type_1 != 80 && mc_type_1 != 81 && mc_type_1 != 82 && mc_type_1 != 83 && mc_type_1 != 84 && mc_type_1 != 85 && mc_type_1 != 86 && mc_type_1 != 87 && mc_type_1 != 88 && mc_type_1 != 89 && mc_type_1 != 90 && mc_type_1 != 91 && mc_type_1 != 92 && mc_type_1 != 93 && mc_type_1 != 94 && mc_type_1 != 95 && mc_type_1 != 96 && mc_type_1 != 97 && mc_type_1 != 98 && mc_type_1 != 99 && mc_type_1 != 100 && mc_type_1 != 101 && mc_type_1 != 102 && mc_type_1 != 103 && mc_type_1 != 104 && mc_type_1 != 105 && mc_type_1 != 106 && mc_type_1 != 107 && mc_type_1 != 108 && mc_type_1 != 109 && mc_type_1 != 110) {
+        return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+    }
+    if (mc_type_1 == 0) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 1) {
+        int32_t mc_data_branch_1_3 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_1_3)) return false;
+    }
+    else if (mc_type_1 == 2) {
+        int32_t mc_data_branch_2_4 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_2_4)) return false;
+    }
+    else if (mc_type_1 == 3) {
+        int32_t mc_data_branch_3_5 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_3_5)) return false;
+    }
+    else if (mc_type_1 == 4) {
+    }
+    else if (mc_type_1 == 5) {
+        bool mc_can_sprint_7 = false;
+        if (!mc_reader_bool(reader, &mc_can_sprint_7)) return false;
+        bool mc_interact_vibrations_8 = false;
+        if (!mc_reader_bool(reader, &mc_interact_vibrations_8)) return false;
+        float mc_speed_multiplier_9 = 0;
+        if (!mc_reader_float(reader, &mc_speed_multiplier_9)) return false;
+        if (!isfinite(mc_speed_multiplier_9)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 6) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 7) {
+        float mc_data_branch_7_11 = 0;
+        if (!mc_reader_float(reader, &mc_data_branch_7_11)) return false;
+        if (!isfinite(mc_data_branch_7_11)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 8) {
+        bool mc_has_holder_12 = false;
+        if (!mc_reader_bool(reader, &mc_has_holder_12)) return false;
+        if (mc_has_holder_12 == 0) {
+            McBytes mc_damage_type_branch_0_13;
+            if (!mc_reader_string(reader, &mc_damage_type_branch_0_13)) return false;
+        }
+        else if (mc_has_holder_12 == 1) {
+            int32_t mc_damage_type_branch_1_holder_14 = -1;
+            if (!mc_reader_varint(reader, &mc_damage_type_branch_1_holder_14) || mc_damage_type_branch_1_holder_14 < 0) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            if (mc_damage_type_branch_1_holder_14 == 0) {
+                if (!mc_generated_776_component_damage_type_data(reader, depth + 1U)) return false;
+            }
+        }
+    }
+    else if (mc_type_1 == 9) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 10) {
+        McBytes mc_data_branch_10_16;
+        if (!mc_reader_string(reader, &mc_data_branch_10_16)) return false;
+    }
+    else if (mc_type_1 == 11) {
+        int32_t mc_data_branch_11_count_17 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_11_count_17)) return false;
+        if (mc_data_branch_11_count_17 < 0
+            || (uint64_t)mc_data_branch_11_count_17 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_data_branch_11_bounded_count_18 = (uint32_t)mc_data_branch_11_count_17;
+        for (uint32_t mc_data_branch_11_index_19 = 0U; mc_data_branch_11_index_19 < mc_data_branch_11_bounded_count_18; ++mc_data_branch_11_index_19) {
+            if (!mc_reader_nbt(reader, false, NULL)) return false;
+        }
+    }
+    else if (mc_type_1 == 12) {
+        int32_t mc_data_branch_12_21 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_12_21)) return false;
+        if (mc_data_branch_12_21 != 0 && mc_data_branch_12_21 != 1 && mc_data_branch_12_21 != 2 && mc_data_branch_12_21 != 3) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 13) {
+        int32_t mc_enchantments_count_22 = 0;
+        if (!mc_reader_varint(reader, &mc_enchantments_count_22)) return false;
+        if (mc_enchantments_count_22 < 0
+            || (uint64_t)mc_enchantments_count_22 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_enchantments_bounded_count_23 = (uint32_t)mc_enchantments_count_22;
+        for (uint32_t mc_enchantments_index_24 = 0U; mc_enchantments_index_24 < mc_enchantments_bounded_count_23; ++mc_enchantments_index_24) {
+            int32_t mc_id_25 = 0;
+            if (!mc_reader_varint(reader, &mc_id_25)) return false;
+            int32_t mc_level_26 = 0;
+            if (!mc_reader_varint(reader, &mc_level_26)) return false;
+        }
+    }
+    else if (mc_type_1 == 14) {
+        int32_t mc_predicates_count_27 = 0;
+        if (!mc_reader_varint(reader, &mc_predicates_count_27)) return false;
+        if (mc_predicates_count_27 < 0
+            || (uint64_t)mc_predicates_count_27 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_predicates_bounded_count_28 = (uint32_t)mc_predicates_count_27;
+        for (uint32_t mc_predicates_index_29 = 0U; mc_predicates_index_29 < mc_predicates_bounded_count_28; ++mc_predicates_index_29) {
+            if (!mc_generated_776_component_item_block_predicate(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 15) {
+        int32_t mc_predicates_count_30 = 0;
+        if (!mc_reader_varint(reader, &mc_predicates_count_30)) return false;
+        if (mc_predicates_count_30 < 0
+            || (uint64_t)mc_predicates_count_30 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_predicates_bounded_count_31 = (uint32_t)mc_predicates_count_30;
+        for (uint32_t mc_predicates_index_32 = 0U; mc_predicates_index_32 < mc_predicates_bounded_count_31; ++mc_predicates_index_32) {
+            if (!mc_generated_776_component_item_block_predicate(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 16) {
+        int32_t mc_data_branch_16_count_33 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_16_count_33)) return false;
+        if (mc_data_branch_16_count_33 < 0
+            || (uint64_t)mc_data_branch_16_count_33 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_data_branch_16_bounded_count_34 = (uint32_t)mc_data_branch_16_count_33;
+        for (uint32_t mc_data_branch_16_index_35 = 0U; mc_data_branch_16_index_35 < mc_data_branch_16_bounded_count_34; ++mc_data_branch_16_index_35) {
+            int32_t mc_type_id_36 = 0;
+            if (!mc_reader_varint(reader, &mc_type_id_36)) return false;
+            McBytes mc_name_37;
+            if (!mc_reader_string(reader, &mc_name_37)) return false;
+            double mc_value_38 = 0;
+            if (!mc_reader_double(reader, &mc_value_38)) return false;
+            if (!isfinite(mc_value_38)) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            int32_t mc_operation_39 = 0;
+            if (!mc_reader_varint(reader, &mc_operation_39)) return false;
+            if (mc_operation_39 != 0 && mc_operation_39 != 1 && mc_operation_39 != 2) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            int32_t mc_slot_40 = 0;
+            if (!mc_reader_varint(reader, &mc_slot_40)) return false;
+            if (mc_slot_40 != 0 && mc_slot_40 != 1 && mc_slot_40 != 2 && mc_slot_40 != 3 && mc_slot_40 != 4 && mc_slot_40 != 5 && mc_slot_40 != 6 && mc_slot_40 != 7 && mc_slot_40 != 8 && mc_slot_40 != 9 && mc_slot_40 != 10) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            int32_t mc_type_41 = 0;
+            if (!mc_reader_varint(reader, &mc_type_41)) return false;
+            if (mc_type_41 != 0 && mc_type_41 != 1 && mc_type_41 != 2) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            if (mc_type_41 == 2) {
+                if (!mc_reader_nbt(reader, false, NULL)) return false;
+            }
+        }
+    }
+    else if (mc_type_1 == 17) {
+        int32_t mc_floats_count_43 = 0;
+        if (!mc_reader_varint(reader, &mc_floats_count_43)) return false;
+        if (mc_floats_count_43 < 0
+            || (uint64_t)mc_floats_count_43 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_floats_bounded_count_44 = (uint32_t)mc_floats_count_43;
+        for (uint32_t mc_floats_index_45 = 0U; mc_floats_index_45 < mc_floats_bounded_count_44; ++mc_floats_index_45) {
+            float mc_floats_element_46 = 0;
+            if (!mc_reader_float(reader, &mc_floats_element_46)) return false;
+            if (!isfinite(mc_floats_element_46)) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+        }
+        int32_t mc_flags_count_47 = 0;
+        if (!mc_reader_varint(reader, &mc_flags_count_47)) return false;
+        if (mc_flags_count_47 < 0
+            || (uint64_t)mc_flags_count_47 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_flags_bounded_count_48 = (uint32_t)mc_flags_count_47;
+        for (uint32_t mc_flags_index_49 = 0U; mc_flags_index_49 < mc_flags_bounded_count_48; ++mc_flags_index_49) {
+            bool mc_flags_element_50 = false;
+            if (!mc_reader_bool(reader, &mc_flags_element_50)) return false;
+        }
+        int32_t mc_strings_count_51 = 0;
+        if (!mc_reader_varint(reader, &mc_strings_count_51)) return false;
+        if (mc_strings_count_51 < 0
+            || (uint64_t)mc_strings_count_51 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_strings_bounded_count_52 = (uint32_t)mc_strings_count_51;
+        for (uint32_t mc_strings_index_53 = 0U; mc_strings_index_53 < mc_strings_bounded_count_52; ++mc_strings_index_53) {
+            McBytes mc_strings_element_54;
+            if (!mc_reader_string(reader, &mc_strings_element_54)) return false;
+        }
+        int32_t mc_colors_count_55 = 0;
+        if (!mc_reader_varint(reader, &mc_colors_count_55)) return false;
+        if (mc_colors_count_55 < 0
+            || (uint64_t)mc_colors_count_55 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_colors_bounded_count_56 = (uint32_t)mc_colors_count_55;
+        for (uint32_t mc_colors_index_57 = 0U; mc_colors_index_57 < mc_colors_bounded_count_56; ++mc_colors_index_57) {
+            int32_t mc_colors_element_58 = 0;
+            if (!mc_reader_i32(reader, &mc_colors_element_58)) return false;
+        }
+    }
+    else if (mc_type_1 == 18) {
+        bool mc_hide_tooltip_59 = false;
+        if (!mc_reader_bool(reader, &mc_hide_tooltip_59)) return false;
+        int32_t mc_hidden_components_count_60 = 0;
+        if (!mc_reader_varint(reader, &mc_hidden_components_count_60)) return false;
+        if (mc_hidden_components_count_60 < 0
+            || (uint64_t)mc_hidden_components_count_60 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_hidden_components_bounded_count_61 = (uint32_t)mc_hidden_components_count_60;
+        for (uint32_t mc_hidden_components_index_62 = 0U; mc_hidden_components_index_62 < mc_hidden_components_bounded_count_61; ++mc_hidden_components_index_62) {
+            int32_t mc_hidden_components_element_63 = 0;
+            if (!mc_reader_varint(reader, &mc_hidden_components_element_63)) return false;
+        }
+    }
+    else if (mc_type_1 == 19) {
+        int32_t mc_data_branch_19_64 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_19_64)) return false;
+    }
+    else if (mc_type_1 == 20) {
+    }
+    else if (mc_type_1 == 21) {
+        bool mc_data_branch_21_66 = false;
+        if (!mc_reader_bool(reader, &mc_data_branch_21_66)) return false;
+    }
+    else if (mc_type_1 == 22) {
+    }
+    else if (mc_type_1 == 23) {
+        int32_t mc_nutrition_68 = 0;
+        if (!mc_reader_varint(reader, &mc_nutrition_68)) return false;
+        float mc_saturation_modifier_69 = 0;
+        if (!mc_reader_float(reader, &mc_saturation_modifier_69)) return false;
+        if (!isfinite(mc_saturation_modifier_69)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        bool mc_can_always_eat_70 = false;
+        if (!mc_reader_bool(reader, &mc_can_always_eat_70)) return false;
+    }
+    else if (mc_type_1 == 24) {
+        float mc_consume_seconds_71 = 0;
+        if (!mc_reader_float(reader, &mc_consume_seconds_71)) return false;
+        if (!isfinite(mc_consume_seconds_71)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        int32_t mc_animation_72 = 0;
+        if (!mc_reader_varint(reader, &mc_animation_72)) return false;
+        if (mc_animation_72 != 0 && mc_animation_72 != 1 && mc_animation_72 != 2 && mc_animation_72 != 3 && mc_animation_72 != 4 && mc_animation_72 != 5 && mc_animation_72 != 6 && mc_animation_72 != 7 && mc_animation_72 != 8 && mc_animation_72 != 9 && mc_animation_72 != 10) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        bool mc_makes_particles_73 = false;
+        if (!mc_reader_bool(reader, &mc_makes_particles_73)) return false;
+        int32_t mc_effects_count_74 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_74)) return false;
+        if (mc_effects_count_74 < 0
+            || (uint64_t)mc_effects_count_74 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_effects_bounded_count_75 = (uint32_t)mc_effects_count_74;
+        for (uint32_t mc_effects_index_76 = 0U; mc_effects_index_76 < mc_effects_bounded_count_75; ++mc_effects_index_76) {
+            if (!mc_generated_776_component_item_consume_effect(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 25) {
+        int32_t mc_item_id_77 = 0;
+        if (!mc_reader_varint(reader, &mc_item_id_77)) return false;
+        int32_t mc_item_count_78 = 0;
+        if (!mc_reader_varint(reader, &mc_item_count_78)) return false;
+        int32_t mc_added_component_count_79 = 0;
+        if (!mc_reader_varint(reader, &mc_added_component_count_79)) return false;
+        int32_t mc_removed_component_count_80 = 0;
+        if (!mc_reader_varint(reader, &mc_removed_component_count_80)) return false;
+        if (mc_added_component_count_79 < 0
+            || (uint64_t)mc_added_component_count_79 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_components_bounded_count_81 = (uint32_t)mc_added_component_count_79;
+        for (uint32_t mc_components_index_82 = 0U; mc_components_index_82 < mc_components_bounded_count_81; ++mc_components_index_82) {
+            if (!mc_generated_776_component_slot_component(reader, depth + 1U)) return false;
+        }
+        if (mc_removed_component_count_80 < 0
+            || (uint64_t)mc_removed_component_count_80 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_remove_components_bounded_count_83 = (uint32_t)mc_removed_component_count_80;
+        for (uint32_t mc_remove_components_index_84 = 0U; mc_remove_components_index_84 < mc_remove_components_bounded_count_83; ++mc_remove_components_index_84) {
+            if (!mc_generated_776_component_slot_component_type(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 26) {
+        float mc_seconds_85 = 0;
+        if (!mc_reader_float(reader, &mc_seconds_85)) return false;
+        if (!isfinite(mc_seconds_85)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        bool mc_cooldown_group_present_86 = false;
+        if (!mc_reader_bool(reader, &mc_cooldown_group_present_86)) return false;
+        if (mc_cooldown_group_present_86) {
+            McBytes mc_cooldown_group_value_87;
+            if (!mc_reader_string(reader, &mc_cooldown_group_value_87)) return false;
+        }
+    }
+    else if (mc_type_1 == 27) {
+        McBytes mc_data_branch_27_88;
+        if (!mc_reader_string(reader, &mc_data_branch_27_88)) return false;
+    }
+    else if (mc_type_1 == 28) {
+        int32_t mc_rules_count_89 = 0;
+        if (!mc_reader_varint(reader, &mc_rules_count_89)) return false;
+        if (mc_rules_count_89 < 0
+            || (uint64_t)mc_rules_count_89 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_rules_bounded_count_90 = (uint32_t)mc_rules_count_89;
+        for (uint32_t mc_rules_index_91 = 0U; mc_rules_index_91 < mc_rules_bounded_count_90; ++mc_rules_index_91) {
+            if (!mc_generated_776_component_idset(reader, depth + 1U)) return false;
+            bool mc_speed_present_92 = false;
+            if (!mc_reader_bool(reader, &mc_speed_present_92)) return false;
+            if (mc_speed_present_92) {
+                float mc_speed_value_93 = 0;
+                if (!mc_reader_float(reader, &mc_speed_value_93)) return false;
+                if (!isfinite(mc_speed_value_93)) {
+                    return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+                }
+            }
+            bool mc_correct_drop_for_blocks_present_94 = false;
+            if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_present_94)) return false;
+            if (mc_correct_drop_for_blocks_present_94) {
+                bool mc_correct_drop_for_blocks_value_95 = false;
+                if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_value_95)) return false;
+            }
+        }
+        float mc_default_mining_speed_96 = 0;
+        if (!mc_reader_float(reader, &mc_default_mining_speed_96)) return false;
+        if (!isfinite(mc_default_mining_speed_96)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        int32_t mc_damage_per_block_97 = 0;
+        if (!mc_reader_varint(reader, &mc_damage_per_block_97)) return false;
+        bool mc_can_destroy_blocks_in_creative_98 = false;
+        if (!mc_reader_bool(reader, &mc_can_destroy_blocks_in_creative_98)) return false;
+    }
+    else if (mc_type_1 == 29) {
+        int32_t mc_item_damage_per_attack_99 = 0;
+        if (!mc_reader_varint(reader, &mc_item_damage_per_attack_99)) return false;
+        float mc_disable_blocking_for_seconds_100 = 0;
+        if (!mc_reader_float(reader, &mc_disable_blocking_for_seconds_100)) return false;
+        if (!isfinite(mc_disable_blocking_for_seconds_100)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 30) {
+        float mc_min_range_101 = 0;
+        if (!mc_reader_float(reader, &mc_min_range_101)) return false;
+        if (!isfinite(mc_min_range_101)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_max_range_102 = 0;
+        if (!mc_reader_float(reader, &mc_max_range_102)) return false;
+        if (!isfinite(mc_max_range_102)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_min_creative_range_103 = 0;
+        if (!mc_reader_float(reader, &mc_min_creative_range_103)) return false;
+        if (!isfinite(mc_min_creative_range_103)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_max_creative_range_104 = 0;
+        if (!mc_reader_float(reader, &mc_max_creative_range_104)) return false;
+        if (!isfinite(mc_max_creative_range_104)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_hitbox_margin_105 = 0;
+        if (!mc_reader_float(reader, &mc_hitbox_margin_105)) return false;
+        if (!isfinite(mc_hitbox_margin_105)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_mob_factor_106 = 0;
+        if (!mc_reader_float(reader, &mc_mob_factor_106)) return false;
+        if (!isfinite(mc_mob_factor_106)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 31) {
+        int32_t mc_data_branch_31_107 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_31_107)) return false;
+    }
+    else if (mc_type_1 == 32) {
+        int32_t mc_slot_108 = 0;
+        if (!mc_reader_varint(reader, &mc_slot_108)) return false;
+        if (mc_slot_108 != 0 && mc_slot_108 != 1 && mc_slot_108 != 2 && mc_slot_108 != 3 && mc_slot_108 != 4 && mc_slot_108 != 5 && mc_slot_108 != 6 && mc_slot_108 != 7) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        bool mc_model_present_109 = false;
+        if (!mc_reader_bool(reader, &mc_model_present_109)) return false;
+        if (mc_model_present_109) {
+            McBytes mc_model_value_110;
+            if (!mc_reader_string(reader, &mc_model_value_110)) return false;
+        }
+        bool mc_camera_overlay_present_111 = false;
+        if (!mc_reader_bool(reader, &mc_camera_overlay_present_111)) return false;
+        if (mc_camera_overlay_present_111) {
+            McBytes mc_camera_overlay_value_112;
+            if (!mc_reader_string(reader, &mc_camera_overlay_value_112)) return false;
+        }
+        bool mc_allowed_entities_present_113 = false;
+        if (!mc_reader_bool(reader, &mc_allowed_entities_present_113)) return false;
+        if (mc_allowed_entities_present_113) {
+            if (!mc_generated_776_component_idset(reader, depth + 1U)) return false;
+        }
+        bool mc_dispensable_114 = false;
+        if (!mc_reader_bool(reader, &mc_dispensable_114)) return false;
+        bool mc_swappable_115 = false;
+        if (!mc_reader_bool(reader, &mc_swappable_115)) return false;
+        bool mc_damageable_116 = false;
+        if (!mc_reader_bool(reader, &mc_damageable_116)) return false;
+        bool mc_equip_on_interact_117 = false;
+        if (!mc_reader_bool(reader, &mc_equip_on_interact_117)) return false;
+        bool mc_shearable_118 = false;
+        if (!mc_reader_bool(reader, &mc_shearable_118)) return false;
+        if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 33) {
+        if (!mc_generated_776_component_idset(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 34) {
+    }
+    else if (mc_type_1 == 35) {
+        McBytes mc_data_branch_35_120;
+        if (!mc_reader_string(reader, &mc_data_branch_35_120)) return false;
+    }
+    else if (mc_type_1 == 36) {
+        int32_t mc_effects_count_121 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_121)) return false;
+        if (mc_effects_count_121 < 0
+            || (uint64_t)mc_effects_count_121 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_effects_bounded_count_122 = (uint32_t)mc_effects_count_121;
+        for (uint32_t mc_effects_index_123 = 0U; mc_effects_index_123 < mc_effects_bounded_count_122; ++mc_effects_index_123) {
+            if (!mc_generated_776_component_item_consume_effect(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 37) {
+        float mc_block_delay_seconds_124 = 0;
+        if (!mc_reader_float(reader, &mc_block_delay_seconds_124)) return false;
+        if (!isfinite(mc_block_delay_seconds_124)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_disable_cooldown_scale_125 = 0;
+        if (!mc_reader_float(reader, &mc_disable_cooldown_scale_125)) return false;
+        if (!isfinite(mc_disable_cooldown_scale_125)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        int32_t mc_damage_reductions_count_126 = 0;
+        if (!mc_reader_varint(reader, &mc_damage_reductions_count_126)) return false;
+        if (mc_damage_reductions_count_126 < 0
+            || (uint64_t)mc_damage_reductions_count_126 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_damage_reductions_bounded_count_127 = (uint32_t)mc_damage_reductions_count_126;
+        for (uint32_t mc_damage_reductions_index_128 = 0U; mc_damage_reductions_index_128 < mc_damage_reductions_bounded_count_127; ++mc_damage_reductions_index_128) {
+            float mc_horizontal_blocking_angle_129 = 0;
+            if (!mc_reader_float(reader, &mc_horizontal_blocking_angle_129)) return false;
+            if (!isfinite(mc_horizontal_blocking_angle_129)) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            bool mc_type_present_130 = false;
+            if (!mc_reader_bool(reader, &mc_type_present_130)) return false;
+            if (mc_type_present_130) {
+                if (!mc_generated_776_component_idset(reader, depth + 1U)) return false;
+            }
+            float mc_base_131 = 0;
+            if (!mc_reader_float(reader, &mc_base_131)) return false;
+            if (!isfinite(mc_base_131)) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            float mc_factor_132 = 0;
+            if (!mc_reader_float(reader, &mc_factor_132)) return false;
+            if (!isfinite(mc_factor_132)) {
+                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+        }
+        float mc_threshold_133 = 0;
+        if (!mc_reader_float(reader, &mc_threshold_133)) return false;
+        if (!isfinite(mc_threshold_133)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_base_134 = 0;
+        if (!mc_reader_float(reader, &mc_base_134)) return false;
+        if (!isfinite(mc_base_134)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_factor_135 = 0;
+        if (!mc_reader_float(reader, &mc_factor_135)) return false;
+        if (!isfinite(mc_factor_135)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        bool mc_bypassed_by_present_136 = false;
+        if (!mc_reader_bool(reader, &mc_bypassed_by_present_136)) return false;
+        if (mc_bypassed_by_present_136) {
+            McBytes mc_bypassed_by_value_137;
+            if (!mc_reader_string(reader, &mc_bypassed_by_value_137)) return false;
+        }
+        bool mc_block_sound_present_138 = false;
+        if (!mc_reader_bool(reader, &mc_block_sound_present_138)) return false;
+        if (mc_block_sound_present_138) {
+            if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        }
+        bool mc_disable_sound_present_139 = false;
+        if (!mc_reader_bool(reader, &mc_disable_sound_present_139)) return false;
+        if (mc_disable_sound_present_139) {
+            if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 38) {
+        bool mc_deals_knockback_140 = false;
+        if (!mc_reader_bool(reader, &mc_deals_knockback_140)) return false;
+        bool mc_dismounts_141 = false;
+        if (!mc_reader_bool(reader, &mc_dismounts_141)) return false;
+        bool mc_sound_present_142 = false;
+        if (!mc_reader_bool(reader, &mc_sound_present_142)) return false;
+        if (mc_sound_present_142) {
+            if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        }
+        bool mc_hit_sound_present_143 = false;
+        if (!mc_reader_bool(reader, &mc_hit_sound_present_143)) return false;
+        if (mc_hit_sound_present_143) {
+            if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 39) {
+        int32_t mc_contact_cooldown_ticks_144 = 0;
+        if (!mc_reader_varint(reader, &mc_contact_cooldown_ticks_144)) return false;
+        int32_t mc_delay_ticks_145 = 0;
+        if (!mc_reader_varint(reader, &mc_delay_ticks_145)) return false;
+        bool mc_dismount_conditions_present_146 = false;
+        if (!mc_reader_bool(reader, &mc_dismount_conditions_present_146)) return false;
+        if (mc_dismount_conditions_present_146) {
+            if (!mc_generated_776_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
+        }
+        bool mc_knockback_conditions_present_147 = false;
+        if (!mc_reader_bool(reader, &mc_knockback_conditions_present_147)) return false;
+        if (mc_knockback_conditions_present_147) {
+            if (!mc_generated_776_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
+        }
+        bool mc_damage_conditions_present_148 = false;
+        if (!mc_reader_bool(reader, &mc_damage_conditions_present_148)) return false;
+        if (mc_damage_conditions_present_148) {
+            if (!mc_generated_776_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
+        }
+        float mc_forward_movement_149 = 0;
+        if (!mc_reader_float(reader, &mc_forward_movement_149)) return false;
+        if (!isfinite(mc_forward_movement_149)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        float mc_damage_multiplier_150 = 0;
+        if (!mc_reader_float(reader, &mc_damage_multiplier_150)) return false;
+        if (!isfinite(mc_damage_multiplier_150)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        bool mc_sound_present_151 = false;
+        if (!mc_reader_bool(reader, &mc_sound_present_151)) return false;
+        if (mc_sound_present_151) {
+            if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        }
+        bool mc_hit_sound_present_152 = false;
+        if (!mc_reader_bool(reader, &mc_hit_sound_present_152)) return false;
+        if (mc_hit_sound_present_152) {
+            if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 40) {
+        int32_t mc_type_153 = 0;
+        if (!mc_reader_varint(reader, &mc_type_153)) return false;
+        if (mc_type_153 != 0 && mc_type_153 != 1 && mc_type_153 != 2) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        int32_t mc_duration_154 = 0;
+        if (!mc_reader_varint(reader, &mc_duration_154)) return false;
+    }
+    else if (mc_type_1 == 41) {
+        int32_t mc_data_branch_41_155 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_41_155)) return false;
+    }
+    else if (mc_type_1 == 42) {
+        int32_t mc_enchantments_count_156 = 0;
+        if (!mc_reader_varint(reader, &mc_enchantments_count_156)) return false;
+        if (mc_enchantments_count_156 < 0
+            || (uint64_t)mc_enchantments_count_156 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_enchantments_bounded_count_157 = (uint32_t)mc_enchantments_count_156;
+        for (uint32_t mc_enchantments_index_158 = 0U; mc_enchantments_index_158 < mc_enchantments_bounded_count_157; ++mc_enchantments_index_158) {
+            int32_t mc_id_159 = 0;
+            if (!mc_reader_varint(reader, &mc_id_159)) return false;
+            int32_t mc_level_160 = 0;
+            if (!mc_reader_varint(reader, &mc_level_160)) return false;
+        }
+    }
+    else if (mc_type_1 == 43) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 44) {
+        int32_t mc_data_branch_44_161 = 0;
+        if (!mc_reader_i32(reader, &mc_data_branch_44_161)) return false;
+    }
+    else if (mc_type_1 == 45) {
+        int32_t mc_data_branch_45_162 = 0;
+        if (!mc_reader_i32(reader, &mc_data_branch_45_162)) return false;
+    }
+    else if (mc_type_1 == 46) {
+        int32_t mc_data_branch_46_163 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_46_163)) return false;
+    }
+    else if (mc_type_1 == 47) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 48) {
+        int32_t mc_data_branch_48_165 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_48_165)) return false;
+    }
+    else if (mc_type_1 == 49) {
+        int32_t mc_data_branch_49_count_166 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_49_count_166)) return false;
+        if (mc_data_branch_49_count_166 < 0
+            || (uint64_t)mc_data_branch_49_count_166 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_data_branch_49_bounded_count_167 = (uint32_t)mc_data_branch_49_count_166;
+        for (uint32_t mc_data_branch_49_index_168 = 0U; mc_data_branch_49_index_168 < mc_data_branch_49_bounded_count_167; ++mc_data_branch_49_index_168) {
+            int32_t mc_item_id_169 = 0;
+            if (!mc_reader_varint(reader, &mc_item_id_169)) return false;
+            int32_t mc_item_count_170 = 0;
+            if (!mc_reader_varint(reader, &mc_item_count_170)) return false;
+            int32_t mc_added_component_count_171 = 0;
+            if (!mc_reader_varint(reader, &mc_added_component_count_171)) return false;
+            int32_t mc_removed_component_count_172 = 0;
+            if (!mc_reader_varint(reader, &mc_removed_component_count_172)) return false;
+            if (mc_added_component_count_171 < 0
+                || (uint64_t)mc_added_component_count_171 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_components_bounded_count_173 = (uint32_t)mc_added_component_count_171;
+            for (uint32_t mc_components_index_174 = 0U; mc_components_index_174 < mc_components_bounded_count_173; ++mc_components_index_174) {
+                if (!mc_generated_776_component_slot_component(reader, depth + 1U)) return false;
+            }
+            if (mc_removed_component_count_172 < 0
+                || (uint64_t)mc_removed_component_count_172 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_remove_components_bounded_count_175 = (uint32_t)mc_removed_component_count_172;
+            for (uint32_t mc_remove_components_index_176 = 0U; mc_remove_components_index_176 < mc_remove_components_bounded_count_175; ++mc_remove_components_index_176) {
+                if (!mc_generated_776_component_slot_component_type(reader, depth + 1U)) return false;
+            }
+        }
+    }
+    else if (mc_type_1 == 50) {
+        int32_t mc_data_branch_50_count_177 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_50_count_177)) return false;
+        if (mc_data_branch_50_count_177 < 0
+            || (uint64_t)mc_data_branch_50_count_177 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_data_branch_50_bounded_count_178 = (uint32_t)mc_data_branch_50_count_177;
+        for (uint32_t mc_data_branch_50_index_179 = 0U; mc_data_branch_50_index_179 < mc_data_branch_50_bounded_count_178; ++mc_data_branch_50_index_179) {
+            int32_t mc_item_id_180 = 0;
+            if (!mc_reader_varint(reader, &mc_item_id_180)) return false;
+            int32_t mc_item_count_181 = 0;
+            if (!mc_reader_varint(reader, &mc_item_count_181)) return false;
+            int32_t mc_added_component_count_182 = 0;
+            if (!mc_reader_varint(reader, &mc_added_component_count_182)) return false;
+            int32_t mc_removed_component_count_183 = 0;
+            if (!mc_reader_varint(reader, &mc_removed_component_count_183)) return false;
+            if (mc_added_component_count_182 < 0
+                || (uint64_t)mc_added_component_count_182 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_components_bounded_count_184 = (uint32_t)mc_added_component_count_182;
+            for (uint32_t mc_components_index_185 = 0U; mc_components_index_185 < mc_components_bounded_count_184; ++mc_components_index_185) {
+                if (!mc_generated_776_component_slot_component(reader, depth + 1U)) return false;
+            }
+            if (mc_removed_component_count_183 < 0
+                || (uint64_t)mc_removed_component_count_183 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_remove_components_bounded_count_186 = (uint32_t)mc_removed_component_count_183;
+            for (uint32_t mc_remove_components_index_187 = 0U; mc_remove_components_index_187 < mc_remove_components_bounded_count_186; ++mc_remove_components_index_187) {
+                if (!mc_generated_776_component_slot_component_type(reader, depth + 1U)) return false;
+            }
+        }
+    }
+    else if (mc_type_1 == 51) {
+        bool mc_potion_id_present_188 = false;
+        if (!mc_reader_bool(reader, &mc_potion_id_present_188)) return false;
+        if (mc_potion_id_present_188) {
+            int32_t mc_potion_id_value_189 = 0;
+            if (!mc_reader_varint(reader, &mc_potion_id_value_189)) return false;
+        }
+        bool mc_custom_color_present_190 = false;
+        if (!mc_reader_bool(reader, &mc_custom_color_present_190)) return false;
+        if (mc_custom_color_present_190) {
+            int32_t mc_custom_color_value_191 = 0;
+            if (!mc_reader_i32(reader, &mc_custom_color_value_191)) return false;
+        }
+        int32_t mc_custom_effects_count_192 = 0;
+        if (!mc_reader_varint(reader, &mc_custom_effects_count_192)) return false;
+        if (mc_custom_effects_count_192 < 0
+            || (uint64_t)mc_custom_effects_count_192 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_custom_effects_bounded_count_193 = (uint32_t)mc_custom_effects_count_192;
+        for (uint32_t mc_custom_effects_index_194 = 0U; mc_custom_effects_index_194 < mc_custom_effects_bounded_count_193; ++mc_custom_effects_index_194) {
+            if (!mc_generated_776_component_item_potion_effect(reader, depth + 1U)) return false;
+        }
+        bool mc_custom_name_present_195 = false;
+        if (!mc_reader_bool(reader, &mc_custom_name_present_195)) return false;
+        if (mc_custom_name_present_195) {
+            McBytes mc_custom_name_value_196;
+            if (!mc_reader_string(reader, &mc_custom_name_value_196)) return false;
+        }
+    }
+    else if (mc_type_1 == 52) {
+        float mc_data_branch_52_197 = 0;
+        if (!mc_reader_float(reader, &mc_data_branch_52_197)) return false;
+        if (!isfinite(mc_data_branch_52_197)) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+    }
+    else if (mc_type_1 == 53) {
+        int32_t mc_effects_count_198 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_198)) return false;
+        if (mc_effects_count_198 < 0
+            || (uint64_t)mc_effects_count_198 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_effects_bounded_count_199 = (uint32_t)mc_effects_count_198;
+        for (uint32_t mc_effects_index_200 = 0U; mc_effects_index_200 < mc_effects_bounded_count_199; ++mc_effects_index_200) {
+            int32_t mc_effect_201 = 0;
+            if (!mc_reader_varint(reader, &mc_effect_201)) return false;
+            int32_t mc_duration_202 = 0;
+            if (!mc_reader_varint(reader, &mc_duration_202)) return false;
+        }
+    }
+    else if (mc_type_1 == 54) {
+        int32_t mc_pages_count_203 = 0;
+        if (!mc_reader_varint(reader, &mc_pages_count_203)) return false;
+        if (mc_pages_count_203 < 0
+            || (uint64_t)mc_pages_count_203 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_pages_bounded_count_204 = (uint32_t)mc_pages_count_203;
+        for (uint32_t mc_pages_index_205 = 0U; mc_pages_index_205 < mc_pages_bounded_count_204; ++mc_pages_index_205) {
+            if (!mc_generated_776_component_item_book_page(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 55) {
+        McBytes mc_raw_title_206;
+        if (!mc_reader_string(reader, &mc_raw_title_206)) return false;
+        bool mc_filtered_title_present_207 = false;
+        if (!mc_reader_bool(reader, &mc_filtered_title_present_207)) return false;
+        if (mc_filtered_title_present_207) {
+            McBytes mc_filtered_title_value_208;
+            if (!mc_reader_string(reader, &mc_filtered_title_value_208)) return false;
+        }
+        McBytes mc_author_209;
+        if (!mc_reader_string(reader, &mc_author_209)) return false;
+        int32_t mc_generation_210 = 0;
+        if (!mc_reader_varint(reader, &mc_generation_210)) return false;
+        int32_t mc_pages_count_211 = 0;
+        if (!mc_reader_varint(reader, &mc_pages_count_211)) return false;
+        if (mc_pages_count_211 < 0
+            || (uint64_t)mc_pages_count_211 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_pages_bounded_count_212 = (uint32_t)mc_pages_count_211;
+        for (uint32_t mc_pages_index_213 = 0U; mc_pages_index_213 < mc_pages_bounded_count_212; ++mc_pages_index_213) {
+            if (!mc_generated_776_component_item_written_book_page(reader, depth + 1U)) return false;
+        }
+        bool mc_resolved_214 = false;
+        if (!mc_reader_bool(reader, &mc_resolved_214)) return false;
+    }
+    else if (mc_type_1 == 56) {
+        int32_t mc_material_holder_215 = -1;
+        if (!mc_reader_varint(reader, &mc_material_holder_215) || mc_material_holder_215 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_material_holder_215 == 0) {
+            if (!mc_generated_776_component_armor_trim_material(reader, depth + 1U)) return false;
+        }
+        int32_t mc_pattern_holder_216 = -1;
+        if (!mc_reader_varint(reader, &mc_pattern_holder_216) || mc_pattern_holder_216 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_pattern_holder_216 == 0) {
+            if (!mc_generated_776_component_armor_trim_pattern(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 57) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 58) {
+        int32_t mc_type_218 = 0;
+        if (!mc_reader_varint(reader, &mc_type_218)) return false;
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 59) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 60) {
+        int32_t mc_type_221 = 0;
+        if (!mc_reader_varint(reader, &mc_type_221)) return false;
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 61) {
+        int32_t mc_data_branch_61_holder_223 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_61_holder_223) || mc_data_branch_61_holder_223 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_data_branch_61_holder_223 == 0) {
+            if (!mc_generated_776_component_instrument_data(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 62) {
+        int32_t mc_data_branch_62_holder_224 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_62_holder_224) || mc_data_branch_62_holder_224 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_data_branch_62_holder_224 == 0) {
+            if (!mc_generated_776_component_armor_trim_material(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 63) {
+        int32_t mc_data_branch_63_225 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_63_225)) return false;
+    }
+    else if (mc_type_1 == 64) {
+        int32_t mc_data_branch_64_holder_226 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_64_holder_226) || mc_data_branch_64_holder_226 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_data_branch_64_holder_226 == 0) {
+            if (!mc_generated_776_component_jukebox_song_data(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 65) {
+        McBytes mc_data_branch_65_227;
+        if (!mc_reader_string(reader, &mc_data_branch_65_227)) return false;
+    }
+    else if (mc_type_1 == 66) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 67) {
+        bool mc_global_position_present_229 = false;
+        if (!mc_reader_bool(reader, &mc_global_position_present_229)) return false;
+        if (mc_global_position_present_229) {
+            if (!mc_generated_776_component_global_pos(reader, depth + 1U)) return false;
+        }
+        bool mc_tracked_230 = false;
+        if (!mc_reader_bool(reader, &mc_tracked_230)) return false;
+    }
+    else if (mc_type_1 == 68) {
+        if (!mc_generated_776_component_item_firework_explosion(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 69) {
+        int32_t mc_flight_duration_231 = 0;
+        if (!mc_reader_varint(reader, &mc_flight_duration_231)) return false;
+        int32_t mc_explosions_count_232 = 0;
+        if (!mc_reader_varint(reader, &mc_explosions_count_232)) return false;
+        if (mc_explosions_count_232 < 0
+            || (uint64_t)mc_explosions_count_232 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_explosions_bounded_count_233 = (uint32_t)mc_explosions_count_232;
+        for (uint32_t mc_explosions_index_234 = 0U; mc_explosions_index_234 < mc_explosions_bounded_count_233; ++mc_explosions_index_234) {
+            if (!mc_generated_776_component_item_firework_explosion(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 70) {
+        if (!mc_generated_776_component_resolvable_profile(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 71) {
+        McBytes mc_data_branch_71_235;
+        if (!mc_reader_string(reader, &mc_data_branch_71_235)) return false;
+    }
+    else if (mc_type_1 == 72) {
+        int32_t mc_layers_count_236 = 0;
+        if (!mc_reader_varint(reader, &mc_layers_count_236)) return false;
+        if (mc_layers_count_236 < 0
+            || (uint64_t)mc_layers_count_236 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_layers_bounded_count_237 = (uint32_t)mc_layers_count_236;
+        for (uint32_t mc_layers_index_238 = 0U; mc_layers_index_238 < mc_layers_bounded_count_237; ++mc_layers_index_238) {
+            if (!mc_generated_776_component_banner_pattern_layer(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 73) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 74) {
+        int32_t mc_decorations_count_239 = 0;
+        if (!mc_reader_varint(reader, &mc_decorations_count_239)) return false;
+        if (mc_decorations_count_239 < 0
+            || (uint64_t)mc_decorations_count_239 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_decorations_bounded_count_240 = (uint32_t)mc_decorations_count_239;
+        for (uint32_t mc_decorations_index_241 = 0U; mc_decorations_index_241 < mc_decorations_bounded_count_240; ++mc_decorations_index_241) {
+            int32_t mc_decorations_element_242 = 0;
+            if (!mc_reader_varint(reader, &mc_decorations_element_242)) return false;
+        }
+    }
+    else if (mc_type_1 == 75) {
+        int32_t mc_data_branch_75_count_243 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_75_count_243)) return false;
+        if (mc_data_branch_75_count_243 < 0
+            || (uint64_t)mc_data_branch_75_count_243 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_data_branch_75_bounded_count_244 = (uint32_t)mc_data_branch_75_count_243;
+        for (uint32_t mc_data_branch_75_index_245 = 0U; mc_data_branch_75_index_245 < mc_data_branch_75_bounded_count_244; ++mc_data_branch_75_index_245) {
+            bool mc_data_branch_75_element_present_246 = false;
+            if (!mc_reader_bool(reader, &mc_data_branch_75_element_present_246)) return false;
+            if (mc_data_branch_75_element_present_246) {
+                int32_t mc_item_id_247 = 0;
+                if (!mc_reader_varint(reader, &mc_item_id_247)) return false;
+                int32_t mc_item_count_248 = 0;
+                if (!mc_reader_varint(reader, &mc_item_count_248)) return false;
+                int32_t mc_added_component_count_249 = 0;
+                if (!mc_reader_varint(reader, &mc_added_component_count_249)) return false;
+                int32_t mc_removed_component_count_250 = 0;
+                if (!mc_reader_varint(reader, &mc_removed_component_count_250)) return false;
+                if (mc_added_component_count_249 < 0
+                    || (uint64_t)mc_added_component_count_249 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                    return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+                }
+                const uint32_t mc_components_bounded_count_251 = (uint32_t)mc_added_component_count_249;
+                for (uint32_t mc_components_index_252 = 0U; mc_components_index_252 < mc_components_bounded_count_251; ++mc_components_index_252) {
+                    if (!mc_generated_776_component_slot_component(reader, depth + 1U)) return false;
+                }
+                if (mc_removed_component_count_250 < 0
+                    || (uint64_t)mc_removed_component_count_250 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                    return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+                }
+                const uint32_t mc_remove_components_bounded_count_253 = (uint32_t)mc_removed_component_count_250;
+                for (uint32_t mc_remove_components_index_254 = 0U; mc_remove_components_index_254 < mc_remove_components_bounded_count_253; ++mc_remove_components_index_254) {
+                    if (!mc_generated_776_component_slot_component_type(reader, depth + 1U)) return false;
+                }
+            }
+        }
+    }
+    else if (mc_type_1 == 76) {
+        int32_t mc_properties_count_255 = 0;
+        if (!mc_reader_varint(reader, &mc_properties_count_255)) return false;
+        if (mc_properties_count_255 < 0
+            || (uint64_t)mc_properties_count_255 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_properties_bounded_count_256 = (uint32_t)mc_properties_count_255;
+        for (uint32_t mc_properties_index_257 = 0U; mc_properties_index_257 < mc_properties_bounded_count_256; ++mc_properties_index_257) {
+            McBytes mc_name_258;
+            if (!mc_reader_string(reader, &mc_name_258)) return false;
+            McBytes mc_value_259;
+            if (!mc_reader_string(reader, &mc_value_259)) return false;
+        }
+    }
+    else if (mc_type_1 == 77) {
+        int32_t mc_bees_count_260 = 0;
+        if (!mc_reader_varint(reader, &mc_bees_count_260)) return false;
+        if (mc_bees_count_260 < 0
+            || (uint64_t)mc_bees_count_260 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_bees_bounded_count_261 = (uint32_t)mc_bees_count_260;
+        for (uint32_t mc_bees_index_262 = 0U; mc_bees_index_262 < mc_bees_bounded_count_261; ++mc_bees_index_262) {
+            if (!mc_reader_nbt(reader, false, NULL)) return false;
+            int32_t mc_ticks_in_hive_264 = 0;
+            if (!mc_reader_varint(reader, &mc_ticks_in_hive_264)) return false;
+            int32_t mc_min_ticks_in_hive_265 = 0;
+            if (!mc_reader_varint(reader, &mc_min_ticks_in_hive_265)) return false;
+        }
+    }
+    else if (mc_type_1 == 78) {
+        int32_t mc_item_id_266 = 0;
+        if (!mc_reader_varint(reader, &mc_item_id_266)) return false;
+        int32_t mc_item_count_267 = 0;
+        if (!mc_reader_varint(reader, &mc_item_count_267)) return false;
+        int32_t mc_added_component_count_268 = 0;
+        if (!mc_reader_varint(reader, &mc_added_component_count_268)) return false;
+        int32_t mc_removed_component_count_269 = 0;
+        if (!mc_reader_varint(reader, &mc_removed_component_count_269)) return false;
+        if (mc_added_component_count_268 < 0
+            || (uint64_t)mc_added_component_count_268 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_components_bounded_count_270 = (uint32_t)mc_added_component_count_268;
+        for (uint32_t mc_components_index_271 = 0U; mc_components_index_271 < mc_components_bounded_count_270; ++mc_components_index_271) {
+            if (!mc_generated_776_component_slot_component(reader, depth + 1U)) return false;
+        }
+        if (mc_removed_component_count_269 < 0
+            || (uint64_t)mc_removed_component_count_269 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_remove_components_bounded_count_272 = (uint32_t)mc_removed_component_count_269;
+        for (uint32_t mc_remove_components_index_273 = 0U; mc_remove_components_index_273 < mc_remove_components_bounded_count_272; ++mc_remove_components_index_273) {
+            if (!mc_generated_776_component_slot_component_type(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 79) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 80) {
+        if (!mc_reader_nbt(reader, false, NULL)) return false;
+    }
+    else if (mc_type_1 == 81) {
+        if (!mc_generated_776_component_item_sound_holder(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 82) {
+        int32_t mc_data_branch_82_276 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_82_276)) return false;
+    }
+    else if (mc_type_1 == 83) {
+        int32_t mc_data_branch_83_277 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_83_277)) return false;
+    }
+    else if (mc_type_1 == 84) {
+        int32_t mc_data_branch_84_278 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_84_278)) return false;
+    }
+    else if (mc_type_1 == 85) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 86) {
+        int32_t mc_data_branch_86_279 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_86_279)) return false;
+    }
+    else if (mc_type_1 == 87) {
+        int32_t mc_data_branch_87_280 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_87_280)) return false;
+    }
+    else if (mc_type_1 == 88) {
+        int32_t mc_data_branch_88_281 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_88_281)) return false;
+    }
+    else if (mc_type_1 == 89) {
+        int32_t mc_data_branch_89_282 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_89_282)) return false;
+    }
+    else if (mc_type_1 == 90) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 91) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 92) {
+        int32_t mc_data_branch_92_283 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_92_283)) return false;
+    }
+    else if (mc_type_1 == 93) {
+        int32_t mc_data_branch_93_284 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_93_284)) return false;
+    }
+    else if (mc_type_1 == 94) {
+        int32_t mc_data_branch_94_285 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_94_285)) return false;
+    }
+    else if (mc_type_1 == 95) {
+        int32_t mc_data_branch_95_286 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_95_286)) return false;
+    }
+    else if (mc_type_1 == 96) {
+        int32_t mc_data_branch_96_287 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_96_287)) return false;
+    }
+    else if (mc_type_1 == 97) {
+        int32_t mc_data_branch_97_288 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_97_288)) return false;
+    }
+    else if (mc_type_1 == 98) {
+        int32_t mc_data_branch_98_holder_289 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_98_holder_289) || mc_data_branch_98_holder_289 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_data_branch_98_holder_289 == 0) {
+            McBytes mc_data_branch_98_inline_290;
+            if (!mc_reader_string(reader, &mc_data_branch_98_inline_290)) return false;
+        }
+    }
+    else if (mc_type_1 == 99) {
+        int32_t mc_data_branch_99_holder_291 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_99_holder_291) || mc_data_branch_99_holder_291 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_data_branch_99_holder_291 == 0) {
+            McBytes mc_data_branch_99_inline_292;
+            if (!mc_reader_string(reader, &mc_data_branch_99_inline_292)) return false;
+        }
+    }
+    else if (mc_type_1 == 100) {
+        int32_t mc_data_branch_100_holder_293 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_100_holder_293) || mc_data_branch_100_holder_293 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_data_branch_100_holder_293 == 0) {
+            McBytes mc_data_branch_100_inline_294;
+            if (!mc_reader_string(reader, &mc_data_branch_100_inline_294)) return false;
+        }
+    }
+    else if (mc_type_1 == 101) {
+        int32_t mc_data_branch_101_295 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_101_295)) return false;
+    }
+    else if (mc_type_1 == 102) {
+        int32_t mc_data_branch_102_296 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_102_296)) return false;
+    }
+    else if (mc_type_1 == 103) {
+        int32_t mc_data_branch_103_holder_297 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_103_holder_297) || mc_data_branch_103_holder_297 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        if (mc_data_branch_103_holder_297 == 0) {
+            if (!mc_generated_776_component_entity_metadata_painting_variant(reader, depth + 1U)) return false;
+        }
+    }
+    else if (mc_type_1 == 104) {
+        int32_t mc_data_branch_104_298 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_104_298)) return false;
+    }
+    else if (mc_type_1 == 105) {
+        int32_t mc_data_branch_105_299 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_105_299)) return false;
+    }
+    else if (mc_type_1 == 106) {
+        int32_t mc_data_branch_106_300 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_106_300)) return false;
+    }
+    else if (mc_type_1 == 107) {
+        int32_t mc_data_branch_107_301 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_107_301)) return false;
+    }
+    else if (mc_type_1 == 108) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 109) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    else if (mc_type_1 == 110) {
+        if (!mc_generated_776_component_dye_color(reader, depth + 1U)) return false;
+    }
+    return true;
+}
+
+static bool mc_generated_776_component_slot_component_type(McReader *reader, unsigned int depth)
+{
+    if (reader == NULL) return false;
+    if (depth > MC_MAX_NBT_DEPTH) {
+        return reader_fail(reader, MC_ERROR_NBT_DEPTH, reader->offset);
+    }
+    int32_t mc_slot_component_type_1 = 0;
+    if (!mc_reader_varint(reader, &mc_slot_component_type_1)) return false;
+    if (mc_slot_component_type_1 != 0 && mc_slot_component_type_1 != 1 && mc_slot_component_type_1 != 2 && mc_slot_component_type_1 != 3 && mc_slot_component_type_1 != 4 && mc_slot_component_type_1 != 5 && mc_slot_component_type_1 != 6 && mc_slot_component_type_1 != 7 && mc_slot_component_type_1 != 8 && mc_slot_component_type_1 != 9 && mc_slot_component_type_1 != 10 && mc_slot_component_type_1 != 11 && mc_slot_component_type_1 != 12 && mc_slot_component_type_1 != 13 && mc_slot_component_type_1 != 14 && mc_slot_component_type_1 != 15 && mc_slot_component_type_1 != 16 && mc_slot_component_type_1 != 17 && mc_slot_component_type_1 != 18 && mc_slot_component_type_1 != 19 && mc_slot_component_type_1 != 20 && mc_slot_component_type_1 != 21 && mc_slot_component_type_1 != 22 && mc_slot_component_type_1 != 23 && mc_slot_component_type_1 != 24 && mc_slot_component_type_1 != 25 && mc_slot_component_type_1 != 26 && mc_slot_component_type_1 != 27 && mc_slot_component_type_1 != 28 && mc_slot_component_type_1 != 29 && mc_slot_component_type_1 != 30 && mc_slot_component_type_1 != 31 && mc_slot_component_type_1 != 32 && mc_slot_component_type_1 != 33 && mc_slot_component_type_1 != 34 && mc_slot_component_type_1 != 35 && mc_slot_component_type_1 != 36 && mc_slot_component_type_1 != 37 && mc_slot_component_type_1 != 38 && mc_slot_component_type_1 != 39 && mc_slot_component_type_1 != 40 && mc_slot_component_type_1 != 41 && mc_slot_component_type_1 != 42 && mc_slot_component_type_1 != 43 && mc_slot_component_type_1 != 44 && mc_slot_component_type_1 != 45 && mc_slot_component_type_1 != 46 && mc_slot_component_type_1 != 47 && mc_slot_component_type_1 != 48 && mc_slot_component_type_1 != 49 && mc_slot_component_type_1 != 50 && mc_slot_component_type_1 != 51 && mc_slot_component_type_1 != 52 && mc_slot_component_type_1 != 53 && mc_slot_component_type_1 != 54 && mc_slot_component_type_1 != 55 && mc_slot_component_type_1 != 56 && mc_slot_component_type_1 != 57 && mc_slot_component_type_1 != 58 && mc_slot_component_type_1 != 59 && mc_slot_component_type_1 != 60 && mc_slot_component_type_1 != 61 && mc_slot_component_type_1 != 62 && mc_slot_component_type_1 != 63 && mc_slot_component_type_1 != 64 && mc_slot_component_type_1 != 65 && mc_slot_component_type_1 != 66 && mc_slot_component_type_1 != 67 && mc_slot_component_type_1 != 68 && mc_slot_component_type_1 != 69 && mc_slot_component_type_1 != 70 && mc_slot_component_type_1 != 71 && mc_slot_component_type_1 != 72 && mc_slot_component_type_1 != 73 && mc_slot_component_type_1 != 74 && mc_slot_component_type_1 != 75 && mc_slot_component_type_1 != 76 && mc_slot_component_type_1 != 77 && mc_slot_component_type_1 != 78 && mc_slot_component_type_1 != 79 && mc_slot_component_type_1 != 80 && mc_slot_component_type_1 != 81 && mc_slot_component_type_1 != 82 && mc_slot_component_type_1 != 83 && mc_slot_component_type_1 != 84 && mc_slot_component_type_1 != 85 && mc_slot_component_type_1 != 86 && mc_slot_component_type_1 != 87 && mc_slot_component_type_1 != 88 && mc_slot_component_type_1 != 89 && mc_slot_component_type_1 != 90 && mc_slot_component_type_1 != 91 && mc_slot_component_type_1 != 92 && mc_slot_component_type_1 != 93 && mc_slot_component_type_1 != 94 && mc_slot_component_type_1 != 95 && mc_slot_component_type_1 != 96 && mc_slot_component_type_1 != 97 && mc_slot_component_type_1 != 98 && mc_slot_component_type_1 != 99 && mc_slot_component_type_1 != 100 && mc_slot_component_type_1 != 101 && mc_slot_component_type_1 != 102 && mc_slot_component_type_1 != 103 && mc_slot_component_type_1 != 104 && mc_slot_component_type_1 != 105 && mc_slot_component_type_1 != 106 && mc_slot_component_type_1 != 107 && mc_slot_component_type_1 != 108 && mc_slot_component_type_1 != 109 && mc_slot_component_type_1 != 110) {
         return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
     }
     return true;
@@ -19088,7 +21042,7 @@ static bool mc_generated_skip_slot_component(McReader *reader,
     case 773: return mc_generated_773_component_slot_component(reader, depth);
     case 774: return mc_generated_774_component_slot_component(reader, depth);
     case 775: return mc_generated_775_component_slot_component(reader, depth);
-    case 776: return mc_generated_775_component_slot_component(reader, depth);
+    case 776: return mc_generated_776_component_slot_component(reader, depth);
     default:
         return reader_fail(reader, MC_ERROR_UNSUPPORTED_PROTOCOL,
             reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
@@ -19109,7 +21063,7 @@ static bool mc_generated_skip_slot_component_type(McReader *reader,
     case 773: return mc_generated_773_component_slot_component_type(reader, depth);
     case 774: return mc_generated_774_component_slot_component_type(reader, depth);
     case 775: return mc_generated_775_component_slot_component_type(reader, depth);
-    case 776: return mc_generated_775_component_slot_component_type(reader, depth);
+    case 776: return mc_generated_776_component_slot_component_type(reader, depth);
     default:
         return reader_fail(reader, MC_ERROR_UNSUPPORTED_PROTOCOL,
             reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
@@ -20177,140 +22131,163 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
         }
     }
     else if (mc_type_1 == 25) {
-        if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
+        int32_t mc_item_id_77 = 0;
+        if (!mc_reader_varint(reader, &mc_item_id_77)) return false;
+        int32_t mc_item_count_78 = 0;
+        if (!mc_reader_varint(reader, &mc_item_count_78)) return false;
+        int32_t mc_added_component_count_79 = 0;
+        if (!mc_reader_varint(reader, &mc_added_component_count_79)) return false;
+        int32_t mc_removed_component_count_80 = 0;
+        if (!mc_reader_varint(reader, &mc_removed_component_count_80)) return false;
+        if (mc_added_component_count_79 < 0
+            || (uint64_t)mc_added_component_count_79 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_components_bounded_count_81 = (uint32_t)mc_added_component_count_79;
+        for (uint32_t mc_components_index_82 = 0U; mc_components_index_82 < mc_components_bounded_count_81; ++mc_components_index_82) {
+            if (!mc_derived_777_component_slot_component(reader, depth + 1U)) return false;
+        }
+        if (mc_removed_component_count_80 < 0
+            || (uint64_t)mc_removed_component_count_80 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_remove_components_bounded_count_83 = (uint32_t)mc_removed_component_count_80;
+        for (uint32_t mc_remove_components_index_84 = 0U; mc_remove_components_index_84 < mc_remove_components_bounded_count_83; ++mc_remove_components_index_84) {
+            if (!mc_derived_777_component_slot_component_type(reader, depth + 1U)) return false;
+        }
     }
     else if (mc_type_1 == 26) {
-        float mc_seconds_77 = 0;
-        if (!mc_reader_float(reader, &mc_seconds_77)) return false;
-        if (!isfinite(mc_seconds_77)) {
+        float mc_seconds_85 = 0;
+        if (!mc_reader_float(reader, &mc_seconds_85)) return false;
+        if (!isfinite(mc_seconds_85)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        bool mc_cooldown_group_present_78 = false;
-        if (!mc_reader_bool(reader, &mc_cooldown_group_present_78)) return false;
-        if (mc_cooldown_group_present_78) {
-            McBytes mc_cooldown_group_value_79;
-            if (!mc_reader_string(reader, &mc_cooldown_group_value_79)) return false;
+        bool mc_cooldown_group_present_86 = false;
+        if (!mc_reader_bool(reader, &mc_cooldown_group_present_86)) return false;
+        if (mc_cooldown_group_present_86) {
+            McBytes mc_cooldown_group_value_87;
+            if (!mc_reader_string(reader, &mc_cooldown_group_value_87)) return false;
         }
     }
     else if (mc_type_1 == 27) {
-        McBytes mc_data_branch_27_80;
-        if (!mc_reader_string(reader, &mc_data_branch_27_80)) return false;
+        McBytes mc_data_branch_27_88;
+        if (!mc_reader_string(reader, &mc_data_branch_27_88)) return false;
     }
     else if (mc_type_1 == 28) {
-        int32_t mc_rules_count_81 = 0;
-        if (!mc_reader_varint(reader, &mc_rules_count_81)) return false;
-        if (mc_rules_count_81 < 0
-            || (uint64_t)mc_rules_count_81 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_rules_count_89 = 0;
+        if (!mc_reader_varint(reader, &mc_rules_count_89)) return false;
+        if (mc_rules_count_89 < 0
+            || (uint64_t)mc_rules_count_89 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_rules_bounded_count_82 = (uint32_t)mc_rules_count_81;
-        for (uint32_t mc_rules_index_83 = 0U; mc_rules_index_83 < mc_rules_bounded_count_82; ++mc_rules_index_83) {
+        const uint32_t mc_rules_bounded_count_90 = (uint32_t)mc_rules_count_89;
+        for (uint32_t mc_rules_index_91 = 0U; mc_rules_index_91 < mc_rules_bounded_count_90; ++mc_rules_index_91) {
             if (!mc_derived_777_component_idset(reader, depth + 1U)) return false;
-            bool mc_speed_present_84 = false;
-            if (!mc_reader_bool(reader, &mc_speed_present_84)) return false;
-            if (mc_speed_present_84) {
-                float mc_speed_value_85 = 0;
-                if (!mc_reader_float(reader, &mc_speed_value_85)) return false;
-                if (!isfinite(mc_speed_value_85)) {
+            bool mc_speed_present_92 = false;
+            if (!mc_reader_bool(reader, &mc_speed_present_92)) return false;
+            if (mc_speed_present_92) {
+                float mc_speed_value_93 = 0;
+                if (!mc_reader_float(reader, &mc_speed_value_93)) return false;
+                if (!isfinite(mc_speed_value_93)) {
                     return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
                 }
             }
-            bool mc_correct_drop_for_blocks_present_86 = false;
-            if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_present_86)) return false;
-            if (mc_correct_drop_for_blocks_present_86) {
-                bool mc_correct_drop_for_blocks_value_87 = false;
-                if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_value_87)) return false;
+            bool mc_correct_drop_for_blocks_present_94 = false;
+            if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_present_94)) return false;
+            if (mc_correct_drop_for_blocks_present_94) {
+                bool mc_correct_drop_for_blocks_value_95 = false;
+                if (!mc_reader_bool(reader, &mc_correct_drop_for_blocks_value_95)) return false;
             }
         }
-        float mc_default_mining_speed_88 = 0;
-        if (!mc_reader_float(reader, &mc_default_mining_speed_88)) return false;
-        if (!isfinite(mc_default_mining_speed_88)) {
+        float mc_default_mining_speed_96 = 0;
+        if (!mc_reader_float(reader, &mc_default_mining_speed_96)) return false;
+        if (!isfinite(mc_default_mining_speed_96)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        int32_t mc_damage_per_block_89 = 0;
-        if (!mc_reader_varint(reader, &mc_damage_per_block_89)) return false;
-        bool mc_can_destroy_blocks_in_creative_90 = false;
-        if (!mc_reader_bool(reader, &mc_can_destroy_blocks_in_creative_90)) return false;
+        int32_t mc_damage_per_block_97 = 0;
+        if (!mc_reader_varint(reader, &mc_damage_per_block_97)) return false;
+        bool mc_can_destroy_blocks_in_creative_98 = false;
+        if (!mc_reader_bool(reader, &mc_can_destroy_blocks_in_creative_98)) return false;
     }
     else if (mc_type_1 == 29) {
-        int32_t mc_item_damage_per_attack_91 = 0;
-        if (!mc_reader_varint(reader, &mc_item_damage_per_attack_91)) return false;
-        float mc_disable_blocking_for_seconds_92 = 0;
-        if (!mc_reader_float(reader, &mc_disable_blocking_for_seconds_92)) return false;
-        if (!isfinite(mc_disable_blocking_for_seconds_92)) {
+        int32_t mc_item_damage_per_attack_99 = 0;
+        if (!mc_reader_varint(reader, &mc_item_damage_per_attack_99)) return false;
+        float mc_disable_blocking_for_seconds_100 = 0;
+        if (!mc_reader_float(reader, &mc_disable_blocking_for_seconds_100)) return false;
+        if (!isfinite(mc_disable_blocking_for_seconds_100)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 30) {
-        float mc_min_range_93 = 0;
-        if (!mc_reader_float(reader, &mc_min_range_93)) return false;
-        if (!isfinite(mc_min_range_93)) {
+        float mc_min_range_101 = 0;
+        if (!mc_reader_float(reader, &mc_min_range_101)) return false;
+        if (!isfinite(mc_min_range_101)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_max_range_94 = 0;
-        if (!mc_reader_float(reader, &mc_max_range_94)) return false;
-        if (!isfinite(mc_max_range_94)) {
+        float mc_max_range_102 = 0;
+        if (!mc_reader_float(reader, &mc_max_range_102)) return false;
+        if (!isfinite(mc_max_range_102)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_min_creative_range_95 = 0;
-        if (!mc_reader_float(reader, &mc_min_creative_range_95)) return false;
-        if (!isfinite(mc_min_creative_range_95)) {
+        float mc_min_creative_range_103 = 0;
+        if (!mc_reader_float(reader, &mc_min_creative_range_103)) return false;
+        if (!isfinite(mc_min_creative_range_103)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_max_creative_range_96 = 0;
-        if (!mc_reader_float(reader, &mc_max_creative_range_96)) return false;
-        if (!isfinite(mc_max_creative_range_96)) {
+        float mc_max_creative_range_104 = 0;
+        if (!mc_reader_float(reader, &mc_max_creative_range_104)) return false;
+        if (!isfinite(mc_max_creative_range_104)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_hitbox_margin_97 = 0;
-        if (!mc_reader_float(reader, &mc_hitbox_margin_97)) return false;
-        if (!isfinite(mc_hitbox_margin_97)) {
+        float mc_hitbox_margin_105 = 0;
+        if (!mc_reader_float(reader, &mc_hitbox_margin_105)) return false;
+        if (!isfinite(mc_hitbox_margin_105)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_mob_factor_98 = 0;
-        if (!mc_reader_float(reader, &mc_mob_factor_98)) return false;
-        if (!isfinite(mc_mob_factor_98)) {
+        float mc_mob_factor_106 = 0;
+        if (!mc_reader_float(reader, &mc_mob_factor_106)) return false;
+        if (!isfinite(mc_mob_factor_106)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 31) {
-        int32_t mc_data_branch_31_99 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_31_99)) return false;
+        int32_t mc_data_branch_31_107 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_31_107)) return false;
     }
     else if (mc_type_1 == 32) {
-        int32_t mc_slot_100 = 0;
-        if (!mc_reader_varint(reader, &mc_slot_100)) return false;
-        if (mc_slot_100 != 0 && mc_slot_100 != 1 && mc_slot_100 != 2 && mc_slot_100 != 3 && mc_slot_100 != 4 && mc_slot_100 != 5 && mc_slot_100 != 6 && mc_slot_100 != 7) {
+        int32_t mc_slot_108 = 0;
+        if (!mc_reader_varint(reader, &mc_slot_108)) return false;
+        if (mc_slot_108 != 0 && mc_slot_108 != 1 && mc_slot_108 != 2 && mc_slot_108 != 3 && mc_slot_108 != 4 && mc_slot_108 != 5 && mc_slot_108 != 6 && mc_slot_108 != 7) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
         if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
-        bool mc_model_present_101 = false;
-        if (!mc_reader_bool(reader, &mc_model_present_101)) return false;
-        if (mc_model_present_101) {
-            McBytes mc_model_value_102;
-            if (!mc_reader_string(reader, &mc_model_value_102)) return false;
+        bool mc_model_present_109 = false;
+        if (!mc_reader_bool(reader, &mc_model_present_109)) return false;
+        if (mc_model_present_109) {
+            McBytes mc_model_value_110;
+            if (!mc_reader_string(reader, &mc_model_value_110)) return false;
         }
-        bool mc_camera_overlay_present_103 = false;
-        if (!mc_reader_bool(reader, &mc_camera_overlay_present_103)) return false;
-        if (mc_camera_overlay_present_103) {
-            McBytes mc_camera_overlay_value_104;
-            if (!mc_reader_string(reader, &mc_camera_overlay_value_104)) return false;
+        bool mc_camera_overlay_present_111 = false;
+        if (!mc_reader_bool(reader, &mc_camera_overlay_present_111)) return false;
+        if (mc_camera_overlay_present_111) {
+            McBytes mc_camera_overlay_value_112;
+            if (!mc_reader_string(reader, &mc_camera_overlay_value_112)) return false;
         }
-        bool mc_allowed_entities_present_105 = false;
-        if (!mc_reader_bool(reader, &mc_allowed_entities_present_105)) return false;
-        if (mc_allowed_entities_present_105) {
+        bool mc_allowed_entities_present_113 = false;
+        if (!mc_reader_bool(reader, &mc_allowed_entities_present_113)) return false;
+        if (mc_allowed_entities_present_113) {
             if (!mc_derived_777_component_idset(reader, depth + 1U)) return false;
         }
-        bool mc_dispensable_106 = false;
-        if (!mc_reader_bool(reader, &mc_dispensable_106)) return false;
-        bool mc_swappable_107 = false;
-        if (!mc_reader_bool(reader, &mc_swappable_107)) return false;
-        bool mc_damageable_108 = false;
-        if (!mc_reader_bool(reader, &mc_damageable_108)) return false;
-        bool mc_equip_on_interact_109 = false;
-        if (!mc_reader_bool(reader, &mc_equip_on_interact_109)) return false;
-        bool mc_shearable_110 = false;
-        if (!mc_reader_bool(reader, &mc_shearable_110)) return false;
+        bool mc_dispensable_114 = false;
+        if (!mc_reader_bool(reader, &mc_dispensable_114)) return false;
+        bool mc_swappable_115 = false;
+        if (!mc_reader_bool(reader, &mc_swappable_115)) return false;
+        bool mc_damageable_116 = false;
+        if (!mc_reader_bool(reader, &mc_damageable_116)) return false;
+        bool mc_equip_on_interact_117 = false;
+        if (!mc_reader_bool(reader, &mc_equip_on_interact_117)) return false;
+        bool mc_shearable_118 = false;
+        if (!mc_reader_bool(reader, &mc_shearable_118)) return false;
         if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 33) {
@@ -20319,340 +22296,386 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
     else if (mc_type_1 == 34) {
     }
     else if (mc_type_1 == 35) {
-        McBytes mc_data_branch_35_112;
-        if (!mc_reader_string(reader, &mc_data_branch_35_112)) return false;
+        McBytes mc_data_branch_35_120;
+        if (!mc_reader_string(reader, &mc_data_branch_35_120)) return false;
     }
     else if (mc_type_1 == 36) {
-        int32_t mc_effects_count_113 = 0;
-        if (!mc_reader_varint(reader, &mc_effects_count_113)) return false;
-        if (mc_effects_count_113 < 0
-            || (uint64_t)mc_effects_count_113 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_effects_count_121 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_121)) return false;
+        if (mc_effects_count_121 < 0
+            || (uint64_t)mc_effects_count_121 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_effects_bounded_count_114 = (uint32_t)mc_effects_count_113;
-        for (uint32_t mc_effects_index_115 = 0U; mc_effects_index_115 < mc_effects_bounded_count_114; ++mc_effects_index_115) {
+        const uint32_t mc_effects_bounded_count_122 = (uint32_t)mc_effects_count_121;
+        for (uint32_t mc_effects_index_123 = 0U; mc_effects_index_123 < mc_effects_bounded_count_122; ++mc_effects_index_123) {
             if (!mc_derived_777_component_item_consume_effect26_3(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 37) {
-        float mc_block_delay_seconds_116 = 0;
-        if (!mc_reader_float(reader, &mc_block_delay_seconds_116)) return false;
-        if (!isfinite(mc_block_delay_seconds_116)) {
+        float mc_block_delay_seconds_124 = 0;
+        if (!mc_reader_float(reader, &mc_block_delay_seconds_124)) return false;
+        if (!isfinite(mc_block_delay_seconds_124)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_disable_cooldown_scale_117 = 0;
-        if (!mc_reader_float(reader, &mc_disable_cooldown_scale_117)) return false;
-        if (!isfinite(mc_disable_cooldown_scale_117)) {
+        float mc_disable_cooldown_scale_125 = 0;
+        if (!mc_reader_float(reader, &mc_disable_cooldown_scale_125)) return false;
+        if (!isfinite(mc_disable_cooldown_scale_125)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        int32_t mc_damage_reductions_count_118 = 0;
-        if (!mc_reader_varint(reader, &mc_damage_reductions_count_118)) return false;
-        if (mc_damage_reductions_count_118 < 0
-            || (uint64_t)mc_damage_reductions_count_118 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_damage_reductions_count_126 = 0;
+        if (!mc_reader_varint(reader, &mc_damage_reductions_count_126)) return false;
+        if (mc_damage_reductions_count_126 < 0
+            || (uint64_t)mc_damage_reductions_count_126 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_damage_reductions_bounded_count_119 = (uint32_t)mc_damage_reductions_count_118;
-        for (uint32_t mc_damage_reductions_index_120 = 0U; mc_damage_reductions_index_120 < mc_damage_reductions_bounded_count_119; ++mc_damage_reductions_index_120) {
-            float mc_horizontal_blocking_angle_121 = 0;
-            if (!mc_reader_float(reader, &mc_horizontal_blocking_angle_121)) return false;
-            if (!isfinite(mc_horizontal_blocking_angle_121)) {
+        const uint32_t mc_damage_reductions_bounded_count_127 = (uint32_t)mc_damage_reductions_count_126;
+        for (uint32_t mc_damage_reductions_index_128 = 0U; mc_damage_reductions_index_128 < mc_damage_reductions_bounded_count_127; ++mc_damage_reductions_index_128) {
+            float mc_horizontal_blocking_angle_129 = 0;
+            if (!mc_reader_float(reader, &mc_horizontal_blocking_angle_129)) return false;
+            if (!isfinite(mc_horizontal_blocking_angle_129)) {
                 return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
-            bool mc_type_present_122 = false;
-            if (!mc_reader_bool(reader, &mc_type_present_122)) return false;
-            if (mc_type_present_122) {
+            bool mc_type_present_130 = false;
+            if (!mc_reader_bool(reader, &mc_type_present_130)) return false;
+            if (mc_type_present_130) {
                 if (!mc_derived_777_component_idset(reader, depth + 1U)) return false;
             }
-            float mc_base_123 = 0;
-            if (!mc_reader_float(reader, &mc_base_123)) return false;
-            if (!isfinite(mc_base_123)) {
+            float mc_base_131 = 0;
+            if (!mc_reader_float(reader, &mc_base_131)) return false;
+            if (!isfinite(mc_base_131)) {
                 return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
-            float mc_factor_124 = 0;
-            if (!mc_reader_float(reader, &mc_factor_124)) return false;
-            if (!isfinite(mc_factor_124)) {
+            float mc_factor_132 = 0;
+            if (!mc_reader_float(reader, &mc_factor_132)) return false;
+            if (!isfinite(mc_factor_132)) {
                 return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
             }
         }
-        float mc_threshold_125 = 0;
-        if (!mc_reader_float(reader, &mc_threshold_125)) return false;
-        if (!isfinite(mc_threshold_125)) {
+        float mc_threshold_133 = 0;
+        if (!mc_reader_float(reader, &mc_threshold_133)) return false;
+        if (!isfinite(mc_threshold_133)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_base_126 = 0;
-        if (!mc_reader_float(reader, &mc_base_126)) return false;
-        if (!isfinite(mc_base_126)) {
+        float mc_base_134 = 0;
+        if (!mc_reader_float(reader, &mc_base_134)) return false;
+        if (!isfinite(mc_base_134)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_factor_127 = 0;
-        if (!mc_reader_float(reader, &mc_factor_127)) return false;
-        if (!isfinite(mc_factor_127)) {
+        float mc_factor_135 = 0;
+        if (!mc_reader_float(reader, &mc_factor_135)) return false;
+        if (!isfinite(mc_factor_135)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        bool mc_bypassed_by_present_128 = false;
-        if (!mc_reader_bool(reader, &mc_bypassed_by_present_128)) return false;
-        if (mc_bypassed_by_present_128) {
-            McBytes mc_bypassed_by_value_129;
-            if (!mc_reader_string(reader, &mc_bypassed_by_value_129)) return false;
+        bool mc_bypassed_by_present_136 = false;
+        if (!mc_reader_bool(reader, &mc_bypassed_by_present_136)) return false;
+        if (mc_bypassed_by_present_136) {
+            McBytes mc_bypassed_by_value_137;
+            if (!mc_reader_string(reader, &mc_bypassed_by_value_137)) return false;
         }
-        bool mc_block_sound_present_130 = false;
-        if (!mc_reader_bool(reader, &mc_block_sound_present_130)) return false;
-        if (mc_block_sound_present_130) {
+        bool mc_block_sound_present_138 = false;
+        if (!mc_reader_bool(reader, &mc_block_sound_present_138)) return false;
+        if (mc_block_sound_present_138) {
             if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
         }
-        bool mc_disable_sound_present_131 = false;
-        if (!mc_reader_bool(reader, &mc_disable_sound_present_131)) return false;
-        if (mc_disable_sound_present_131) {
+        bool mc_disable_sound_present_139 = false;
+        if (!mc_reader_bool(reader, &mc_disable_sound_present_139)) return false;
+        if (mc_disable_sound_present_139) {
             if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 38) {
-        bool mc_deals_knockback_132 = false;
-        if (!mc_reader_bool(reader, &mc_deals_knockback_132)) return false;
-        bool mc_dismounts_133 = false;
-        if (!mc_reader_bool(reader, &mc_dismounts_133)) return false;
-        bool mc_sound_present_134 = false;
-        if (!mc_reader_bool(reader, &mc_sound_present_134)) return false;
-        if (mc_sound_present_134) {
+        bool mc_deals_knockback_140 = false;
+        if (!mc_reader_bool(reader, &mc_deals_knockback_140)) return false;
+        bool mc_dismounts_141 = false;
+        if (!mc_reader_bool(reader, &mc_dismounts_141)) return false;
+        bool mc_sound_present_142 = false;
+        if (!mc_reader_bool(reader, &mc_sound_present_142)) return false;
+        if (mc_sound_present_142) {
             if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
         }
-        bool mc_hit_sound_present_135 = false;
-        if (!mc_reader_bool(reader, &mc_hit_sound_present_135)) return false;
-        if (mc_hit_sound_present_135) {
+        bool mc_hit_sound_present_143 = false;
+        if (!mc_reader_bool(reader, &mc_hit_sound_present_143)) return false;
+        if (mc_hit_sound_present_143) {
             if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 39) {
-        int32_t mc_contact_cooldown_ticks_136 = 0;
-        if (!mc_reader_varint(reader, &mc_contact_cooldown_ticks_136)) return false;
-        int32_t mc_delay_ticks_137 = 0;
-        if (!mc_reader_varint(reader, &mc_delay_ticks_137)) return false;
-        bool mc_dismount_conditions_present_138 = false;
-        if (!mc_reader_bool(reader, &mc_dismount_conditions_present_138)) return false;
-        if (mc_dismount_conditions_present_138) {
+        int32_t mc_contact_cooldown_ticks_144 = 0;
+        if (!mc_reader_varint(reader, &mc_contact_cooldown_ticks_144)) return false;
+        int32_t mc_delay_ticks_145 = 0;
+        if (!mc_reader_varint(reader, &mc_delay_ticks_145)) return false;
+        bool mc_dismount_conditions_present_146 = false;
+        if (!mc_reader_bool(reader, &mc_dismount_conditions_present_146)) return false;
+        if (mc_dismount_conditions_present_146) {
             if (!mc_derived_777_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
         }
-        bool mc_knockback_conditions_present_139 = false;
-        if (!mc_reader_bool(reader, &mc_knockback_conditions_present_139)) return false;
-        if (mc_knockback_conditions_present_139) {
+        bool mc_knockback_conditions_present_147 = false;
+        if (!mc_reader_bool(reader, &mc_knockback_conditions_present_147)) return false;
+        if (mc_knockback_conditions_present_147) {
             if (!mc_derived_777_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
         }
-        bool mc_damage_conditions_present_140 = false;
-        if (!mc_reader_bool(reader, &mc_damage_conditions_present_140)) return false;
-        if (mc_damage_conditions_present_140) {
+        bool mc_damage_conditions_present_148 = false;
+        if (!mc_reader_bool(reader, &mc_damage_conditions_present_148)) return false;
+        if (mc_damage_conditions_present_148) {
             if (!mc_derived_777_component_kinetic_weapon_condition(reader, depth + 1U)) return false;
         }
-        float mc_forward_movement_141 = 0;
-        if (!mc_reader_float(reader, &mc_forward_movement_141)) return false;
-        if (!isfinite(mc_forward_movement_141)) {
+        float mc_forward_movement_149 = 0;
+        if (!mc_reader_float(reader, &mc_forward_movement_149)) return false;
+        if (!isfinite(mc_forward_movement_149)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        float mc_damage_multiplier_142 = 0;
-        if (!mc_reader_float(reader, &mc_damage_multiplier_142)) return false;
-        if (!isfinite(mc_damage_multiplier_142)) {
+        float mc_damage_multiplier_150 = 0;
+        if (!mc_reader_float(reader, &mc_damage_multiplier_150)) return false;
+        if (!isfinite(mc_damage_multiplier_150)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        bool mc_sound_present_143 = false;
-        if (!mc_reader_bool(reader, &mc_sound_present_143)) return false;
-        if (mc_sound_present_143) {
+        bool mc_sound_present_151 = false;
+        if (!mc_reader_bool(reader, &mc_sound_present_151)) return false;
+        if (mc_sound_present_151) {
             if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
         }
-        bool mc_hit_sound_present_144 = false;
-        if (!mc_reader_bool(reader, &mc_hit_sound_present_144)) return false;
-        if (mc_hit_sound_present_144) {
+        bool mc_hit_sound_present_152 = false;
+        if (!mc_reader_bool(reader, &mc_hit_sound_present_152)) return false;
+        if (mc_hit_sound_present_152) {
             if (!mc_derived_777_component_item_sound_holder(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 40) {
-        int32_t mc_type_145 = 0;
-        if (!mc_reader_varint(reader, &mc_type_145)) return false;
-        if (mc_type_145 != 0 && mc_type_145 != 1 && mc_type_145 != 2) {
+        int32_t mc_type_153 = 0;
+        if (!mc_reader_varint(reader, &mc_type_153)) return false;
+        if (mc_type_153 != 0 && mc_type_153 != 1 && mc_type_153 != 2) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        int32_t mc_duration_146 = 0;
-        if (!mc_reader_varint(reader, &mc_duration_146)) return false;
+        int32_t mc_duration_154 = 0;
+        if (!mc_reader_varint(reader, &mc_duration_154)) return false;
     }
     else if (mc_type_1 == 41) {
-        int32_t mc_type_147 = 0;
-        if (!mc_reader_varint(reader, &mc_type_147)) return false;
-        if (mc_type_147 != 0 && mc_type_147 != 1 && mc_type_147 != 2) {
+        int32_t mc_type_155 = 0;
+        if (!mc_reader_varint(reader, &mc_type_155)) return false;
+        if (mc_type_155 != 0 && mc_type_155 != 1 && mc_type_155 != 2) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        int32_t mc_duration_148 = 0;
-        if (!mc_reader_varint(reader, &mc_duration_148)) return false;
+        int32_t mc_duration_156 = 0;
+        if (!mc_reader_varint(reader, &mc_duration_156)) return false;
     }
     else if (mc_type_1 == 42) {
-        int32_t mc_data_branch_42_149 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_42_149)) return false;
+        int32_t mc_data_branch_42_157 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_42_157)) return false;
     }
     else if (mc_type_1 == 43) {
-        int32_t mc_data_branch_43_150 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_43_150)) return false;
+        int32_t mc_data_branch_43_158 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_43_158)) return false;
     }
     else if (mc_type_1 == 44) {
-        int32_t mc_data_branch_44_151 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_44_151)) return false;
+        int32_t mc_data_branch_44_159 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_44_159)) return false;
     }
     else if (mc_type_1 == 45) {
-        int32_t mc_enchantments_count_152 = 0;
-        if (!mc_reader_varint(reader, &mc_enchantments_count_152)) return false;
-        if (mc_enchantments_count_152 < 0
-            || (uint64_t)mc_enchantments_count_152 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_enchantments_count_160 = 0;
+        if (!mc_reader_varint(reader, &mc_enchantments_count_160)) return false;
+        if (mc_enchantments_count_160 < 0
+            || (uint64_t)mc_enchantments_count_160 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_enchantments_bounded_count_153 = (uint32_t)mc_enchantments_count_152;
-        for (uint32_t mc_enchantments_index_154 = 0U; mc_enchantments_index_154 < mc_enchantments_bounded_count_153; ++mc_enchantments_index_154) {
-            int32_t mc_id_155 = 0;
-            if (!mc_reader_varint(reader, &mc_id_155)) return false;
-            int32_t mc_level_156 = 0;
-            if (!mc_reader_varint(reader, &mc_level_156)) return false;
+        const uint32_t mc_enchantments_bounded_count_161 = (uint32_t)mc_enchantments_count_160;
+        for (uint32_t mc_enchantments_index_162 = 0U; mc_enchantments_index_162 < mc_enchantments_bounded_count_161; ++mc_enchantments_index_162) {
+            int32_t mc_id_163 = 0;
+            if (!mc_reader_varint(reader, &mc_id_163)) return false;
+            int32_t mc_level_164 = 0;
+            if (!mc_reader_varint(reader, &mc_level_164)) return false;
         }
     }
     else if (mc_type_1 == 46) {
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 47) {
-        int32_t mc_data_branch_47_157 = 0;
-        if (!mc_reader_i32(reader, &mc_data_branch_47_157)) return false;
+        int32_t mc_data_branch_47_165 = 0;
+        if (!mc_reader_i32(reader, &mc_data_branch_47_165)) return false;
     }
     else if (mc_type_1 == 48) {
-        int32_t mc_data_branch_48_158 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_48_158)) return false;
+        int32_t mc_data_branch_48_166 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_48_166)) return false;
     }
     else if (mc_type_1 == 49) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 50) {
-        int32_t mc_data_branch_50_160 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_50_160)) return false;
+        int32_t mc_data_branch_50_168 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_50_168)) return false;
     }
     else if (mc_type_1 == 51) {
-        int32_t mc_projectiles_count_161 = 0;
-        if (!mc_reader_varint(reader, &mc_projectiles_count_161)) return false;
-        if (mc_projectiles_count_161 < 0
-            || (uint64_t)mc_projectiles_count_161 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_data_branch_51_count_169 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_51_count_169)) return false;
+        if (mc_data_branch_51_count_169 < 0
+            || (uint64_t)mc_data_branch_51_count_169 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_projectiles_bounded_count_162 = (uint32_t)mc_projectiles_count_161;
-        for (uint32_t mc_projectiles_index_163 = 0U; mc_projectiles_index_163 < mc_projectiles_bounded_count_162; ++mc_projectiles_index_163) {
-            if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
+        const uint32_t mc_data_branch_51_bounded_count_170 = (uint32_t)mc_data_branch_51_count_169;
+        for (uint32_t mc_data_branch_51_index_171 = 0U; mc_data_branch_51_index_171 < mc_data_branch_51_bounded_count_170; ++mc_data_branch_51_index_171) {
+            int32_t mc_item_id_172 = 0;
+            if (!mc_reader_varint(reader, &mc_item_id_172)) return false;
+            int32_t mc_item_count_173 = 0;
+            if (!mc_reader_varint(reader, &mc_item_count_173)) return false;
+            int32_t mc_added_component_count_174 = 0;
+            if (!mc_reader_varint(reader, &mc_added_component_count_174)) return false;
+            int32_t mc_removed_component_count_175 = 0;
+            if (!mc_reader_varint(reader, &mc_removed_component_count_175)) return false;
+            if (mc_added_component_count_174 < 0
+                || (uint64_t)mc_added_component_count_174 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_components_bounded_count_176 = (uint32_t)mc_added_component_count_174;
+            for (uint32_t mc_components_index_177 = 0U; mc_components_index_177 < mc_components_bounded_count_176; ++mc_components_index_177) {
+                if (!mc_derived_777_component_slot_component(reader, depth + 1U)) return false;
+            }
+            if (mc_removed_component_count_175 < 0
+                || (uint64_t)mc_removed_component_count_175 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_remove_components_bounded_count_178 = (uint32_t)mc_removed_component_count_175;
+            for (uint32_t mc_remove_components_index_179 = 0U; mc_remove_components_index_179 < mc_remove_components_bounded_count_178; ++mc_remove_components_index_179) {
+                if (!mc_derived_777_component_slot_component_type(reader, depth + 1U)) return false;
+            }
         }
     }
     else if (mc_type_1 == 52) {
-        int32_t mc_contents_count_164 = 0;
-        if (!mc_reader_varint(reader, &mc_contents_count_164)) return false;
-        if (mc_contents_count_164 < 0
-            || (uint64_t)mc_contents_count_164 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_data_branch_52_count_180 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_52_count_180)) return false;
+        if (mc_data_branch_52_count_180 < 0
+            || (uint64_t)mc_data_branch_52_count_180 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_contents_bounded_count_165 = (uint32_t)mc_contents_count_164;
-        for (uint32_t mc_contents_index_166 = 0U; mc_contents_index_166 < mc_contents_bounded_count_165; ++mc_contents_index_166) {
-            if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
+        const uint32_t mc_data_branch_52_bounded_count_181 = (uint32_t)mc_data_branch_52_count_180;
+        for (uint32_t mc_data_branch_52_index_182 = 0U; mc_data_branch_52_index_182 < mc_data_branch_52_bounded_count_181; ++mc_data_branch_52_index_182) {
+            int32_t mc_item_id_183 = 0;
+            if (!mc_reader_varint(reader, &mc_item_id_183)) return false;
+            int32_t mc_item_count_184 = 0;
+            if (!mc_reader_varint(reader, &mc_item_count_184)) return false;
+            int32_t mc_added_component_count_185 = 0;
+            if (!mc_reader_varint(reader, &mc_added_component_count_185)) return false;
+            int32_t mc_removed_component_count_186 = 0;
+            if (!mc_reader_varint(reader, &mc_removed_component_count_186)) return false;
+            if (mc_added_component_count_185 < 0
+                || (uint64_t)mc_added_component_count_185 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_components_bounded_count_187 = (uint32_t)mc_added_component_count_185;
+            for (uint32_t mc_components_index_188 = 0U; mc_components_index_188 < mc_components_bounded_count_187; ++mc_components_index_188) {
+                if (!mc_derived_777_component_slot_component(reader, depth + 1U)) return false;
+            }
+            if (mc_removed_component_count_186 < 0
+                || (uint64_t)mc_removed_component_count_186 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+            }
+            const uint32_t mc_remove_components_bounded_count_189 = (uint32_t)mc_removed_component_count_186;
+            for (uint32_t mc_remove_components_index_190 = 0U; mc_remove_components_index_190 < mc_remove_components_bounded_count_189; ++mc_remove_components_index_190) {
+                if (!mc_derived_777_component_slot_component_type(reader, depth + 1U)) return false;
+            }
         }
     }
     else if (mc_type_1 == 53) {
-        bool mc_potion_id_present_167 = false;
-        if (!mc_reader_bool(reader, &mc_potion_id_present_167)) return false;
-        if (mc_potion_id_present_167) {
-            int32_t mc_potion_id_value_168 = 0;
-            if (!mc_reader_varint(reader, &mc_potion_id_value_168)) return false;
+        bool mc_potion_id_present_191 = false;
+        if (!mc_reader_bool(reader, &mc_potion_id_present_191)) return false;
+        if (mc_potion_id_present_191) {
+            int32_t mc_potion_id_value_192 = 0;
+            if (!mc_reader_varint(reader, &mc_potion_id_value_192)) return false;
         }
-        bool mc_custom_color_present_169 = false;
-        if (!mc_reader_bool(reader, &mc_custom_color_present_169)) return false;
-        if (mc_custom_color_present_169) {
-            int32_t mc_custom_color_value_170 = 0;
-            if (!mc_reader_i32(reader, &mc_custom_color_value_170)) return false;
+        bool mc_custom_color_present_193 = false;
+        if (!mc_reader_bool(reader, &mc_custom_color_present_193)) return false;
+        if (mc_custom_color_present_193) {
+            int32_t mc_custom_color_value_194 = 0;
+            if (!mc_reader_i32(reader, &mc_custom_color_value_194)) return false;
         }
-        int32_t mc_custom_effects_count_171 = 0;
-        if (!mc_reader_varint(reader, &mc_custom_effects_count_171)) return false;
-        if (mc_custom_effects_count_171 < 0
-            || (uint64_t)mc_custom_effects_count_171 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_custom_effects_count_195 = 0;
+        if (!mc_reader_varint(reader, &mc_custom_effects_count_195)) return false;
+        if (mc_custom_effects_count_195 < 0
+            || (uint64_t)mc_custom_effects_count_195 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_custom_effects_bounded_count_172 = (uint32_t)mc_custom_effects_count_171;
-        for (uint32_t mc_custom_effects_index_173 = 0U; mc_custom_effects_index_173 < mc_custom_effects_bounded_count_172; ++mc_custom_effects_index_173) {
+        const uint32_t mc_custom_effects_bounded_count_196 = (uint32_t)mc_custom_effects_count_195;
+        for (uint32_t mc_custom_effects_index_197 = 0U; mc_custom_effects_index_197 < mc_custom_effects_bounded_count_196; ++mc_custom_effects_index_197) {
             if (!mc_derived_777_component_item_potion_effect(reader, depth + 1U)) return false;
         }
-        bool mc_custom_name_present_174 = false;
-        if (!mc_reader_bool(reader, &mc_custom_name_present_174)) return false;
-        if (mc_custom_name_present_174) {
-            McBytes mc_custom_name_value_175;
-            if (!mc_reader_string(reader, &mc_custom_name_value_175)) return false;
+        bool mc_custom_name_present_198 = false;
+        if (!mc_reader_bool(reader, &mc_custom_name_present_198)) return false;
+        if (mc_custom_name_present_198) {
+            McBytes mc_custom_name_value_199;
+            if (!mc_reader_string(reader, &mc_custom_name_value_199)) return false;
         }
     }
     else if (mc_type_1 == 54) {
-        float mc_data_branch_54_176 = 0;
-        if (!mc_reader_float(reader, &mc_data_branch_54_176)) return false;
-        if (!isfinite(mc_data_branch_54_176)) {
+        float mc_data_branch_54_200 = 0;
+        if (!mc_reader_float(reader, &mc_data_branch_54_200)) return false;
+        if (!isfinite(mc_data_branch_54_200)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 55) {
-        int32_t mc_effects_count_177 = 0;
-        if (!mc_reader_varint(reader, &mc_effects_count_177)) return false;
-        if (mc_effects_count_177 < 0
-            || (uint64_t)mc_effects_count_177 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_effects_count_201 = 0;
+        if (!mc_reader_varint(reader, &mc_effects_count_201)) return false;
+        if (mc_effects_count_201 < 0
+            || (uint64_t)mc_effects_count_201 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_effects_bounded_count_178 = (uint32_t)mc_effects_count_177;
-        for (uint32_t mc_effects_index_179 = 0U; mc_effects_index_179 < mc_effects_bounded_count_178; ++mc_effects_index_179) {
-            int32_t mc_effect_180 = 0;
-            if (!mc_reader_varint(reader, &mc_effect_180)) return false;
-            int32_t mc_duration_181 = 0;
-            if (!mc_reader_varint(reader, &mc_duration_181)) return false;
+        const uint32_t mc_effects_bounded_count_202 = (uint32_t)mc_effects_count_201;
+        for (uint32_t mc_effects_index_203 = 0U; mc_effects_index_203 < mc_effects_bounded_count_202; ++mc_effects_index_203) {
+            int32_t mc_effect_204 = 0;
+            if (!mc_reader_varint(reader, &mc_effect_204)) return false;
+            int32_t mc_duration_205 = 0;
+            if (!mc_reader_varint(reader, &mc_duration_205)) return false;
         }
     }
     else if (mc_type_1 == 56) {
-        int32_t mc_pages_count_182 = 0;
-        if (!mc_reader_varint(reader, &mc_pages_count_182)) return false;
-        if (mc_pages_count_182 < 0
-            || (uint64_t)mc_pages_count_182 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_pages_count_206 = 0;
+        if (!mc_reader_varint(reader, &mc_pages_count_206)) return false;
+        if (mc_pages_count_206 < 0
+            || (uint64_t)mc_pages_count_206 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_pages_bounded_count_183 = (uint32_t)mc_pages_count_182;
-        for (uint32_t mc_pages_index_184 = 0U; mc_pages_index_184 < mc_pages_bounded_count_183; ++mc_pages_index_184) {
+        const uint32_t mc_pages_bounded_count_207 = (uint32_t)mc_pages_count_206;
+        for (uint32_t mc_pages_index_208 = 0U; mc_pages_index_208 < mc_pages_bounded_count_207; ++mc_pages_index_208) {
             if (!mc_derived_777_component_item_book_page(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 57) {
-        McBytes mc_raw_title_185;
-        if (!mc_reader_string(reader, &mc_raw_title_185)) return false;
-        bool mc_filtered_title_present_186 = false;
-        if (!mc_reader_bool(reader, &mc_filtered_title_present_186)) return false;
-        if (mc_filtered_title_present_186) {
-            McBytes mc_filtered_title_value_187;
-            if (!mc_reader_string(reader, &mc_filtered_title_value_187)) return false;
+        McBytes mc_raw_title_209;
+        if (!mc_reader_string(reader, &mc_raw_title_209)) return false;
+        bool mc_filtered_title_present_210 = false;
+        if (!mc_reader_bool(reader, &mc_filtered_title_present_210)) return false;
+        if (mc_filtered_title_present_210) {
+            McBytes mc_filtered_title_value_211;
+            if (!mc_reader_string(reader, &mc_filtered_title_value_211)) return false;
         }
-        McBytes mc_author_188;
-        if (!mc_reader_string(reader, &mc_author_188)) return false;
-        int32_t mc_generation_189 = 0;
-        if (!mc_reader_varint(reader, &mc_generation_189)) return false;
-        int32_t mc_pages_count_190 = 0;
-        if (!mc_reader_varint(reader, &mc_pages_count_190)) return false;
-        if (mc_pages_count_190 < 0
-            || (uint64_t)mc_pages_count_190 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        McBytes mc_author_212;
+        if (!mc_reader_string(reader, &mc_author_212)) return false;
+        int32_t mc_generation_213 = 0;
+        if (!mc_reader_varint(reader, &mc_generation_213)) return false;
+        int32_t mc_pages_count_214 = 0;
+        if (!mc_reader_varint(reader, &mc_pages_count_214)) return false;
+        if (mc_pages_count_214 < 0
+            || (uint64_t)mc_pages_count_214 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_pages_bounded_count_191 = (uint32_t)mc_pages_count_190;
-        for (uint32_t mc_pages_index_192 = 0U; mc_pages_index_192 < mc_pages_bounded_count_191; ++mc_pages_index_192) {
+        const uint32_t mc_pages_bounded_count_215 = (uint32_t)mc_pages_count_214;
+        for (uint32_t mc_pages_index_216 = 0U; mc_pages_index_216 < mc_pages_bounded_count_215; ++mc_pages_index_216) {
             if (!mc_derived_777_component_item_written_book_page(reader, depth + 1U)) return false;
         }
-        bool mc_resolved_193 = false;
-        if (!mc_reader_bool(reader, &mc_resolved_193)) return false;
+        bool mc_resolved_217 = false;
+        if (!mc_reader_bool(reader, &mc_resolved_217)) return false;
     }
     else if (mc_type_1 == 58) {
-        int32_t mc_material_holder_194 = -1;
-        if (!mc_reader_varint(reader, &mc_material_holder_194) || mc_material_holder_194 < 0) {
+        int32_t mc_material_holder_218 = -1;
+        if (!mc_reader_varint(reader, &mc_material_holder_218) || mc_material_holder_218 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_material_holder_194 == 0) {
+        if (mc_material_holder_218 == 0) {
             if (!mc_derived_777_component_armor_trim_material26_3(reader, depth + 1U)) return false;
         }
-        int32_t mc_pattern_holder_195 = -1;
-        if (!mc_reader_varint(reader, &mc_pattern_holder_195) || mc_pattern_holder_195 < 0) {
+        int32_t mc_pattern_holder_219 = -1;
+        if (!mc_reader_varint(reader, &mc_pattern_holder_219) || mc_pattern_holder_219 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_pattern_holder_195 == 0) {
+        if (mc_pattern_holder_219 == 0) {
             if (!mc_derived_777_component_armor_trim_pattern(reader, depth + 1U)) return false;
         }
     }
@@ -20660,103 +22683,79 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 60) {
-        int32_t mc_type_197 = 0;
-        if (!mc_reader_varint(reader, &mc_type_197)) return false;
+        int32_t mc_type_221 = 0;
+        if (!mc_reader_varint(reader, &mc_type_221)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 61) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 62) {
-        int32_t mc_type_200 = 0;
-        if (!mc_reader_varint(reader, &mc_type_200)) return false;
+        int32_t mc_type_224 = 0;
+        if (!mc_reader_varint(reader, &mc_type_224)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 63) {
-        bool mc_has_holder_202 = false;
-        if (!mc_reader_bool(reader, &mc_has_holder_202)) return false;
-        if (mc_has_holder_202 == 0) {
-            McBytes mc_data_branch_0_203;
-            if (!mc_reader_string(reader, &mc_data_branch_0_203)) return false;
+        int32_t mc_data_branch_63_holder_226 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_63_holder_226) || mc_data_branch_63_holder_226 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        else if (mc_has_holder_202 == 1) {
-            int32_t mc_data_branch_1_holder_204 = -1;
-            if (!mc_reader_varint(reader, &mc_data_branch_1_holder_204) || mc_data_branch_1_holder_204 < 0) {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-            }
-            if (mc_data_branch_1_holder_204 == 0) {
-                if (!mc_derived_777_component_instrument_data26_3(reader, depth + 1U)) return false;
-            }
+        if (mc_data_branch_63_holder_226 == 0) {
+            if (!mc_derived_777_component_instrument_data26_3(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 64) {
-        bool mc_has_holder_205 = false;
-        if (!mc_reader_bool(reader, &mc_has_holder_205)) return false;
-        if (mc_has_holder_205 == 0) {
-            McBytes mc_material_branch_0_206;
-            if (!mc_reader_string(reader, &mc_material_branch_0_206)) return false;
+        int32_t mc_data_branch_64_holder_227 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_64_holder_227) || mc_data_branch_64_holder_227 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        else if (mc_has_holder_205 == 1) {
-            int32_t mc_material_branch_1_holder_207 = -1;
-            if (!mc_reader_varint(reader, &mc_material_branch_1_holder_207) || mc_material_branch_1_holder_207 < 0) {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-            }
-            if (mc_material_branch_1_holder_207 == 0) {
-                if (!mc_derived_777_component_armor_trim_material26_3(reader, depth + 1U)) return false;
-            }
+        if (mc_data_branch_64_holder_227 == 0) {
+            if (!mc_derived_777_component_armor_trim_material26_3(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 65) {
-        int32_t mc_data_branch_65_208 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_65_208)) return false;
+        int32_t mc_data_branch_65_228 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_65_228)) return false;
     }
     else if (mc_type_1 == 66) {
-        bool mc_has_holder_209 = false;
-        if (!mc_reader_bool(reader, &mc_has_holder_209)) return false;
-        if (mc_has_holder_209 == 0) {
-            McBytes mc_song_branch_0_210;
-            if (!mc_reader_string(reader, &mc_song_branch_0_210)) return false;
+        int32_t mc_data_branch_66_holder_229 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_66_holder_229) || mc_data_branch_66_holder_229 < 0) {
+            return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        else if (mc_has_holder_209 == 1) {
-            int32_t mc_song_branch_1_holder_211 = -1;
-            if (!mc_reader_varint(reader, &mc_song_branch_1_holder_211) || mc_song_branch_1_holder_211 < 0) {
-                return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
-            }
-            if (mc_song_branch_1_holder_211 == 0) {
-                if (!mc_derived_777_component_jukebox_song_data(reader, depth + 1U)) return false;
-            }
+        if (mc_data_branch_66_holder_229 == 0) {
+            if (!mc_derived_777_component_jukebox_song_data(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 67) {
-        McBytes mc_data_branch_67_212;
-        if (!mc_reader_string(reader, &mc_data_branch_67_212)) return false;
+        McBytes mc_data_branch_67_230;
+        if (!mc_reader_string(reader, &mc_data_branch_67_230)) return false;
     }
     else if (mc_type_1 == 68) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
     }
     else if (mc_type_1 == 69) {
-        bool mc_global_position_present_214 = false;
-        if (!mc_reader_bool(reader, &mc_global_position_present_214)) return false;
-        if (mc_global_position_present_214) {
+        bool mc_global_position_present_232 = false;
+        if (!mc_reader_bool(reader, &mc_global_position_present_232)) return false;
+        if (mc_global_position_present_232) {
             if (!mc_derived_777_component_global_pos(reader, depth + 1U)) return false;
         }
-        bool mc_tracked_215 = false;
-        if (!mc_reader_bool(reader, &mc_tracked_215)) return false;
+        bool mc_tracked_233 = false;
+        if (!mc_reader_bool(reader, &mc_tracked_233)) return false;
     }
     else if (mc_type_1 == 70) {
         if (!mc_derived_777_component_item_firework_explosion(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 71) {
-        int32_t mc_flight_duration_216 = 0;
-        if (!mc_reader_varint(reader, &mc_flight_duration_216)) return false;
-        int32_t mc_explosions_count_217 = 0;
-        if (!mc_reader_varint(reader, &mc_explosions_count_217)) return false;
-        if (mc_explosions_count_217 < 0
-            || (uint64_t)mc_explosions_count_217 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_flight_duration_234 = 0;
+        if (!mc_reader_varint(reader, &mc_flight_duration_234)) return false;
+        int32_t mc_explosions_count_235 = 0;
+        if (!mc_reader_varint(reader, &mc_explosions_count_235)) return false;
+        if (mc_explosions_count_235 < 0
+            || (uint64_t)mc_explosions_count_235 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_explosions_bounded_count_218 = (uint32_t)mc_explosions_count_217;
-        for (uint32_t mc_explosions_index_219 = 0U; mc_explosions_index_219 < mc_explosions_bounded_count_218; ++mc_explosions_index_219) {
+        const uint32_t mc_explosions_bounded_count_236 = (uint32_t)mc_explosions_count_235;
+        for (uint32_t mc_explosions_index_237 = 0U; mc_explosions_index_237 < mc_explosions_bounded_count_236; ++mc_explosions_index_237) {
             if (!mc_derived_777_component_item_firework_explosion(reader, depth + 1U)) return false;
         }
     }
@@ -20764,18 +22763,18 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
         if (!mc_derived_777_component_resolvable_profile(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 73) {
-        McBytes mc_data_branch_73_220;
-        if (!mc_reader_string(reader, &mc_data_branch_73_220)) return false;
+        McBytes mc_data_branch_73_238;
+        if (!mc_reader_string(reader, &mc_data_branch_73_238)) return false;
     }
     else if (mc_type_1 == 74) {
-        int32_t mc_layers_count_221 = 0;
-        if (!mc_reader_varint(reader, &mc_layers_count_221)) return false;
-        if (mc_layers_count_221 < 0
-            || (uint64_t)mc_layers_count_221 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_layers_count_239 = 0;
+        if (!mc_reader_varint(reader, &mc_layers_count_239)) return false;
+        if (mc_layers_count_239 < 0
+            || (uint64_t)mc_layers_count_239 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_layers_bounded_count_222 = (uint32_t)mc_layers_count_221;
-        for (uint32_t mc_layers_index_223 = 0U; mc_layers_index_223 < mc_layers_bounded_count_222; ++mc_layers_index_223) {
+        const uint32_t mc_layers_bounded_count_240 = (uint32_t)mc_layers_count_239;
+        for (uint32_t mc_layers_index_241 = 0U; mc_layers_index_241 < mc_layers_bounded_count_240; ++mc_layers_index_241) {
             if (!mc_derived_777_component_banner_pattern_layer(reader, depth + 1U)) return false;
         }
     }
@@ -20783,76 +22782,122 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 76) {
-        bool mc_back_present_224 = false;
-        if (!mc_reader_bool(reader, &mc_back_present_224)) return false;
-        if (mc_back_present_224) {
+        bool mc_back_present_242 = false;
+        if (!mc_reader_bool(reader, &mc_back_present_242)) return false;
+        if (mc_back_present_242) {
             if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
         }
-        bool mc_left_present_225 = false;
-        if (!mc_reader_bool(reader, &mc_left_present_225)) return false;
-        if (mc_left_present_225) {
+        bool mc_left_present_243 = false;
+        if (!mc_reader_bool(reader, &mc_left_present_243)) return false;
+        if (mc_left_present_243) {
             if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
         }
-        bool mc_right_present_226 = false;
-        if (!mc_reader_bool(reader, &mc_right_present_226)) return false;
-        if (mc_right_present_226) {
+        bool mc_right_present_244 = false;
+        if (!mc_reader_bool(reader, &mc_right_present_244)) return false;
+        if (mc_right_present_244) {
             if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
         }
-        bool mc_front_present_227 = false;
-        if (!mc_reader_bool(reader, &mc_front_present_227)) return false;
-        if (mc_front_present_227) {
+        bool mc_front_present_245 = false;
+        if (!mc_reader_bool(reader, &mc_front_present_245)) return false;
+        if (mc_front_present_245) {
             if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 77) {
-        int32_t mc_contents_count_228 = 0;
-        if (!mc_reader_varint(reader, &mc_contents_count_228)) return false;
-        if (mc_contents_count_228 < 0
-            || (uint64_t)mc_contents_count_228 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_data_branch_77_count_246 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_77_count_246)) return false;
+        if (mc_data_branch_77_count_246 < 0
+            || (uint64_t)mc_data_branch_77_count_246 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_contents_bounded_count_229 = (uint32_t)mc_contents_count_228;
-        for (uint32_t mc_contents_index_230 = 0U; mc_contents_index_230 < mc_contents_bounded_count_229; ++mc_contents_index_230) {
-            bool mc_contents_element_present_231 = false;
-            if (!mc_reader_bool(reader, &mc_contents_element_present_231)) return false;
-            if (mc_contents_element_present_231) {
-                if (!mc_derived_777_component_item_stack_template(reader, depth + 1U)) return false;
+        const uint32_t mc_data_branch_77_bounded_count_247 = (uint32_t)mc_data_branch_77_count_246;
+        for (uint32_t mc_data_branch_77_index_248 = 0U; mc_data_branch_77_index_248 < mc_data_branch_77_bounded_count_247; ++mc_data_branch_77_index_248) {
+            bool mc_data_branch_77_element_present_249 = false;
+            if (!mc_reader_bool(reader, &mc_data_branch_77_element_present_249)) return false;
+            if (mc_data_branch_77_element_present_249) {
+                int32_t mc_item_id_250 = 0;
+                if (!mc_reader_varint(reader, &mc_item_id_250)) return false;
+                int32_t mc_item_count_251 = 0;
+                if (!mc_reader_varint(reader, &mc_item_count_251)) return false;
+                int32_t mc_added_component_count_252 = 0;
+                if (!mc_reader_varint(reader, &mc_added_component_count_252)) return false;
+                int32_t mc_removed_component_count_253 = 0;
+                if (!mc_reader_varint(reader, &mc_removed_component_count_253)) return false;
+                if (mc_added_component_count_252 < 0
+                    || (uint64_t)mc_added_component_count_252 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                    return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+                }
+                const uint32_t mc_components_bounded_count_254 = (uint32_t)mc_added_component_count_252;
+                for (uint32_t mc_components_index_255 = 0U; mc_components_index_255 < mc_components_bounded_count_254; ++mc_components_index_255) {
+                    if (!mc_derived_777_component_slot_component(reader, depth + 1U)) return false;
+                }
+                if (mc_removed_component_count_253 < 0
+                    || (uint64_t)mc_removed_component_count_253 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+                    return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+                }
+                const uint32_t mc_remove_components_bounded_count_256 = (uint32_t)mc_removed_component_count_253;
+                for (uint32_t mc_remove_components_index_257 = 0U; mc_remove_components_index_257 < mc_remove_components_bounded_count_256; ++mc_remove_components_index_257) {
+                    if (!mc_derived_777_component_slot_component_type(reader, depth + 1U)) return false;
+                }
             }
         }
     }
     else if (mc_type_1 == 78) {
-        int32_t mc_properties_count_232 = 0;
-        if (!mc_reader_varint(reader, &mc_properties_count_232)) return false;
-        if (mc_properties_count_232 < 0
-            || (uint64_t)mc_properties_count_232 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_properties_count_258 = 0;
+        if (!mc_reader_varint(reader, &mc_properties_count_258)) return false;
+        if (mc_properties_count_258 < 0
+            || (uint64_t)mc_properties_count_258 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_properties_bounded_count_233 = (uint32_t)mc_properties_count_232;
-        for (uint32_t mc_properties_index_234 = 0U; mc_properties_index_234 < mc_properties_bounded_count_233; ++mc_properties_index_234) {
-            McBytes mc_name_235;
-            if (!mc_reader_string(reader, &mc_name_235)) return false;
-            McBytes mc_value_236;
-            if (!mc_reader_string(reader, &mc_value_236)) return false;
+        const uint32_t mc_properties_bounded_count_259 = (uint32_t)mc_properties_count_258;
+        for (uint32_t mc_properties_index_260 = 0U; mc_properties_index_260 < mc_properties_bounded_count_259; ++mc_properties_index_260) {
+            McBytes mc_name_261;
+            if (!mc_reader_string(reader, &mc_name_261)) return false;
+            McBytes mc_value_262;
+            if (!mc_reader_string(reader, &mc_value_262)) return false;
         }
     }
     else if (mc_type_1 == 79) {
-        int32_t mc_bees_count_237 = 0;
-        if (!mc_reader_varint(reader, &mc_bees_count_237)) return false;
-        if (mc_bees_count_237 < 0
-            || (uint64_t)mc_bees_count_237 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+        int32_t mc_bees_count_263 = 0;
+        if (!mc_reader_varint(reader, &mc_bees_count_263)) return false;
+        if (mc_bees_count_263 < 0
+            || (uint64_t)mc_bees_count_263 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
             return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        const uint32_t mc_bees_bounded_count_238 = (uint32_t)mc_bees_count_237;
-        for (uint32_t mc_bees_index_239 = 0U; mc_bees_index_239 < mc_bees_bounded_count_238; ++mc_bees_index_239) {
+        const uint32_t mc_bees_bounded_count_264 = (uint32_t)mc_bees_count_263;
+        for (uint32_t mc_bees_index_265 = 0U; mc_bees_index_265 < mc_bees_bounded_count_264; ++mc_bees_index_265) {
             if (!mc_reader_nbt(reader, false, NULL)) return false;
-            int32_t mc_ticks_in_hive_241 = 0;
-            if (!mc_reader_varint(reader, &mc_ticks_in_hive_241)) return false;
-            int32_t mc_min_ticks_in_hive_242 = 0;
-            if (!mc_reader_varint(reader, &mc_min_ticks_in_hive_242)) return false;
+            int32_t mc_ticks_in_hive_267 = 0;
+            if (!mc_reader_varint(reader, &mc_ticks_in_hive_267)) return false;
+            int32_t mc_min_ticks_in_hive_268 = 0;
+            if (!mc_reader_varint(reader, &mc_min_ticks_in_hive_268)) return false;
         }
     }
     else if (mc_type_1 == 80) {
-        if (!typed_skip_nested_item_stack(reader, 777, depth + 1U)) return false;
+        int32_t mc_item_id_269 = 0;
+        if (!mc_reader_varint(reader, &mc_item_id_269)) return false;
+        int32_t mc_item_count_270 = 0;
+        if (!mc_reader_varint(reader, &mc_item_count_270)) return false;
+        int32_t mc_added_component_count_271 = 0;
+        if (!mc_reader_varint(reader, &mc_added_component_count_271)) return false;
+        int32_t mc_removed_component_count_272 = 0;
+        if (!mc_reader_varint(reader, &mc_removed_component_count_272)) return false;
+        if (mc_added_component_count_271 < 0
+            || (uint64_t)mc_added_component_count_271 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_components_bounded_count_273 = (uint32_t)mc_added_component_count_271;
+        for (uint32_t mc_components_index_274 = 0U; mc_components_index_274 < mc_components_bounded_count_273; ++mc_components_index_274) {
+            if (!mc_derived_777_component_slot_component(reader, depth + 1U)) return false;
+        }
+        if (mc_removed_component_count_272 < 0
+            || (uint64_t)mc_removed_component_count_272 > (uint64_t)MC_MAX_PACKET_ARRAY_COUNT) {
+            return reader_fail(reader, MC_ERROR_INVALID_LENGTH, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
+        }
+        const uint32_t mc_remove_components_bounded_count_275 = (uint32_t)mc_removed_component_count_272;
+        for (uint32_t mc_remove_components_index_276 = 0U; mc_remove_components_index_276 < mc_remove_components_bounded_count_275; ++mc_remove_components_index_276) {
+            if (!mc_derived_777_component_slot_component_type(reader, depth + 1U)) return false;
+        }
     }
     else if (mc_type_1 == 81) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
@@ -20876,42 +22921,42 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
     }
     else if (mc_type_1 == 87) {
         if (!mc_derived_777_component_idset(reader, depth + 1U)) return false;
-        float mc_visibility_245 = 0;
-        if (!mc_reader_float(reader, &mc_visibility_245)) return false;
-        if (!isfinite(mc_visibility_245)) {
+        float mc_visibility_279 = 0;
+        if (!mc_reader_float(reader, &mc_visibility_279)) return false;
+        if (!isfinite(mc_visibility_279)) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
     }
     else if (mc_type_1 == 88) {
-        int32_t mc_data_branch_88_246 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_88_246)) return false;
+        int32_t mc_data_branch_88_280 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_88_280)) return false;
     }
     else if (mc_type_1 == 89) {
-        int32_t mc_data_branch_89_247 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_89_247)) return false;
+        int32_t mc_data_branch_89_281 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_89_281)) return false;
     }
     else if (mc_type_1 == 90) {
-        int32_t mc_data_branch_90_248 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_90_248)) return false;
+        int32_t mc_data_branch_90_282 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_90_282)) return false;
     }
     else if (mc_type_1 == 91) {
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 92) {
-        int32_t mc_data_branch_92_249 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_92_249)) return false;
+        int32_t mc_data_branch_92_283 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_92_283)) return false;
     }
     else if (mc_type_1 == 93) {
-        int32_t mc_data_branch_93_250 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_93_250)) return false;
+        int32_t mc_data_branch_93_284 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_93_284)) return false;
     }
     else if (mc_type_1 == 94) {
-        int32_t mc_data_branch_94_251 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_94_251)) return false;
+        int32_t mc_data_branch_94_285 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_94_285)) return false;
     }
     else if (mc_type_1 == 95) {
-        int32_t mc_data_branch_95_252 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_95_252)) return false;
+        int32_t mc_data_branch_95_286 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_95_286)) return false;
     }
     else if (mc_type_1 == 96) {
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
@@ -20920,91 +22965,91 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 98) {
-        int32_t mc_data_branch_98_253 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_98_253)) return false;
+        int32_t mc_data_branch_98_287 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_98_287)) return false;
     }
     else if (mc_type_1 == 99) {
-        int32_t mc_data_branch_99_254 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_99_254)) return false;
+        int32_t mc_data_branch_99_288 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_99_288)) return false;
     }
     else if (mc_type_1 == 100) {
-        int32_t mc_data_branch_100_255 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_100_255)) return false;
+        int32_t mc_data_branch_100_289 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_100_289)) return false;
     }
     else if (mc_type_1 == 101) {
-        int32_t mc_data_branch_101_256 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_101_256)) return false;
+        int32_t mc_data_branch_101_290 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_101_290)) return false;
     }
     else if (mc_type_1 == 102) {
-        int32_t mc_data_branch_102_257 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_102_257)) return false;
+        int32_t mc_data_branch_102_291 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_102_291)) return false;
     }
     else if (mc_type_1 == 103) {
-        int32_t mc_data_branch_103_258 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_103_258)) return false;
+        int32_t mc_data_branch_103_292 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_103_292)) return false;
     }
     else if (mc_type_1 == 104) {
-        int32_t mc_data_branch_104_holder_259 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_104_holder_259) || mc_data_branch_104_holder_259 < 0) {
+        int32_t mc_data_branch_104_holder_293 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_104_holder_293) || mc_data_branch_104_holder_293 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_104_holder_259 == 0) {
-            McBytes mc_data_branch_104_inline_260;
-            if (!mc_reader_string(reader, &mc_data_branch_104_inline_260)) return false;
+        if (mc_data_branch_104_holder_293 == 0) {
+            McBytes mc_data_branch_104_inline_294;
+            if (!mc_reader_string(reader, &mc_data_branch_104_inline_294)) return false;
         }
     }
     else if (mc_type_1 == 105) {
-        int32_t mc_data_branch_105_holder_261 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_105_holder_261) || mc_data_branch_105_holder_261 < 0) {
+        int32_t mc_data_branch_105_holder_295 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_105_holder_295) || mc_data_branch_105_holder_295 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_105_holder_261 == 0) {
-            McBytes mc_data_branch_105_inline_262;
-            if (!mc_reader_string(reader, &mc_data_branch_105_inline_262)) return false;
+        if (mc_data_branch_105_holder_295 == 0) {
+            McBytes mc_data_branch_105_inline_296;
+            if (!mc_reader_string(reader, &mc_data_branch_105_inline_296)) return false;
         }
     }
     else if (mc_type_1 == 106) {
-        int32_t mc_data_branch_106_holder_263 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_106_holder_263) || mc_data_branch_106_holder_263 < 0) {
+        int32_t mc_data_branch_106_holder_297 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_106_holder_297) || mc_data_branch_106_holder_297 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_106_holder_263 == 0) {
-            McBytes mc_data_branch_106_inline_264;
-            if (!mc_reader_string(reader, &mc_data_branch_106_inline_264)) return false;
+        if (mc_data_branch_106_holder_297 == 0) {
+            McBytes mc_data_branch_106_inline_298;
+            if (!mc_reader_string(reader, &mc_data_branch_106_inline_298)) return false;
         }
     }
     else if (mc_type_1 == 107) {
-        int32_t mc_data_branch_107_265 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_107_265)) return false;
+        int32_t mc_data_branch_107_299 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_107_299)) return false;
     }
     else if (mc_type_1 == 108) {
-        int32_t mc_data_branch_108_266 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_108_266)) return false;
+        int32_t mc_data_branch_108_300 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_108_300)) return false;
     }
     else if (mc_type_1 == 109) {
-        int32_t mc_data_branch_109_holder_267 = -1;
-        if (!mc_reader_varint(reader, &mc_data_branch_109_holder_267) || mc_data_branch_109_holder_267 < 0) {
+        int32_t mc_data_branch_109_holder_301 = -1;
+        if (!mc_reader_varint(reader, &mc_data_branch_109_holder_301) || mc_data_branch_109_holder_301 < 0) {
             return reader_fail(reader, MC_ERROR_INVALID_PACKET_BODY, reader != NULL ? reader->offset : MC_ERROR_OFFSET_UNKNOWN);
         }
-        if (mc_data_branch_109_holder_267 == 0) {
+        if (mc_data_branch_109_holder_301 == 0) {
             if (!mc_derived_777_component_entity_metadata_painting_variant(reader, depth + 1U)) return false;
         }
     }
     else if (mc_type_1 == 110) {
-        int32_t mc_data_branch_110_268 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_110_268)) return false;
+        int32_t mc_data_branch_110_302 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_110_302)) return false;
     }
     else if (mc_type_1 == 111) {
-        int32_t mc_data_branch_111_269 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_111_269)) return false;
+        int32_t mc_data_branch_111_303 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_111_303)) return false;
     }
     else if (mc_type_1 == 112) {
-        int32_t mc_data_branch_112_270 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_112_270)) return false;
+        int32_t mc_data_branch_112_304 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_112_304)) return false;
     }
     else if (mc_type_1 == 113) {
-        int32_t mc_data_branch_113_271 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_113_271)) return false;
+        int32_t mc_data_branch_113_305 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_113_305)) return false;
     }
     else if (mc_type_1 == 114) {
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
@@ -21016,42 +23061,42 @@ static bool mc_derived_777_component_slot_component(McReader *reader, unsigned i
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
     }
     else if (mc_type_1 == 117) {
-        int32_t mc_data_branch_117_272 = 0;
-        if (!mc_reader_varint(reader, &mc_data_branch_117_272)) return false;
+        int32_t mc_data_branch_117_306 = 0;
+        if (!mc_reader_varint(reader, &mc_data_branch_117_306)) return false;
     }
     else if (mc_type_1 == 118) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
-        bool mc_filtered_present_277 = false;
-        if (!mc_reader_bool(reader, &mc_filtered_present_277)) return false;
-        if (mc_filtered_present_277) {
+        bool mc_filtered_present_311 = false;
+        if (!mc_reader_bool(reader, &mc_filtered_present_311)) return false;
+        if (mc_filtered_present_311) {
             if (!mc_reader_nbt(reader, false, NULL)) return false;
             if (!mc_reader_nbt(reader, false, NULL)) return false;
             if (!mc_reader_nbt(reader, false, NULL)) return false;
             if (!mc_reader_nbt(reader, false, NULL)) return false;
         }
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
-        bool mc_glowing_282 = false;
-        if (!mc_reader_bool(reader, &mc_glowing_282)) return false;
+        bool mc_glowing_316 = false;
+        if (!mc_reader_bool(reader, &mc_glowing_316)) return false;
     }
     else if (mc_type_1 == 119) {
         if (!mc_reader_nbt(reader, false, NULL)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
         if (!mc_reader_nbt(reader, false, NULL)) return false;
-        bool mc_filtered_present_287 = false;
-        if (!mc_reader_bool(reader, &mc_filtered_present_287)) return false;
-        if (mc_filtered_present_287) {
+        bool mc_filtered_present_321 = false;
+        if (!mc_reader_bool(reader, &mc_filtered_present_321)) return false;
+        if (mc_filtered_present_321) {
             if (!mc_reader_nbt(reader, false, NULL)) return false;
             if (!mc_reader_nbt(reader, false, NULL)) return false;
             if (!mc_reader_nbt(reader, false, NULL)) return false;
             if (!mc_reader_nbt(reader, false, NULL)) return false;
         }
         if (!mc_derived_777_component_dye_color(reader, depth + 1U)) return false;
-        bool mc_glowing_292 = false;
-        if (!mc_reader_bool(reader, &mc_glowing_292)) return false;
+        bool mc_glowing_326 = false;
+        if (!mc_reader_bool(reader, &mc_glowing_326)) return false;
     }
     else if (mc_type_1 == 120) {
     }

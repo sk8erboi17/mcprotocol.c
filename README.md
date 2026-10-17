@@ -230,7 +230,12 @@ The same overlay carries `component_schema_corrections`: a component schema
 that minecraft-data gets wrong for a release (1.21.11 `attribute_modifiers`,
 whose display belongs to every entry) is replaced by the vanilla codec only
 while the shipped schema still matches the recorded one exactly, and the
-report names each corrected component. A ProtoDef `switch` without a
+report names each corrected component. The reviewed 26.1/26.2 corrections
+also use direct instrument/material/song holders and ItemStackTemplate's
+item-ID/count/patch ordering. `component_registry_insertions` gives 776 its
+own sulfur-cube entry at 78 and shifts the remaining IDs; it refuses an
+upstream registry that no longer matches the recorded insertion point.
+A ProtoDef `switch` without a
 `default` reads nothing for the values it does not list.
 The embedded catalog covers protocol 776, the source-compiled Slot validators
 cover every component wire profile from protocol 766 through 776, and the
@@ -244,8 +249,9 @@ hand-written codec branches follow the cited ViaVersion 5.12.0/PacketEvents
 compiled by the same `ComponentValidatorCompiler` from
 `schema/derived/777-protocol.json` and lives just after the generated region,
 so the 776 manifest hashes stay meaningful. The same evidence corrected the
-776 particle IDs (26.2 inserted seven particles); the 776 Slot validator
-still reuses the 26.1 component list and misses 26.2's `sulfur_cube_content`.
+776 particle IDs (26.2 inserted seven particles). Both 776 and 777 fully
+validate `sulfur_cube_content`, including its nested ItemStackTemplate patch;
+there is no opaque item-component tail.
 
 With `minecraft-data` checked out next to this repository:
 

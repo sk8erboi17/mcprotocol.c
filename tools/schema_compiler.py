@@ -607,6 +607,40 @@ def component_schema_corrections(overlay: dict[str, Any] | None) -> list[Any]:
     return corrections
 
 
+def apply_component_registry_insertions(
+    document: dict[str, Any], protocol: int, insertions: list[Any],
+) -> list[str]:
+    """Apply a reviewed release insertion before compiling Slot validators.
+
+    The named entry at the insertion point must still match the pinned base
+    registry. An upstream update therefore fails generation rather than
+    shifting an already corrected registry a second time.
+    """
+    applied: list[str] = []
+    for insertion in insertions:
+        if protocol != insertion["protocol"]:
+            continue
+        mapping = document["types"]["SlotComponentType"][1]["mappings"]
+        index = insertion["id"]
+        name = insertion["name"]
+        branches = slot_component_branches(document, protocol)
+        if mapping.get(str(index)) != insertion["before"] \
+                or name in mapping.values() or name in branches:
+            raise ValueError(
+                f"protocol {protocol}: component registry insertion {name} "
+                "no longer matches its pinned base; re-check the vanilla registry"
+            )
+        shifted = {
+            str(int(key) + (int(key) >= index)): value
+            for key, value in mapping.items()
+        }
+        shifted[str(index)] = name
+        document["types"]["SlotComponentType"][1]["mappings"] = shifted
+        branches[name] = copy.deepcopy(insertion["schema"])
+        applied.append(name)
+    return applied
+
+
 def generated_component_validators(
     specifications: list[tuple[int, bytes]],
     overlay: dict[str, Any] | None = None,
@@ -621,8 +655,20 @@ def generated_component_validators(
     if not isinstance(renames, dict):
         raise ValueError("component_type_renames must be an object")
     corrections = component_schema_corrections(overlay)
+    insertions = (overlay or {}).get("component_registry_insertions", [])
+    if not isinstance(insertions, list) or any(
+        not isinstance(entry, dict)
+        or set(entry) != {"protocol", "id", "name", "before", "schema"}
+        or not isinstance(entry["protocol"], int)
+        or not isinstance(entry["id"], int) or entry["id"] < 0
+        or not isinstance(entry["name"], str) or not entry["name"]
+        or not isinstance(entry["before"], str) or not entry["before"]
+        for entry in insertions
+    ):
+        raise ValueError("invalid component registry insertions")
     applied_renames: set[str] = set()
     corrected_protocols: set[int] = set()
+    inserted_protocols: set[int] = set()
     for protocol, raw in sorted(specifications):
         digest = hashlib.sha256(raw).hexdigest()
         document = json.loads(raw)
@@ -634,13 +680,17 @@ def generated_component_validators(
                 if name in renames:
                     mappings[1]["mappings"][raw_id] = renames[name]
                     applied_renames.add(name)
+        inserted = apply_component_registry_insertions(document, protocol, insertions)
+        if inserted:
+            inserted_protocols.add(protocol)
         corrected = apply_component_schema_corrections(
             document, protocol, corrections)
         if corrected:
             corrected_protocols.add(protocol)
         # Two protocols share one validator only when both the source bytes
         # and the corrections applied to them are the same.
-        key = digest + "".join(f"+{name}" for name in corrected)
+        key = digest + "".join(f"+{name}" for name in corrected) \
+            + "".join(f"+insert:{name}" for name in inserted)
         if key not in by_hash:
             by_hash[key] = (protocol, document)
         representative = by_hash[key][0]
@@ -648,6 +698,8 @@ def generated_component_validators(
         entry: dict[str, Any] = {"protocol": protocol, "source_sha256": digest}
         if corrected:
             entry["schema_corrections"] = corrected
+        if inserted:
+            entry["registry_insertions"] = inserted
         report.append(entry)
     missing_renames = set(renames) - applied_renames
     if missing_renames:
@@ -663,6 +715,12 @@ def generated_component_validators(
         raise ValueError(
             "component schema correction names protocols without a profile: "
             + ", ".join(str(protocol) for protocol in unused)
+        )
+    unused_insertions = sorted({entry["protocol"] for entry in insertions} - inserted_protocols)
+    if unused_insertions:
+        raise ValueError(
+            "component registry insertion names protocols without a profile: "
+            + ", ".join(str(protocol) for protocol in unused_insertions)
         )
 
     sections = [

@@ -42,15 +42,36 @@
     },
     {
       "protocol": 775,
+      "schema_corrections": [
+        "instrument",
+        "provides_trim_material",
+        "jukebox_playable",
+        "use_remainder",
+        "charged_projectiles",
+        "bundle_contents",
+        "container"
+      ],
       "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"
     },
     {
       "protocol": 776,
+      "registry_insertions": [
+        "sulfur_cube_content"
+      ],
+      "schema_corrections": [
+        "instrument",
+        "provides_trim_material",
+        "jukebox_playable",
+        "use_remainder",
+        "charged_projectiles",
+        "bundle_contents",
+        "container"
+      ],
       "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"
     }
   ],
   "embedded_outputs": {
-    "api.c": "1be7d81e7d46baff4b44df3baa5944149285bea6fcb254c9ea0eebf1ebf6acb2",
+    "api.c": "9cd3b665c0c9b89d9335304e6834c324be6a1ba21d936b9564ffa69febf7024d",
     "api.h": "e0f03c3acdd1dcf164ca77a84b736d2ea602739104c03455f09d5f0f1be94aa4"
   },
   "generated_packets": [
@@ -66,7 +87,7 @@
     }
   ],
   "generator_version": 2,
-  "overlay_sha256": "dc439940a5363ef0442db7d9869e7886c05977a13d2094d7e97bcc06078ede07",
+  "overlay_sha256": "636a2c43e18ecd057ac51b98e8348713d4370b989ccba1fdc4ac42d82fe5a437",
   "packet_id_count": 257,
   "protocol": 776,
   "source_sha256": "c9daf09fbedf465516b4c08c70d374a13ec1c369df70bf945b1817bb181b68fc"

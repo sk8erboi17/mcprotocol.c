@@ -156,19 +156,33 @@ static void encode_component_item_count(McPacket *packet, int protocol,
 }
 
 static void encode_nested_component_item(McPacket *packet, int protocol,
-    unsigned int nesting)
+    unsigned int nesting, bool item_template)
 {
     if (nesting == 0U) {
         encode_component_item_count(packet, protocol, 0);
         return;
     }
-    encode_component_item_count(packet, protocol, 1);
-    assert(mc_packet_varint(packet, 5));
+    if (item_template) {
+        /* 26.1+ container entries are optional ItemStackTemplates: their
+         * item ID precedes the count; only the enclosing Slot is count-first. */
+        assert(mc_packet_varint(packet, 5));
+        assert(mc_packet_varint(packet, 1));
+    } else {
+        encode_component_item_count(packet, protocol, 1);
+        assert(mc_packet_varint(packet, 5));
+    }
     assert(mc_packet_varint(packet, 1));
     assert(mc_packet_varint(packet, 0));
     assert(mc_packet_varint(packet, container_component_id(protocol)));
     assert(mc_packet_varint(packet, 1));
-    encode_nested_component_item(packet, protocol, nesting - 1U);
+    if (protocol >= 775) {
+        assert(mc_packet_bool(packet, nesting > 1U));
+        if (nesting > 1U) {
+            encode_nested_component_item(packet, protocol, nesting - 1U, true);
+        }
+    } else {
+        encode_nested_component_item(packet, protocol, nesting - 1U, false);
+    }
 }
 
 static void test_component_items(void)
@@ -229,7 +243,7 @@ static void test_component_items(void)
         assert(error.code == MC_ERROR_INVALID_PACKET_BODY);
 
         mc_packet_init(&packet, bytes, sizeof(bytes));
-        encode_nested_component_item(&packet, protocol, 8U);
+        encode_nested_component_item(&packet, protocol, 8U, false);
         mc_reader_init_mode(&reader, packet.data, packet.length,
             MC_DECODE_STRICT, &error);
         assert(mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_FULL,
@@ -237,7 +251,7 @@ static void test_component_items(void)
         assert(mc_reader_finish(&reader));
 
         mc_packet_init(&packet, bytes, sizeof(bytes));
-        encode_nested_component_item(&packet, protocol, 70U);
+        encode_nested_component_item(&packet, protocol, 70U, false);
         mc_reader_init_mode(&reader, packet.data, packet.length,
             MC_DECODE_STRICT, &error);
         assert(!mc_reader_item_stack(&reader, protocol, MC_ITEM_WIRE_FULL,
