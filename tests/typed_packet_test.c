@@ -1001,6 +1001,41 @@ static void test_signed_entity_spawn(void)
     }
 }
 
+static void test_signed_entity_metadata(void)
+{
+    /* Virtual display entities use the same signed int id in AddEntity,
+     * metadata and removal. A valid negative id must not be reclassified as
+     * a malformed metadata body; its entries still require exact decoding. */
+    static const int protocols[] = {774, 775, 776, 777};
+    static const int32_t ids[] = {-1, -1400000000, INT32_MIN};
+    for (size_t p = 0U; p < sizeof(protocols) / sizeof(protocols[0]); ++p) {
+        for (size_t i = 0U; i < sizeof(ids) / sizeof(ids[0]); ++i) {
+            unsigned char storage[32];
+            McPacket body;
+            mc_packet_init(&body, storage, sizeof(storage));
+            assert(mc_packet_varint(&body, ids[i]));
+            assert(mc_packet_u8(&body, 0U));
+            assert(mc_packet_varint(&body, 0));
+            assert(mc_packet_u8(&body, 0x20U));
+            assert(mc_packet_u8(&body, UINT8_MAX));
+            TestDecoded decoded;
+            assert(decode(protocols[p], MC_PACKET_CLIENTBOUND, "entity_metadata",
+                body.data, body.length, &decoded) == MC_FAMILY_ENTITY_METADATA);
+            assert(decoded.metadata.entity_id == ids[i]);
+            assert(decoded.metadata.entry_count == 1U);
+            McEntityMetadataIterator iterator;
+            McEntityMetadataEntry entry;
+            assert(mc_entity_metadata_iterator(&decoded.metadata, protocols[p], &iterator));
+            assert(mc_entity_metadata_iterator_next(&iterator, &entry));
+            assert(entry.index == 0U && entry.serializer == 0);
+            assert(entry.value.size == 1U && entry.value.data[0] == 0x20U);
+            assert(!mc_entity_metadata_iterator_next(&iterator, &entry));
+            assert_exact_rejections(protocols[p], MC_PACKET_CLIENTBOUND,
+                "entity_metadata", body.data, body.length);
+        }
+    }
+}
+
 static void test_dispatch_errors(void)
 {
     TestDecoded decoded;
@@ -1025,6 +1060,7 @@ int main(void)
     test_inventory_and_multi_block();
     test_metadata_serializer_removal();
     test_signed_entity_spawn();
+    test_signed_entity_metadata();
     test_dispatch_errors();
     puts("PASS typed packet families, exact decoding and cross-version Tier A core");
     return 0;

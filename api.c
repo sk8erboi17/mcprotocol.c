@@ -25873,8 +25873,9 @@ static bool typed_decode_metadata(McReader *reader, int protocol,
     } else if (!mc_reader_varint(reader, &decoded.entity_id)) {
         return false;
     }
-    if (decoded.entity_id < 0
-        || !typed_decode_metadata_entries(reader, protocol,
+    /* Entity ids are signed ints on the wire. Virtual entities may use the
+     * negative range just as AddEntity, passengers and removals do. */
+    if (!typed_decode_metadata_entries(reader, protocol,
             &decoded.entries, &decoded.entry_count)) {
         return typed_invalid(reader);
     }
