@@ -1370,8 +1370,17 @@ static void clientbound_entity_lifecycle_is_versioned(void)
     unsigned char negative_remove[] = {1U, 0xffU, 0xffU, 0xffU, 0xffU, 0x0fU};
     McClientboundRemoveEntities decoded_remove = {0};
     mc_reader_init(&reader, negative_remove, sizeof(negative_remove));
-    assert(!mc_reader_clientbound_remove_entities(&reader, 47,
+    assert(mc_reader_clientbound_remove_entities(&reader, 47,
         &decoded_remove));
+    assert(mc_reader_finish(&reader));
+    McEntityIdIterator virtual_ids;
+    int32_t virtual_id = 0;
+    assert(mc_remove_entities_iterator(&decoded_remove, &virtual_ids));
+    assert(mc_entity_id_iterator_next(&virtual_ids, &virtual_id));
+    assert(virtual_id == -1);
+    assert(!mc_entity_id_iterator_next(&virtual_ids, &virtual_id));
+    mc_reader_init(&reader, negative_remove + 1U, sizeof(negative_remove) - 1U);
+    assert(!mc_reader_clientbound_remove_entities(&reader, 47, &decoded_remove));
     assert(reader.failed);
     assert(!mc_reader_clientbound_entity_spawn(NULL, 47, &decoded_spawn));
     McClientboundObjectSpawn decoded_object = {0};

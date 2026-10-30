@@ -26493,7 +26493,7 @@ bool mc_reader_clientbound_remove_entities(McReader *reader, int protocol,
         const bool valid = decoded.fixed_i32_ids
             ? mc_reader_i32(reader, &entity_id)
             : mc_reader_varint(reader, &entity_id);
-        if (!valid || entity_id < 0) return typed_invalid(reader);
+        if (!valid) return typed_invalid(reader);
     }
     decoded.entity_count = (uint32_t)count;
     decoded.entity_ids = (McBytes){reader->data + start,
@@ -26530,7 +26530,7 @@ bool mc_entity_id_iterator_next(McEntityIdIterator *iterator,
     const bool valid = iterator->fixed_i32_ids
         ? mc_reader_i32(&iterator->reader, &decoded)
         : mc_reader_varint(&iterator->reader, &decoded);
-    if (!valid || decoded < 0) return typed_invalid(&iterator->reader);
+    if (!valid) return typed_invalid(&iterator->reader);
     --iterator->remaining;
     if (iterator->remaining == 0U
         && mc_reader_remaining(&iterator->reader) != 0U) {
@@ -27213,14 +27213,13 @@ static bool typed_decode_passengers(McReader *reader,
     const size_t start = reader->offset;
     for (int32_t index = 0; index < count; ++index) {
         int32_t passenger = -1;
-        if (!mc_reader_varint(reader, &passenger) || passenger < 0) {
+        if (!mc_reader_varint(reader, &passenger)) {
             return typed_invalid(reader);
         }
     }
     decoded.passenger_count = (uint32_t)count;
     decoded.passengers = (McBytes){reader->data + start,
         reader->offset - start};
-    if (decoded.entity_id < 0) return typed_invalid(reader);
     *value = decoded;
     return true;
 }

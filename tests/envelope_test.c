@@ -192,6 +192,26 @@ static void test_simple_tier_b_envelopes(void)
             assert(decoded.passengers.passenger_count == 0U);
             assert_exact(protocol, "set_passengers", packet.data,
                 packet.length);
+
+            /* Virtual display ids are signed VarInts, including their riders. */
+            mc_packet_init(&packet, bytes, sizeof(bytes));
+            assert(mc_packet_varint(&packet, INT32_MIN));
+            assert(mc_packet_varint(&packet, 2));
+            assert(mc_packet_varint(&packet, -1));
+            assert(mc_packet_varint(&packet, INT32_MAX));
+            assert(decode(protocol, "set_passengers", packet.data,
+                packet.length, &decoded) == MC_FAMILY_SET_PASSENGERS);
+            assert(decoded.passengers.entity_id == INT32_MIN);
+            assert(decoded.passengers.passenger_count == 2U);
+            McReader ids;
+            mc_reader_init(&ids, decoded.passengers.passengers.data,
+                decoded.passengers.passengers.size);
+            int32_t id = 0;
+            assert(mc_reader_varint(&ids, &id) && id == -1);
+            assert(mc_reader_varint(&ids, &id) && id == INT32_MAX);
+            assert(mc_reader_finish(&ids));
+            assert_exact(protocol, "set_passengers", packet.data,
+                packet.length);
         }
 
         if (packet_id(protocol, "game_state_change") >= 0) {
